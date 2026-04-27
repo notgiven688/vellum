@@ -1,0 +1,84 @@
+name: Deploy Web Demo
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  CONFIGURATION: Release
+  WEB_PROJECT: other/Vellum.Web/Vellum.Web.csproj
+  WEB_OUTPUT: other/Vellum.Web/bin/Release/net10.0/browser-wasm/AppBundle
+  PAGES_OUTPUT: ${{ github.workspace }}/artifacts/pages
+
+jobs:
+  build:
+    name: Build web demo and docs
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Install WASM workload
+        run: dotnet workload install wasm-tools
+
+      - name: Publish web demo
+        run: dotnet publish ${{ env.WEB_PROJECT }} --configuration ${{ env.CONFIGURATION }}
+
+      - name: Install DocFX
+        run: dotnet tool install -g docfx
+
+      - name: Generate API metadata
+        run: docfx metadata docfx.json
+        working-directory: docs
+
+      - name: Build docs
+        run: docfx build docfx.json
+        working-directory: docs
+
+      - name: Assemble Pages site
+        run: |
+          mkdir -p "${{ env.PAGES_OUTPUT }}"
+          cp -R "${{ env.WEB_OUTPUT }}/." "${{ env.PAGES_OUTPUT }}/"
+          mkdir -p "${{ env.PAGES_OUTPUT }}/docs"
+          cp -R docs/_site/. "${{ env.PAGES_OUTPUT }}/docs/"
+
+      - name: Disable Jekyll
+        run: touch "${{ env.PAGES_OUTPUT }}/.nojekyll"
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ${{ env.PAGES_OUTPUT }}
+
+  deploy:
+    name: Deploy to GitHub Pages
+    runs-on: ubuntu-latest
+    needs: build
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

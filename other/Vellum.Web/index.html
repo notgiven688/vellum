@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Vellum Web Demo</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="modulepreload" href="./main.js">
+  <link rel="modulepreload" href="./_framework/dotnet.js">
+  <style>
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      background: #1f2329;
+      color: #d6dde6;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    #page {
+      max-width: 1040px;
+      margin: 0 auto;
+      padding: 24px 16px;
+    }
+
+    #canvas_wrapper {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 960 / 680;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: #11151a;
+    }
+
+    canvas.emscripten {
+      display: block;
+      width: 100%;
+      height: 100%;
+      outline: none;
+    }
+
+    #github-link {
+      position: fixed;
+      top: 12px;
+      right: 16px;
+      color: #fff;
+      background: #303741;
+      font-size: 14px;
+      font-weight: 600;
+      text-decoration: none;
+      padding: 8px 14px;
+      border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      z-index: 1000;
+    }
+
+    #spinner {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    #spinner_animation {
+      height: 48px;
+      width: 48px;
+      animation: rotation .6s infinite linear;
+      border-left: 5px solid rgba(91,168,245,.16);
+      border-right: 5px solid rgba(91,168,245,.16);
+      border-bottom: 5px solid rgba(91,168,245,.16);
+      border-top: 5px solid rgba(91,168,245,.85);
+      border-radius: 100%;
+    }
+
+    .hint {
+      color: #9eaab7;
+      font-size: 0.9em;
+      margin-top: 10px;
+    }
+
+    @keyframes rotation {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(359deg); }
+    }
+
+    @media (max-width: 700px) {
+      html, body {
+        height: 100%;
+        overflow: hidden;
+      }
+
+      #page {
+        box-sizing: border-box;
+        display: flex;
+        flex-direction: column;
+        height: 100svh;
+        max-width: none;
+        padding: 10px;
+      }
+
+      #canvas_wrapper {
+        flex: 1 1 auto;
+        min-height: 0;
+        aspect-ratio: auto;
+      }
+
+      #github-link {
+        display: none;
+      }
+
+      .hint {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <a id="github-link" href="https://github.com/notgiven688/vellum" target="_blank">View on GitHub</a>
+  <div id="page">
+    <div id="canvas_wrapper">
+      <canvas class="emscripten" id="canvas" oncontextmenu="event.preventDefault()" tabindex="-1"></canvas>
+      <div id="spinner"><div id="spinner_animation"></div></div>
+    </div>
+    <p class="hint">The browser demo uses the Raylib backend and the same Vellum widget scene as the desktop demos.</p>
+  </div>
+
+  <script type="module" src="./main.js"></script>
+</body>
+</html>

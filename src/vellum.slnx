@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="Vellum.Demo/Vellum.Demo.csproj" />
+  <Project Path="Vellum/Vellum.csproj" />
+  <Project Path="Vellum.Tests/Vellum.Tests.csproj" />
+</Solution>

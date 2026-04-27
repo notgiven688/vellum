@@ -1,0 +1,33 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Vellum.Tests" />
+    <EmbeddedResource Include="_package\Roboto-Regular.ttf"
+                      LogicalName="Vellum.Assets.Fonts.Roboto-Regular.ttf" />
+    <None Include="_package\THIRD-PARTY-NOTICES.txt"
+          Pack="true"
+          PackagePath="" />
+    <None Include="_package\README.md"
+          Pack="true"
+          PackagePath="" />
+    <None Include="_package\LICENSE"
+          Pack="true"
+          PackagePath="" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <PackageId>VellumUI</PackageId>
+    <Description>Immediate-mode GUI library for C# with a small renderer API and built-in text rendering.</Description>
+    <Authors>notgiven688</Authors>
+    <PackageTags>gui;immediate-mode;csharp;dotnet;ui</PackageTags>
+    <RepositoryUrl>https://github.com/notgiven688/vellum.git</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageLicenseFile>LICENSE</PackageLicenseFile>
+  </PropertyGroup>
+
+</Project>
