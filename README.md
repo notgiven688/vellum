@@ -104,11 +104,6 @@ Backends running on HiDPI displays should pass `RenderFrameInfo` with both logic
 
 The text stack is deliberately small: it supports basic TrueType glyph lookup, rasterization, wrapping, clipping, ellipsis, text fields, and text areas, but it is not a full shaping engine. See [Text and Fonts](docs/docs/guides/text-and-fonts.md) for the exact supported and unsupported cases.
 
-## Documentation
-
-- User-facing overview: this file
-- API docs configuration: [docs/docfx.json](docs/docfx.json)
-
 ## Build
 
 ```bash
