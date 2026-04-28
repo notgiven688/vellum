@@ -2113,6 +2113,71 @@ public sealed class VellumTests
         DragFrame(new Vector2(30, 30), false);
         Check("dragged scrollbar keeps content clipped and offset", !dragFirst.Hovered);
 
+        Response panArea = default, panFirst = default;
+
+        void PanFrame(Vector2 mouse, bool mouseDown)
+        {
+            ui.Frame(800, 600, mouse, mouseDown, frame =>
+            {
+                panArea = frame.ScrollArea("pan", 180, 90, frame =>
+                {
+                    panFirst = frame.Label("First");
+                    for (int i = 0; i < 16; i++)
+                        frame.Label($"Line {i}");
+                });
+            });
+        }
+
+        PanFrame(Vector2.Zero, false);
+        PanFrame(new Vector2(30, 70), true);
+        PanFrame(new Vector2(30, 20), true);
+        Check("dragging scroll area content reports a changed scroll area", panArea.Changed);
+
+        PanFrame(new Vector2(30, 20), false);
+        Check("dragged scroll area content keeps content clipped and offset", !panFirst.Hovered);
+
+        Response guardedArea = default, guardedButton = default;
+
+        void GuardedPanFrame(Vector2 mouse, bool mouseDown)
+        {
+            ui.Frame(800, 600, mouse, mouseDown, frame =>
+            {
+                guardedArea = frame.ScrollArea("guarded-pan", 180, 90, frame =>
+                {
+                    guardedButton = frame.Button("First");
+                    for (int i = 0; i < 10; i++)
+                        frame.Button($"Guarded {i}");
+                });
+            });
+        }
+
+        GuardedPanFrame(Vector2.Zero, false);
+        GuardedPanFrame(new Vector2(30, 20), true);
+        GuardedPanFrame(new Vector2(30, 1), true);
+        Check("drag starting on a child widget does not pan scroll area content", !guardedArea.Changed);
+        Check("drag starting on a child widget still lets the child press", guardedButton.Pressed);
+
+        Response panBothArea = default;
+
+        void PanBothFrame(Vector2 mouse, bool mouseDown)
+        {
+            ui.Frame(800, 600, mouse, mouseDown, frame =>
+            {
+                panBothArea = frame.ScrollAreaBoth("pan-both", 120, 80, frame =>
+                {
+                    frame.Canvas(260, 180, static canvas =>
+                    {
+                        canvas.DrawRect(0, 0, 260, 180, new Color(40, 40, 40));
+                    });
+                });
+            });
+        }
+
+        PanBothFrame(Vector2.Zero, false);
+        PanBothFrame(new Vector2(70, 60), true);
+        PanBothFrame(new Vector2(20, 20), true);
+        Check("dragging bidirectional scroll area content reports a changed scroll area", panBothArea.Changed);
+
         Console.WriteLine($"Ui scroll: {passed} passed, {failed} failed\n");
     }
 

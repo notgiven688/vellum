@@ -10,8 +10,13 @@ public sealed partial class Ui
         public float ScrollY;
         public float ContentWidth;
         public float ContentHeight;
+        public float ContentDragStartMouseX;
+        public float ContentDragStartMouseY;
+        public float ContentDragStartScrollX;
+        public float ContentDragStartScrollY;
         public float ThumbDragOffsetX;
         public float ThumbDragOffsetY;
+        public bool DraggingContent;
         public bool DraggingHorizontalThumb;
         public bool DraggingThumb;
     }
@@ -57,8 +62,17 @@ public sealed partial class Ui
         if (hover) _hotId = widgetId;
 
         bool changed = false;
-        if (!enabled) state.DraggingThumb = false;
-        if (!IsMouseDown(UiMouseButton.Left)) state.DraggingThumb = false;
+        if (!enabled)
+        {
+            state.DraggingThumb = false;
+            state.DraggingContent = false;
+        }
+
+        if (!IsMouseDown(UiMouseButton.Left))
+        {
+            state.DraggingThumb = false;
+            state.DraggingContent = false;
+        }
 
         float previousContentHeight = MathF.Max(state.ContentHeight, viewH);
         float previousMaxScroll = MathF.Max(0, previousContentHeight - viewH);
@@ -77,10 +91,11 @@ public sealed partial class Ui
         {
             _activeId = widgetId;
             state.DraggingThumb = true;
+            state.DraggingContent = false;
             state.ThumbDragOffsetY = _mouse.Y - thumbY;
         }
 
-        if (enabled && hover && _input.WheelDelta.Y != 0 && !state.DraggingThumb)
+        if (enabled && hover && _input.WheelDelta.Y != 0 && !state.DraggingThumb && !state.DraggingContent)
         {
             float clampedBefore = Math.Clamp(state.ScrollY, 0, previousMaxScroll);
             float previous = state.ScrollY;
@@ -94,6 +109,14 @@ public sealed partial class Ui
             float scrollRatio = (thumbTop - viewY) / thumbTravel;
             float previous = state.ScrollY;
             state.ScrollY = scrollRatio * previousMaxScroll;
+            changed |= MathF.Abs(state.ScrollY - previous) > 0.01f;
+        }
+
+        if (enabled && state.DraggingContent && _activeId == widgetId && IsMouseDown(UiMouseButton.Left) && previousMaxScroll > 0)
+        {
+            float deltaY = _mouse.Y - state.ContentDragStartMouseY;
+            float previous = state.ScrollY;
+            state.ScrollY = Math.Clamp(state.ContentDragStartScrollY - deltaY, 0, previousMaxScroll);
             changed |= MathF.Abs(state.ScrollY - previous) > 0.01f;
         }
 
@@ -138,9 +161,11 @@ public sealed partial class Ui
         state.ScrollY = clampedScroll;
 
         bool showScrollbar = maxScroll > 0.5f;
+        bool currentThumbHover = false;
         if (!showScrollbar)
         {
             state.DraggingThumb = false;
+            state.DraggingContent = false;
         }
         else
         {
@@ -150,7 +175,7 @@ public sealed partial class Ui
                 ? viewY + (state.ScrollY / maxScroll) * currentThumbTravel
                 : viewY;
 
-            bool currentThumbHover = enabled && PointIn(trackX, currentThumbY, Theme.ScrollbarWidth, currentThumbH);
+            currentThumbHover = enabled && PointIn(trackX, currentThumbY, Theme.ScrollbarWidth, currentThumbH);
             if (currentThumbHover || state.DraggingThumb)
                 RequestCursor(UiCursor.PointingHand);
 
@@ -164,6 +189,16 @@ public sealed partial class Ui
             _painter.DrawRect(trackX, currentThumbY, Theme.ScrollbarWidth, currentThumbH, thumbColor, radius: scrollbarRadius);
         }
 
+        bool viewHover = enabled && showScrollbar && PointIn(viewX, viewY, viewW, viewH);
+        bool childClaimedHover = _hotId != 0 && _hotId != widgetId;
+        if (mousePressed && viewHover && !currentThumbHover && !state.DraggingThumb && !childClaimedHover)
+        {
+            _activeId = widgetId;
+            state.DraggingContent = true;
+            state.ContentDragStartMouseY = _mouse.Y;
+            state.ContentDragStartScrollY = state.ScrollY;
+        }
+
         Advance(width, height);
         return new Response(
             x,
@@ -171,7 +206,7 @@ public sealed partial class Ui
             width,
             height,
             hover,
-            enabled && state.DraggingThumb && _activeId == widgetId && IsMouseDown(UiMouseButton.Left),
+            enabled && (state.DraggingThumb || state.DraggingContent) && _activeId == widgetId && IsMouseDown(UiMouseButton.Left),
             false,
             changed: changed,
             disabled: !enabled);
@@ -202,8 +237,17 @@ public sealed partial class Ui
         if (hover) _hotId = widgetId;
 
         bool changed = false;
-        if (!enabled) state.DraggingThumb = false;
-        if (!IsMouseDown(UiMouseButton.Left)) state.DraggingThumb = false;
+        if (!enabled)
+        {
+            state.DraggingThumb = false;
+            state.DraggingContent = false;
+        }
+
+        if (!IsMouseDown(UiMouseButton.Left))
+        {
+            state.DraggingThumb = false;
+            state.DraggingContent = false;
+        }
 
         float previousContentHeight = MathF.Max(state.ContentHeight, viewH);
         float previousMaxScroll = MathF.Max(0, previousContentHeight - viewH);
@@ -222,10 +266,11 @@ public sealed partial class Ui
         {
             _activeId = widgetId;
             state.DraggingThumb = true;
+            state.DraggingContent = false;
             state.ThumbDragOffsetY = _mouse.Y - thumbY;
         }
 
-        if (enabled && hover && _input.WheelDelta.Y != 0 && !state.DraggingThumb)
+        if (enabled && hover && _input.WheelDelta.Y != 0 && !state.DraggingThumb && !state.DraggingContent)
         {
             float clampedBefore = Math.Clamp(state.ScrollY, 0, previousMaxScroll);
             float previous = state.ScrollY;
@@ -239,6 +284,14 @@ public sealed partial class Ui
             float scrollRatio = (thumbTop - viewY) / thumbTravel;
             float previous = state.ScrollY;
             state.ScrollY = scrollRatio * previousMaxScroll;
+            changed |= MathF.Abs(state.ScrollY - previous) > 0.01f;
+        }
+
+        if (enabled && state.DraggingContent && _activeId == widgetId && IsMouseDown(UiMouseButton.Left) && previousMaxScroll > 0)
+        {
+            float deltaY = _mouse.Y - state.ContentDragStartMouseY;
+            float previous = state.ScrollY;
+            state.ScrollY = Math.Clamp(state.ContentDragStartScrollY - deltaY, 0, previousMaxScroll);
             changed |= MathF.Abs(state.ScrollY - previous) > 0.01f;
         }
 
@@ -283,9 +336,11 @@ public sealed partial class Ui
         state.ScrollY = clampedScroll;
 
         bool showScrollbar = maxScroll > 0.5f;
+        bool currentThumbHover = false;
         if (!showScrollbar)
         {
             state.DraggingThumb = false;
+            state.DraggingContent = false;
         }
         else
         {
@@ -295,7 +350,7 @@ public sealed partial class Ui
                 ? viewY + (state.ScrollY / maxScroll) * currentThumbTravel
                 : viewY;
 
-            bool currentThumbHover = enabled && PointIn(trackX, currentThumbY, Theme.ScrollbarWidth, currentThumbH);
+            currentThumbHover = enabled && PointIn(trackX, currentThumbY, Theme.ScrollbarWidth, currentThumbH);
             if (currentThumbHover || state.DraggingThumb)
                 RequestCursor(UiCursor.PointingHand);
 
@@ -309,6 +364,16 @@ public sealed partial class Ui
             _painter.DrawRect(trackX, currentThumbY, Theme.ScrollbarWidth, currentThumbH, thumbColor, radius: scrollbarRadius);
         }
 
+        bool viewHover = enabled && showScrollbar && PointIn(viewX, viewY, viewW, viewH);
+        bool childClaimedHover = _hotId != 0 && _hotId != widgetId;
+        if (mousePressed && viewHover && !currentThumbHover && !state.DraggingThumb && !childClaimedHover)
+        {
+            _activeId = widgetId;
+            state.DraggingContent = true;
+            state.ContentDragStartMouseY = _mouse.Y;
+            state.ContentDragStartScrollY = state.ScrollY;
+        }
+
         Advance(width, height);
         return new Response(
             x,
@@ -316,7 +381,7 @@ public sealed partial class Ui
             width,
             height,
             hover,
-            enabled && state.DraggingThumb && _activeId == widgetId && IsMouseDown(UiMouseButton.Left),
+            enabled && (state.DraggingThumb || state.DraggingContent) && _activeId == widgetId && IsMouseDown(UiMouseButton.Left),
             false,
             changed: changed,
             disabled: !enabled);
@@ -352,12 +417,14 @@ public sealed partial class Ui
         {
             state.DraggingThumb = false;
             state.DraggingHorizontalThumb = false;
+            state.DraggingContent = false;
         }
 
         if (!IsMouseDown(UiMouseButton.Left))
         {
             state.DraggingThumb = false;
             state.DraggingHorizontalThumb = false;
+            state.DraggingContent = false;
         }
 
         float previousContentWidth = MathF.Max(state.ContentWidth, innerW);
@@ -397,6 +464,7 @@ public sealed partial class Ui
                 _activeId = widgetId;
                 state.DraggingThumb = true;
                 state.DraggingHorizontalThumb = false;
+                state.DraggingContent = false;
                 state.ThumbDragOffsetY = _mouse.Y - verticalThumbY;
             }
             else if (horizontalThumbHover)
@@ -404,11 +472,12 @@ public sealed partial class Ui
                 _activeId = widgetId;
                 state.DraggingHorizontalThumb = true;
                 state.DraggingThumb = false;
+                state.DraggingContent = false;
                 state.ThumbDragOffsetX = _mouse.X - horizontalThumbX;
             }
         }
 
-        if (enabled && hover && !state.DraggingThumb && !state.DraggingHorizontalThumb)
+        if (enabled && hover && !state.DraggingThumb && !state.DraggingHorizontalThumb && !state.DraggingContent)
         {
             float horizontalWheel = _input.WheelDelta.X;
             float verticalWheel = _input.WheelDelta.Y;
@@ -452,6 +521,26 @@ public sealed partial class Ui
             float previous = state.ScrollX;
             state.ScrollX = scrollRatio * previousMaxScrollX;
             changed |= MathF.Abs(state.ScrollX - previous) > 0.01f;
+        }
+
+        if (enabled && state.DraggingContent && _activeId == widgetId && IsMouseDown(UiMouseButton.Left) && (previousMaxScrollX > 0 || previousMaxScrollY > 0))
+        {
+            float deltaX = _mouse.X - state.ContentDragStartMouseX;
+            float deltaY = _mouse.Y - state.ContentDragStartMouseY;
+
+            if (previousMaxScrollX > 0)
+            {
+                float previous = state.ScrollX;
+                state.ScrollX = Math.Clamp(state.ContentDragStartScrollX - deltaX, 0, previousMaxScrollX);
+                changed |= MathF.Abs(state.ScrollX - previous) > 0.01f;
+            }
+
+            if (previousMaxScrollY > 0)
+            {
+                float previous = state.ScrollY;
+                state.ScrollY = Math.Clamp(state.ContentDragStartScrollY - deltaY, 0, previousMaxScrollY);
+                changed |= MathF.Abs(state.ScrollY - previous) > 0.01f;
+            }
         }
 
         state.ScrollX = Math.Clamp(state.ScrollX, 0, previousMaxScrollX);
@@ -507,7 +596,10 @@ public sealed partial class Ui
             state.DraggingThumb = false;
         if (!current.ShowHorizontal)
             state.DraggingHorizontalThumb = false;
+        if (!current.ShowVertical && !current.ShowHorizontal)
+            state.DraggingContent = false;
 
+        bool currentVerticalThumbHover = false;
         if (current.ShowVertical)
         {
             float currentThumbH = MathF.Max(Theme.ScrollbarMinThumbSize, (current.ViewHeight * current.ViewHeight) / MathF.Max(contentHeight, current.ViewHeight));
@@ -516,20 +608,21 @@ public sealed partial class Ui
                 ? innerY + (state.ScrollY / maxScrollY) * currentThumbTravel
                 : innerY;
 
-            bool currentThumbHover = enabled && PointIn(verticalTrackX, currentThumbY, Theme.ScrollbarWidth, currentThumbH);
-            if (currentThumbHover || state.DraggingThumb)
+            currentVerticalThumbHover = enabled && PointIn(verticalTrackX, currentThumbY, Theme.ScrollbarWidth, currentThumbH);
+            if (currentVerticalThumbHover || state.DraggingThumb)
                 RequestCursor(UiCursor.PointingHand);
 
             _painter.DrawRect(verticalTrackX, verticalTrackY, Theme.ScrollbarWidth, current.ViewHeight, Theme.ScrollbarTrack, radius: scrollbarRadius);
 
             Color thumbColor = state.DraggingThumb && _activeId == widgetId
                 ? Theme.ScrollbarThumbActive
-                : currentThumbHover
+                : currentVerticalThumbHover
                     ? Theme.ScrollbarThumbHover
                     : Theme.ScrollbarThumb;
             _painter.DrawRect(verticalTrackX, currentThumbY, Theme.ScrollbarWidth, currentThumbH, thumbColor, radius: scrollbarRadius);
         }
 
+        bool currentHorizontalThumbHover = false;
         if (current.ShowHorizontal)
         {
             float currentThumbW = MathF.Max(Theme.ScrollbarMinThumbSize, (current.ViewWidth * current.ViewWidth) / MathF.Max(contentWidth, current.ViewWidth));
@@ -538,15 +631,15 @@ public sealed partial class Ui
                 ? innerX + (state.ScrollX / maxScrollX) * currentThumbTravel
                 : innerX;
 
-            bool currentThumbHover = enabled && PointIn(currentThumbX, horizontalTrackY, currentThumbW, Theme.ScrollbarWidth);
-            if (currentThumbHover || state.DraggingHorizontalThumb)
+            currentHorizontalThumbHover = enabled && PointIn(currentThumbX, horizontalTrackY, currentThumbW, Theme.ScrollbarWidth);
+            if (currentHorizontalThumbHover || state.DraggingHorizontalThumb)
                 RequestCursor(UiCursor.PointingHand);
 
             _painter.DrawRect(horizontalTrackX, horizontalTrackY, current.ViewWidth, Theme.ScrollbarWidth, Theme.ScrollbarTrack, radius: scrollbarRadius);
 
             Color thumbColor = state.DraggingHorizontalThumb && _activeId == widgetId
                 ? Theme.ScrollbarThumbActive
-                : currentThumbHover
+                : currentHorizontalThumbHover
                     ? Theme.ScrollbarThumbHover
                     : Theme.ScrollbarThumb;
             _painter.DrawRect(currentThumbX, horizontalTrackY, currentThumbW, Theme.ScrollbarWidth, thumbColor, radius: scrollbarRadius);
@@ -557,8 +650,26 @@ public sealed partial class Ui
             _painter.DrawRect(verticalTrackX, horizontalTrackY, Theme.ScrollbarWidth, Theme.ScrollbarWidth, Theme.ScrollbarTrack);
         }
 
+        bool viewHover = enabled && (current.ShowHorizontal || current.ShowVertical) && PointIn(innerX, innerY, current.ViewWidth, current.ViewHeight);
+        bool childClaimedHover = _hotId != 0 && _hotId != widgetId;
+        if (mousePressed &&
+            viewHover &&
+            !currentVerticalThumbHover &&
+            !currentHorizontalThumbHover &&
+            !state.DraggingThumb &&
+            !state.DraggingHorizontalThumb &&
+            !childClaimedHover)
+        {
+            _activeId = widgetId;
+            state.DraggingContent = true;
+            state.ContentDragStartMouseX = _mouse.X;
+            state.ContentDragStartMouseY = _mouse.Y;
+            state.ContentDragStartScrollX = state.ScrollX;
+            state.ContentDragStartScrollY = state.ScrollY;
+        }
+
         Advance(width, height);
-        bool dragging = enabled && _activeId == widgetId && IsMouseDown(UiMouseButton.Left) && (state.DraggingThumb || state.DraggingHorizontalThumb);
+        bool dragging = enabled && _activeId == widgetId && IsMouseDown(UiMouseButton.Left) && (state.DraggingThumb || state.DraggingHorizontalThumb || state.DraggingContent);
         return new Response(
             x,
             y,
