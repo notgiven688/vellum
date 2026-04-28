@@ -341,6 +341,93 @@ public sealed partial class Ui
         return new Response(x, y, w, h, false, false, false);
     }
 
+    /// <summary>Draws a draggable vertical splitter for horizontal pane layouts.</summary>
+    public Response Splitter(
+        string id,
+        ref float beforeSize,
+        float min = 0f,
+        float max = float.PositiveInfinity,
+        float thickness = 6f,
+        float? height = null,
+        bool enabled = true,
+        float keyboardStep = 8f)
+    {
+        enabled = ResolveEnabled(enabled);
+        if (max < min) (min, max) = (max, min);
+        beforeSize = Math.Clamp(beforeSize, min, max);
+
+        int widgetId = MakeId(id);
+        float w = MathF.Max(1f, thickness);
+        float h = MathF.Max(1f, height ?? (DefaultFontSize + 6f));
+        var (x, y) = Place(w, h);
+
+        bool focused = RegisterFocusable(widgetId, enabled);
+        bool hover = enabled && PointIn(x, y, w, h);
+        if (hover) _hotId = widgetId;
+
+        if (enabled && hover && IsMousePressed(UiMouseButton.Left))
+        {
+            _activeId = widgetId;
+            SetFocus(widgetId);
+            focused = true;
+        }
+
+        bool pressed = enabled && _activeId == widgetId && IsMouseDown(UiMouseButton.Left);
+        if (enabled && (hover || pressed))
+            RequestCursor(UiCursor.ResizeEW);
+
+        bool changed = false;
+        if (enabled && pressed && _mouseDelta.X != 0)
+        {
+            float next = Math.Clamp(beforeSize + _mouseDelta.X, min, max);
+            if (MathF.Abs(next - beforeSize) > 0.01f)
+            {
+                beforeSize = next;
+                changed = true;
+            }
+        }
+
+        if (enabled && focused && !pressed)
+        {
+            float next = beforeSize;
+            float step = MathF.Max(0.1f, keyboardStep);
+            if (_input.IsPressed(UiKey.Left)) next -= step;
+            if (_input.IsPressed(UiKey.Right)) next += step;
+            if (_input.IsPressed(UiKey.Home)) next = min;
+            if (!float.IsPositiveInfinity(max) && _input.IsPressed(UiKey.End)) next = max;
+            next = Math.Clamp(next, min, max);
+            if (MathF.Abs(next - beforeSize) > 0.01f)
+            {
+                beforeSize = next;
+                changed = true;
+            }
+        }
+
+        Color color = !enabled
+            ? Theme.Separator.WithAlpha(90)
+            : pressed
+                ? Theme.ScrollbarThumbActive
+                : hover || focused
+                    ? Theme.ScrollbarThumbHover
+                    : Theme.Separator;
+        float lineW = MathF.Min(w, MathF.Max(2f, MathF.Floor(w * 0.4f)));
+        float lineX = x + (w - lineW) * 0.5f;
+        _painter.DrawRect(lineX, y, lineW, h, color, radius: MathF.Min(FrameRadius, lineW * 0.5f));
+
+        Advance(w, h);
+        return new Response(
+            x,
+            y,
+            w,
+            h,
+            hover,
+            pressed,
+            false,
+            focused: focused,
+            changed: changed,
+            disabled: !enabled);
+    }
+
     /// <summary>Draws an auto-height panel using the current available width.</summary>
     public Response Panel(Action<Ui> content)
         => Panel(null, AvailableWidth, content);

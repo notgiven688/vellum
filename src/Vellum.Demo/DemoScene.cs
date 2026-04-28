@@ -425,12 +425,24 @@ internal static class DemoScene
             {
                 using (panel.Horizontal())
                 {
-                    float leftWidth = MathF.Max(0, MathF.Floor((panel.AvailableWidth - panel.Theme.Gap) * 0.4f));
+                    const float splitterWidth = 8f;
+                    const float actionsHeight = 236f;
+                    float totalWidth = panel.AvailableWidth;
+                    float minLeftWidth = MathF.Min(180f, MathF.Max(0, totalWidth * 0.35f));
+                    float minRightWidth = MathF.Min(220f, MathF.Max(0, totalWidth * 0.35f));
+                    float maxLeftWidth = MathF.Max(minLeftWidth, totalWidth - minRightWidth - splitterWidth - panel.Theme.Gap * 2f);
+                    if (state.ActivityActionsWidth <= 0f)
+                        state.ActivityActionsWidth = MathF.Floor((totalWidth - splitterWidth - panel.Theme.Gap * 2f) * 0.4f);
+                    state.ActivityActionsWidth = Math.Clamp(state.ActivityActionsWidth, minLeftWidth, maxLeftWidth);
+
+                    float leftWidth = state.ActivityActionsWidth;
                     using (panel.Width(leftWidth))
                     {
                         panel.Label("Actions", color: panel.Theme.TextSecondary);
-                        panel.ScrollArea("actions", panel.AvailableWidth, 236, state, static (actions, state) => DrawActionButtons(actions, state));
+                        panel.ScrollArea("actions", panel.AvailableWidth, actionsHeight, state, static (actions, state) => DrawActionButtons(actions, state));
                     }
+
+                    panel.Splitter("activity-splitter", ref state.ActivityActionsWidth, minLeftWidth, maxLeftWidth, splitterWidth, actionsHeight + panel.DefaultFontSize + panel.Theme.Gap);
 
                     using (panel.Width(panel.AvailableWidth))
                         DrawStatusCanvas(panel, state);
@@ -446,7 +458,7 @@ internal static class DemoScene
             panel.Spacing(8);
             panel.Label("Timeline", color: panel.Theme.TextSecondary);
             panel.ScrollAreaBoth("timeline", panel.AvailableWidth, 132, state, static (timeline, state) => DrawTimelinePreview(timeline, state));
-            BodyLabel(panel, "The timeline preview scrolls on both axes. Drag either thumb, use the wheel vertically, or hold Shift while wheeling to route motion horizontally.", panel.Theme.TextSecondary);
+            BodyLabel(panel, "The timeline preview scrolls on both axes. Drag the content or either thumb, use the wheel vertically, or hold Shift while wheeling to route motion horizontally.", panel.Theme.TextSecondary);
         });
     }
 
@@ -826,6 +838,7 @@ internal sealed class DemoState
     public string Role = "Engineer";
     public bool ProfileLocked;
     public bool GarbageCollectionOpen = true;
+    public float ActivityActionsWidth;
     public WindowState InspectorWindow = new(new Vector2(720, 76));
     public Response QuickMenuButton;
     public float UiCpuTimeMs;

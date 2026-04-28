@@ -677,6 +677,38 @@ public sealed class VellumTests
         });
         Check("max-width clamps to the available width", MathF.Abs(clampedField.W - rootAvailable) < 0.1f);
 
+        float splitterPaneWidth = 120f;
+        Response splitter = default, splitterRight = default;
+
+        void SplitterFrame(Vector2 mouse, bool mouseDown, UiInputState input = default)
+        {
+            ui.Frame(400, 300, mouse, mouseDown, input, frame =>
+            {
+                using (frame.Horizontal())
+                {
+                    using (frame.Width(splitterPaneWidth))
+                        frame.Label("Left");
+
+                    splitter = frame.Splitter("layout-splitter", ref splitterPaneWidth, 80f, 180f, thickness: 8f, height: 44f);
+
+                    using (frame.Width(frame.AvailableWidth))
+                        splitterRight = frame.Button("Right", width: frame.AvailableWidth);
+                }
+            });
+        }
+
+        SplitterFrame(Vector2.Zero, false);
+        Vector2 splitterMouse = new(splitter.X + splitter.W * 0.5f, splitter.Y + splitter.H * 0.5f);
+        SplitterFrame(splitterMouse, false);
+        SplitterFrame(splitterMouse, true);
+        SplitterFrame(splitterMouse + new Vector2(24f, 0f), true);
+        Check("splitter drag updates caller-owned pane size", splitter.Changed && MathF.Abs(splitterPaneWidth - 144f) < 0.1f);
+
+        SplitterFrame(splitterMouse + new Vector2(24f, 0f), false);
+        SplitterFrame(Vector2.Zero, false, Input(keys: new[] { UiKey.Right }));
+        Check("focused splitter supports keyboard resizing", splitter.Changed && MathF.Abs(splitterPaneWidth - 152f) < 0.1f);
+        Check("splitter participates in horizontal layout", splitterRight.X > splitter.X + splitter.W);
+
         Console.WriteLine($"Ui layout: {passed} passed, {failed} failed\n");
     }
 
