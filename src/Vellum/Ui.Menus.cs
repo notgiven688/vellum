@@ -136,7 +136,9 @@ public sealed partial class Ui
         if (_menuMeasureOnly)
         {
             float measuredWidth = width.HasValue
-                ? MathF.Max(width.Value, intrinsicW)
+                ? sidePopup
+                    ? MathF.Max(0, width.Value)
+                    : MathF.Max(width.Value, intrinsicW)
                 : _menuMeasureIntrinsicWidth
                     ? intrinsicW
                     : topLevel
@@ -150,13 +152,22 @@ public sealed partial class Ui
         }
 
         float resolvedWidth = width.HasValue
-            ? MathF.Max(width.Value, intrinsicW)
+            ? sidePopup
+                ? MathF.Max(0, width.Value)
+                : MathF.Max(width.Value, intrinsicW)
             : topLevel
                 ? sidePopup
                     ? Math.Max(AvailableWidth, intrinsicW)
                     : intrinsicW
                 : MathF.Max(AvailableWidth, intrinsicW);
         var (x, y) = Place(resolvedWidth, resolvedHeight);
+
+        TextLayoutResult displayLabelLayout = labelLayout;
+        if (sidePopup)
+        {
+            float labelMaxW = MathF.Max(0, resolvedWidth - pad.Horizontal - arrowSize - arrowGap);
+            displayLabelLayout = LayoutText(label, resolvedSize, maxWidth: labelMaxW, overflow: TextOverflowMode.Ellipsis);
+        }
 
         int widgetId = MakeId(label);
         string popupId = label + "/menu";
@@ -242,8 +253,8 @@ public sealed partial class Ui
             float strokeWidth = visuals.Border.A > 0 ? FrameBorderWidth : 0f;
             _painter.DrawRect(x, y, resolvedWidth, resolvedHeight, visuals.Fill, visuals.Border, strokeWidth, FrameRadius);
 
-            float textX = x + MathF.Max(pad.Left, (resolvedWidth - labelLayout.Width) * 0.5f);
-            DrawTextLayout(labelLayout, textX, y + pad.Top, visuals.Foreground);
+            float textX = x + MathF.Max(pad.Left, (resolvedWidth - displayLabelLayout.Width) * 0.5f);
+            DrawTextLayout(displayLabelLayout, textX, y + pad.Top, visuals.Foreground);
         }
         else
         {
@@ -252,7 +263,7 @@ public sealed partial class Ui
             _painter.DrawRect(x, y, resolvedWidth, resolvedHeight, visuals.Fill, focused ? visuals.Border : default, strokeWidth, FrameRadius);
 
             float textX = x + pad.Left;
-            DrawTextLayout(labelLayout, textX, y + pad.Top, visuals.Foreground);
+            DrawTextLayout(displayLabelLayout, textX, y + pad.Top, visuals.Foreground);
             DrawChevron(
                 x + resolvedWidth - pad.Right - arrowSize,
                 y + (resolvedHeight - arrowSize) * 0.5f,

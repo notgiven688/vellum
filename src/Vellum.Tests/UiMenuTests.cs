@@ -103,6 +103,30 @@ public sealed class UiMenuTests
     }
 
     [Fact]
+    public void SideOpening_Menu_Anchors_To_Explicit_Row_Width_With_Long_Label()
+    {
+        var renderer = new UiTestRenderer();
+        var ui = UiTestSupport.CreateUi(renderer);
+        const string label = "Demo 17 - Voxel World (Current island tessellation stress scene)";
+
+        Response menu = default;
+        Response item = default;
+
+        ui.Frame(640, 240, new Vector2(20, 20), false, frame =>
+        {
+            menu = frame.Menu(label, popup =>
+            {
+                item = popup.MenuItem("Demo 00 - Convex Decomposition");
+            }, width: 180f, openOnHover: true, openToSide: true);
+        });
+
+        Assert.InRange(menu.W, 179.9f, 180.1f);
+        Assert.True(item.W > 0);
+        Assert.True(ui.TryGetPopupBounds(label + "/menu", out float popupX, out _, out _, out _));
+        Assert.InRange(popupX, menu.X + menu.W + 3.9f, menu.X + menu.W + 4.1f);
+    }
+
+    [Fact]
     public void ModalPopup_Blocks_Underlying_Controls_And_Can_Close_Itself()
     {
         var renderer = new UiTestRenderer();
