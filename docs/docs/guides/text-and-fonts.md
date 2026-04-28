@@ -64,10 +64,3 @@ Backends only need to:
 - render LCD text with the documented LCD blend path, or disable LCD text.
 
 See the [Backend Implementation](backends.md) guide for the render-side contract.
-
-## Recommended Language
-
-When describing Vellum text support publicly, use phrasing like:
-
-> Vellum includes a lightweight TrueType text renderer for UI text. It supports basic Unicode glyph lookup, wrapping, clipping, ellipsis, editable text fields, and text areas. It does not yet include a full shaping engine, bidi layout, font fallback, or IME support.
-
