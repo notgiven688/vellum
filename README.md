@@ -19,7 +19,7 @@ Dear ImGui is excellent, but from C# it usually means a C wrapper plus a .NET bi
 
 The original itch was rendering a small UI window inside the [Jitter Physics](https://github.com/notgiven688/jitterphysics2) demo without pulling in a desktop framework or native GUI stack.
 
-This is also an AI-assisted library experiment. Most of the repository was written by ChatGPT/Codex, guided by a human maintainer, so treat it as experimental software and review it accordingly.
+Immediate-mode GUI libraries are shallow by nature: apart from font rendering, most of the work is direct layout, input state, and draw command generation. That makes Vellum a useful experiment in how far AI can take a focused library like this. Most of the repository was written by ChatGPT/Codex, guided by a human maintainer, so treat it as experimental software and review it accordingly.
 
 ## Quick Example
 
