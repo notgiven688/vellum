@@ -96,7 +96,7 @@ Custom TrueType fonts can be loaded directly:
 ui.Font = TrueTypeFont.FromFile("MyFont.ttf");
 ```
 
-If `ui.Font` is not set, `Vellum` uses an embedded default font shipped inside the library. The default is exposed as `UiFonts.DefaultSans` and comes from the embedded `Roboto-Regular.ttf` resource in the core project.
+If `ui.Font` is not set, `Vellum` uses an embedded default font shipped inside the library. The default is exposed as `UiFonts.DefaultSans` and comes from the embedded `JetBrainsMono-Regular.ttf` resource in the core project.
 
 Backends running on HiDPI displays should pass `RenderFrameInfo` with both logical and framebuffer sizes. By default, `ui.AutoTextRasterScale` updates `ui.TextRasterScale` from that frame scale so text atlases are rasterized at the correct density.
 

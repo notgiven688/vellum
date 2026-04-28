@@ -2,8 +2,8 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Vellum.Tests" />
-    <EmbeddedResource Include="_package\Roboto-Regular.ttf"
-                      LogicalName="Vellum.Assets.Fonts.Roboto-Regular.ttf" />
+    <EmbeddedResource Include="_package\JetBrainsMono-Regular.ttf"
+                      LogicalName="Vellum.Assets.Fonts.JetBrainsMono-Regular.ttf" />
     <None Include="_package\THIRD-PARTY-NOTICES.txt"
           Pack="true"
           PackagePath="" />

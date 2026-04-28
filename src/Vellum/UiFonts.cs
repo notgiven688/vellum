@@ -7,7 +7,7 @@ namespace Vellum;
 /// </summary>
 public static class UiFonts
 {
-    private const string DefaultSansResourceName = "Vellum.Assets.Fonts.Roboto-Regular.ttf";
+    private const string DefaultSansResourceName = "Vellum.Assets.Fonts.JetBrainsMono-Regular.ttf";
     private static readonly Lazy<TrueTypeFont> s_defaultSans = new(LoadDefaultSans);
 
     /// <summary>
