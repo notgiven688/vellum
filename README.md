@@ -13,13 +13,11 @@
 
 ## Motivation
 
-The C# ecosystem does not really have a first-class intermediate GUI library: something small enough to embed in a renderer or tool window, but still written for managed applications.
+The C# ecosystem does not really have a first-class intermediate GUI library. Dear ImGui is excellent, but from C# it usually means a C wrapper plus a .NET binding. Vellum exists for cases where a small C# UI layer is enough.
 
-Dear ImGui is excellent, but from C# it usually means a C wrapper plus a .NET binding. Vellum exists for cases where a small native C# UI layer is enough.
+The original goal was rendering a UI window inside the [Jitter Physics](https://github.com/notgiven688/jitterphysics2) demo without pulling in a native GUI stack.
 
-The original itch was rendering a small UI window inside the [Jitter Physics](https://github.com/notgiven688/jitterphysics2) demo without pulling in a desktop framework or native GUI stack.
-
-Immediate-mode GUI libraries are shallow by nature: apart from font rendering, most of the work is direct layout, input state, and draw command generation. That makes Vellum a useful experiment in how far AI can take a focused library like this. Most of the repository was written by ChatGPT/Codex, guided by a human maintainer, so treat it as experimental software and review it accordingly.
+Immediate-mode GUI libraries are shallow by nature: apart from font rendering, most of the work is direct layout, input state, and draw command generation. That makes Vellum a useful experiment in how far AI can take a focused library like this. Most of the repository was written by ChatGPT/Codex, so treat it as experimental software and review it accordingly.
 
 ## Quick Example
 
