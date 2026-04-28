@@ -9,7 +9,9 @@
 📚 [Documentation](https://notgiven688.github.io/vellum/docs/) ·
 📦 [NuGet Package](https://www.nuget.org/packages/VellumUI/)
 
-<img src="media/screenshot.png" alt="Vellum demo screenshot" width="720">
+<img src="media/screenshot_dark.png" alt="Vellum demo screenshot" width="720">
+
+<img src="media/screenshot_light.png" alt="Vellum demo screenshot" width="720">
 
 ## Motivation
 
