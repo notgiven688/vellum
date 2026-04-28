@@ -9,6 +9,8 @@
 📚 [Documentation](https://notgiven688.github.io/vellum/docs/) ·
 📦 [NuGet Package](https://www.nuget.org/packages/VellumUI/)
 
+<img src="media/screenshot.png" alt="Vellum demo screenshot" width="720">
+
 ## Motivation
 
 The C# ecosystem does not really have a first-class intermediate GUI library: something small enough to embed in a renderer or tool window, but still written for managed applications.
