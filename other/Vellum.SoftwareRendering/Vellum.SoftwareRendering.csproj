@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <PackageId>VellumUI.SoftwareRendering</PackageId>
+    <Description>Pure C# software renderer for Vellum render lists, useful for headless screenshots and tests.</Description>
+    <Authors>notgiven688</Authors>
+    <PackageTags>gui;immediate-mode;csharp;dotnet;ui;software-renderer;screenshots</PackageTags>
+    <RepositoryUrl>https://github.com/notgiven688/vellum.git</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Vellum\Vellum.csproj" />
+  </ItemGroup>
+
+</Project>

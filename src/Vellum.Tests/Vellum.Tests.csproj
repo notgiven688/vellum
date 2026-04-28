@@ -19,6 +19,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Vellum\Vellum.csproj" />
+    <ProjectReference Include="..\..\other\Vellum.SoftwareRendering\Vellum.SoftwareRendering.csproj" />
   </ItemGroup>
 
 </Project>

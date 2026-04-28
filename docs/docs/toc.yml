@@ -2,6 +2,8 @@
   href: introduction.md
 - name: Quickstart
   href: quickstart.md
+- name: Widget Gallery
+  href: widget-gallery.md
 - name: Guides
   expanded: true
   items:
