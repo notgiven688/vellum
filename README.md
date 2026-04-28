@@ -1,7 +1,7 @@
 # Vellum
 
 [![Tests](https://github.com/notgiven688/vellum/actions/workflows/tests.yml/badge.svg)](https://github.com/notgiven688/vellum/actions/workflows/tests.yml)
-[![NuGet](https://img.shields.io/nuget/v/VellumUI.svg?label=NuGet)](https://www.nuget.org/packages/VellumUI/)
+[![NuGet](https://img.shields.io/nuget/v/VellumUI.svg?label=NuGet&color=yellow)](https://www.nuget.org/packages/VellumUI/)
 
 `Vellum` is an immediate-mode GUI library for C#.
 
