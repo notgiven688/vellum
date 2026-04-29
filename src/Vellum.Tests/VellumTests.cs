@@ -1416,7 +1416,8 @@ public sealed class VellumTests
             }
 
             Frame(new Vector2(20, 24));
-            Check("side-opening menu auto-sizes to long content", longItem.W > 180f);
+            bool hasBounds = ui.TryGetChildPopupBounds("Select Demo Scene", "menu", out _, out _, out float popupW, out _);
+            Check("side-opening menu auto-sizes to long content", hasBounds && longItem.W > 180f && popupW > 180f);
         }
 
         {
@@ -1442,13 +1443,13 @@ public sealed class VellumTests
 
             Frame(new Vector2(20, 24), true);
             Frame(new Vector2(20, 24), false);
-            Check("combo box focuses on click", combo.Focused);
+            Check("combo box opens on click", combo.Focused && ui.IsChildPopupOpen("theme", "popup"));
 
-            Vector2 firstOptionPoint = new(combo.X + 12, combo.Y + combo.H + 12);
-            Frame(firstOptionPoint, true);
-            Frame(firstOptionPoint, false);
+            bool popupBoundsKnown = ui.TryGetChildPopupBounds("theme", "popup", out float px, out float py, out _, out _);
+            Frame(new Vector2(px + 12, py + 56), true);
+            Frame(new Vector2(px + 12, py + 56), false);
             Frame(Vector2.Zero, false);
-            Check("combo box selects an item and closes", selected == 0 && combo.Changed);
+            Check("combo box selects an item and closes", popupBoundsKnown && selected == 0 && !ui.IsChildPopupOpen("theme", "popup") && combo.Changed);
         }
 
         {
@@ -1474,13 +1475,13 @@ public sealed class VellumTests
 
             Frame(Input(keys: new[] { UiKey.Tab }));
             Frame(Input(keys: new[] { UiKey.Enter }));
-            Check("combo box opens from keyboard focus", combo.Focused);
+            Check("combo box opens from keyboard focus", ui.IsChildPopupOpen("theme/keyboard", "popup") && combo.Focused);
 
             Frame(Input(keys: new[] { UiKey.Down }));
-            Check("combo box keeps the committed value while only moving the highlight", selected == 1 && !combo.Changed);
+            Check("combo box keeps the committed value while only moving the highlight", selected == 1 && ui.IsChildPopupOpen("theme/keyboard", "popup") && !combo.Changed);
 
             Frame(Input(keys: new[] { UiKey.Enter }));
-            Check("combo box commits the highlighted item on enter", selected == 2 && combo.Changed && combo.Focused);
+            Check("combo box commits the highlighted item on enter", selected == 2 && !ui.IsChildPopupOpen("theme/keyboard", "popup") && combo.Changed && combo.Focused);
         }
 
         {
@@ -1508,12 +1509,12 @@ public sealed class VellumTests
             Frame(Input(keys: new[] { UiKey.Enter }));
             Frame(Input(keys: new[] { UiKey.End }));
             Frame(Input(keys: new[] { UiKey.Escape }));
-            Check("combo box escape closes without applying the highlighted item", selected == 1 && !combo.Changed && combo.Focused);
+            Check("combo box escape closes without applying the highlighted item", selected == 1 && !ui.IsChildPopupOpen("theme/cancel", "popup") && !combo.Changed && combo.Focused);
 
             Frame(Input(keys: new[] { UiKey.Enter }));
             Frame(Input(keys: new[] { UiKey.Home }));
             Frame(Input(keys: new[] { UiKey.Enter }));
-            Check("combo box home jumps to the first item before commit", selected == 0 && combo.Changed);
+            Check("combo box home jumps to the first item before commit", selected == 0 && !ui.IsChildPopupOpen("theme/cancel", "popup") && combo.Changed);
         }
 
         {

@@ -66,6 +66,27 @@ public sealed partial class Ui
         return false;
     }
 
+    internal bool IsChildPopupOpen(string parentId, string childId)
+        => IsPopupOpen(MakeChildId(MakeId(parentId), childId));
+
+    internal bool TryGetChildPopupBounds(string parentId, string childId, out float x, out float y, out float width, out float height)
+    {
+        if (TryGetKnownPopupRect(MakeChildId(MakeId(parentId), childId), out var rect))
+        {
+            x = rect.X;
+            y = rect.Y;
+            width = rect.W;
+            height = rect.H;
+            return true;
+        }
+
+        x = 0;
+        y = 0;
+        width = 0;
+        height = 0;
+        return false;
+    }
+
     /// <summary>Declares a popup anchored at an explicit position.</summary>
     public bool Popup(
         string id,

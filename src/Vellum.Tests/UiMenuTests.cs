@@ -50,10 +50,13 @@ public sealed class UiMenuTests
 
         Frame(filePoint, UiTestSupport.Input(mouseButtons: [UiMouseButton.Left]));
         Frame(filePoint);
+        Assert.True(ui.IsChildPopupOpen("File", "menu"));
         Assert.True(fileMenu.Opened);
         Assert.True(fileItem.W > 0);
 
         Frame(editPoint);
+        Assert.True(ui.IsChildPopupOpen("Edit", "menu"));
+        Assert.False(ui.IsChildPopupOpen("File", "menu"));
         Assert.True(editMenu.Opened);
         Assert.True(editItem.W > 0);
         Assert.Equal(0f, fileItem.W);
@@ -119,6 +122,8 @@ public sealed class UiMenuTests
 
         Assert.InRange(menu.W, 179.9f, 180.1f);
         Assert.True(item.W > 0);
+        Assert.True(ui.TryGetChildPopupBounds(label, "menu", out float popupX, out _, out _, out _));
+        Assert.InRange(popupX, menu.X + menu.W + 3.9f, menu.X + menu.W + 4.1f);
         float expectedItemX = menu.X + menu.W + 4f + MathF.Max(0, ui.Theme.BorderWidth) + ui.Theme.PopupPadding.Left;
         Assert.InRange(item.X, expectedItemX - 0.6f, expectedItemX + 0.6f);
     }
