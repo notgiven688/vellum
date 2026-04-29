@@ -239,13 +239,21 @@ internal sealed class GlyphAtlas
                 }
                 else
                 {
-                    byte a = bmp[y * w + x];
+                    byte a = AdjustGrayscaleCoverage(bmp[y * w + x]);
                     rgba[dst] = rgba[dst + 1] = rgba[dst + 2] = 255;
                     rgba[dst + 3] = a;
                 }
             }
         }
         return rgba;
+    }
+
+    private static byte AdjustGrayscaleCoverage(byte coverage)
+    {
+        if (coverage is 0 or 255) return coverage;
+
+        float normalized = coverage / 255f;
+        return (byte)(MathF.Pow(normalized, 1f / 1.45f) * 255f + 0.5f);
     }
 
     private static int NextPowerOfTwo(int v)

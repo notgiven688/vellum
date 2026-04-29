@@ -54,12 +54,12 @@ public readonly record struct RenderFrameInfo(
         int framebufferWidth = FramebufferWidth > 0 ? FramebufferWidth : logicalWidth;
         int framebufferHeight = FramebufferHeight > 0 ? FramebufferHeight : logicalHeight;
 
-        float scaleX = float.IsFinite(ScaleX) && ScaleX > 0
-            ? ScaleX
-            : logicalWidth > 0 ? framebufferWidth / (float)logicalWidth : 1f;
-        float scaleY = float.IsFinite(ScaleY) && ScaleY > 0
-            ? ScaleY
-            : logicalHeight > 0 ? framebufferHeight / (float)logicalHeight : 1f;
+        float scaleX = logicalWidth > 0 && framebufferWidth > 0
+            ? framebufferWidth / (float)logicalWidth
+            : float.IsFinite(ScaleX) && ScaleX > 0 ? ScaleX : 1f;
+        float scaleY = logicalHeight > 0 && framebufferHeight > 0
+            ? framebufferHeight / (float)logicalHeight
+            : float.IsFinite(ScaleY) && ScaleY > 0 ? ScaleY : 1f;
 
         return new RenderFrameInfo(logicalWidth, logicalHeight, framebufferWidth, framebufferHeight, scaleX, scaleY);
     }
