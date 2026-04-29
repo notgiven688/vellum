@@ -58,6 +58,7 @@ public sealed partial class Ui
         });
 
         float innerH;
+        bool contentCompleted = false;
         try
         {
             content(this, state);
@@ -66,11 +67,15 @@ public sealed partial class Ui
             innerH = inner.Dir == LayoutDir.Horizontal
                 ? inner.MaxExtent
                 : inner.CursorY - inner.OriginY;
+            contentCompleted = true;
         }
         finally
         {
             _layouts.RemoveAt(_layouts.Count - 1);
             _painter = parentPainter;
+
+            if (!contentCompleted)
+                ReleaseDeferredPainter(contentPainter);
         }
 
         float resolvedHeight = MathF.Max(0, innerH + border * 2 + pad.Vertical);
@@ -94,7 +99,8 @@ public sealed partial class Ui
         float maxPopupHeight = 280f,
         bool enabled = true,
         bool openOnHover = false,
-        bool openToSide = false)
+        bool openToSide = false,
+        string? id = null)
         => Menu(
             label,
             new UiActionState(content),
@@ -105,9 +111,10 @@ public sealed partial class Ui
             maxPopupHeight,
             enabled,
             openOnHover,
-            openToSide);
+            openToSide,
+            id);
 
-    /// <inheritdoc cref="Menu(string, Action{Ui}, float?, float?, float?, float, bool, bool, bool)" />
+    /// <inheritdoc cref="Menu(string, Action{Ui}, float?, float?, float?, float, bool, bool, bool, string?)" />
     public Response Menu<TState>(
         string label,
         TState state,
@@ -118,7 +125,8 @@ public sealed partial class Ui
         float maxPopupHeight = 280f,
         bool enabled = true,
         bool openOnHover = false,
-        bool openToSide = false)
+        bool openToSide = false,
+        string? id = null)
     {
         ArgumentNullException.ThrowIfNull(content);
 
@@ -169,8 +177,9 @@ public sealed partial class Ui
             displayLabelLayout = LayoutText(label, resolvedSize, maxWidth: labelMaxW, overflow: TextOverflowMode.Ellipsis);
         }
 
-        int widgetId = MakeId(label);
-        string popupId = label + "/menu";
+        string resolvedId = id ?? label;
+        int widgetId = MakeId(resolvedId);
+        string popupId = resolvedId + "/menu";
         int popupWidgetId = MakeId(popupId);
         _menuPopupIds.Add(popupWidgetId);
         bool popupOpen = IsPopupOpen(popupWidgetId);

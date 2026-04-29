@@ -129,18 +129,19 @@ public sealed partial class Ui
 
     /// <summary>Draws a single-line editable text field.</summary>
     public Response TextField(
-        string id,
+        string label,
         ref string text,
         float width,
         float? size = null,
         string? placeholder = null,
         bool enabled = true,
-        bool readOnly = false)
+        bool readOnly = false,
+        string? id = null)
     {
         enabled = ResolveEnabled(enabled);
         float s = size ?? DefaultFontSize;
         var pad = Theme.TextFieldPadding;
-        int widgetId = MakeId(id);
+        int widgetId = MakeId(id ?? label);
         float border = FrameBorderWidth;
 
         string normalizedText = SanitizeTextInput(text);
@@ -296,19 +297,20 @@ public sealed partial class Ui
 
     /// <summary>Draws a multiline editable text area.</summary>
     public Response TextArea(
-        string id,
+        string label,
         ref string text,
         float width,
         float height,
         float? size = null,
         string? placeholder = null,
         bool enabled = true,
-        bool readOnly = false)
+        bool readOnly = false,
+        string? id = null)
     {
         enabled = ResolveEnabled(enabled);
         float s = size ?? DefaultFontSize;
         var pad = Theme.TextFieldPadding;
-        int widgetId = MakeId(id);
+        int widgetId = MakeId(id ?? label);
         float border = FrameBorderWidth;
 
         string normalizedText = SanitizeTextInput(text, allowNewlines: true);

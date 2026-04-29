@@ -614,9 +614,10 @@ public sealed partial class Ui : IDisposable
 
     private void Scope(LayoutDir dir, float? width, UiAlign align, bool reserveWidth, Action<Ui> content)
     {
+        ArgumentNullException.ThrowIfNull(content);
         BeginScope(dir, width, align, reserveWidth);
-        content(this);
-        EndScope();
+        try { content(this); }
+        finally { EndScope(); }
     }
 
     private void BeginScope(LayoutDir dir, float? width, UiAlign align, bool reserveWidth)
@@ -828,15 +829,24 @@ public sealed partial class Ui : IDisposable
     // ID generation
     // -------------------------------------------------------------------------
 
-    private int MakeId(string label)
+    private int CurrentIdSeed => _idStack.Count > 0 ? _idStack.Peek() : unchecked((int)0x9e3779b1);
+
+    private int MakeId(ReadOnlySpan<char> label)
     {
-        int parent = _idStack.Count > 0 ? _idStack.Peek() : unchecked((int)0x9e3779b1);
-        return HashMix(parent, HashString(label));
+        return HashMix(CurrentIdSeed, HashString(label));
     }
+
+    private int MakeId(int value) => HashMix(CurrentIdSeed, HashInt(value));
+
+    private int MakeId(long value) => HashMix(CurrentIdSeed, HashLong(value));
+
+    private int MakeId(ulong value) => HashMix(CurrentIdSeed, HashLong(unchecked((long)value)));
+
+    private int MakeId(Guid value) => HashMix(CurrentIdSeed, HashGuid(value));
 
     private static int HashMix(int a, int b) => (int)((uint)a * 2654435761u ^ (uint)b);
 
-    private static int HashString(string text)
+    private static int HashString(ReadOnlySpan<char> text)
     {
         unchecked
         {
@@ -851,10 +861,159 @@ public sealed partial class Ui : IDisposable
         }
     }
 
+    private static int HashInt(int value)
+    {
+        unchecked
+        {
+            uint hash = 2166136261;
+            hash ^= (uint)value;
+            hash *= 16777619;
+            return (int)hash;
+        }
+    }
+
+    private static int HashLong(long value)
+    {
+        unchecked
+        {
+            uint hash = 2166136261;
+            ulong bits = (ulong)value;
+            hash ^= (uint)bits;
+            hash *= 16777619;
+            hash ^= (uint)(bits >> 32);
+            hash *= 16777619;
+            return (int)hash;
+        }
+    }
+
+    private static int HashGuid(Guid value)
+    {
+        Span<byte> bytes = stackalloc byte[16];
+        value.TryWriteBytes(bytes);
+
+        unchecked
+        {
+            uint hash = 2166136261;
+            foreach (byte b in bytes)
+            {
+                hash ^= b;
+                hash *= 16777619;
+            }
+
+            return (int)hash;
+        }
+    }
+
     /// <summary>Pushes an id seed for subsequent widgets.</summary>
-    public void PushId(string name) => _idStack.Push(MakeId(name));
+    public void PushId(string name) => PushId(name.AsSpan());
+    /// <summary>Pushes an id seed for subsequent widgets.</summary>
+    public void PushId(ReadOnlySpan<char> name) => _idStack.Push(MakeId(name));
+    /// <summary>Pushes an id seed for subsequent widgets.</summary>
+    public void PushId(int value) => _idStack.Push(MakeId(value));
+    /// <summary>Pushes an id seed for subsequent widgets.</summary>
+    public void PushId(long value) => _idStack.Push(MakeId(value));
+    /// <summary>Pushes an id seed for subsequent widgets.</summary>
+    public void PushId(ulong value) => _idStack.Push(MakeId(value));
+    /// <summary>Pushes an id seed for subsequent widgets.</summary>
+    public void PushId(Guid value) => _idStack.Push(MakeId(value));
     /// <summary>Pops the most recent id seed.</summary>
     public void PopId() => _idStack.Pop();
+
+    /// <summary>Runs content inside a nested id scope.</summary>
+    public void Id(string name, Action<Ui> content) => Id(name.AsSpan(), content);
+
+    /// <summary>Runs content inside a nested id scope.</summary>
+    public void Id(ReadOnlySpan<char> name, Action<Ui> content)
+    {
+        ArgumentNullException.ThrowIfNull(content);
+        PushId(name);
+        try { content(this); }
+        finally { PopId(); }
+    }
+
+    /// <summary>Runs content inside a nested id scope.</summary>
+    public void Id<TState>(string name, TState state, Action<Ui, TState> content) => Id(name.AsSpan(), state, content);
+
+    /// <summary>Runs content inside a nested id scope.</summary>
+    public void Id<TState>(ReadOnlySpan<char> name, TState state, Action<Ui, TState> content)
+    {
+        ArgumentNullException.ThrowIfNull(content);
+        PushId(name);
+        try { content(this, state); }
+        finally { PopId(); }
+    }
+
+    /// <summary>Runs content inside a nested id scope.</summary>
+    public void Id(int value, Action<Ui> content)
+    {
+        ArgumentNullException.ThrowIfNull(content);
+        PushId(value);
+        try { content(this); }
+        finally { PopId(); }
+    }
+
+    /// <summary>Runs content inside a nested id scope.</summary>
+    public void Id<TState>(int value, TState state, Action<Ui, TState> content)
+    {
+        ArgumentNullException.ThrowIfNull(content);
+        PushId(value);
+        try { content(this, state); }
+        finally { PopId(); }
+    }
+
+    /// <summary>Runs content inside a nested id scope.</summary>
+    public void Id(long value, Action<Ui> content)
+    {
+        ArgumentNullException.ThrowIfNull(content);
+        PushId(value);
+        try { content(this); }
+        finally { PopId(); }
+    }
+
+    /// <summary>Runs content inside a nested id scope.</summary>
+    public void Id<TState>(long value, TState state, Action<Ui, TState> content)
+    {
+        ArgumentNullException.ThrowIfNull(content);
+        PushId(value);
+        try { content(this, state); }
+        finally { PopId(); }
+    }
+
+    /// <summary>Runs content inside a nested id scope.</summary>
+    public void Id(ulong value, Action<Ui> content)
+    {
+        ArgumentNullException.ThrowIfNull(content);
+        PushId(value);
+        try { content(this); }
+        finally { PopId(); }
+    }
+
+    /// <summary>Runs content inside a nested id scope.</summary>
+    public void Id<TState>(ulong value, TState state, Action<Ui, TState> content)
+    {
+        ArgumentNullException.ThrowIfNull(content);
+        PushId(value);
+        try { content(this, state); }
+        finally { PopId(); }
+    }
+
+    /// <summary>Runs content inside a nested id scope.</summary>
+    public void Id(Guid value, Action<Ui> content)
+    {
+        ArgumentNullException.ThrowIfNull(content);
+        PushId(value);
+        try { content(this); }
+        finally { PopId(); }
+    }
+
+    /// <summary>Runs content inside a nested id scope.</summary>
+    public void Id<TState>(Guid value, TState state, Action<Ui, TState> content)
+    {
+        ArgumentNullException.ThrowIfNull(content);
+        PushId(value);
+        try { content(this, state); }
+        finally { PopId(); }
+    }
 
     /// <summary>Requests keyboard focus for the widget with the given id.</summary>
     public void RequestFocus(string id)

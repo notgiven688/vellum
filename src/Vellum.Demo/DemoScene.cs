@@ -608,9 +608,8 @@ internal static class DemoScene
         window.Spacing(4);
         window.Label("Floating window", color: window.Theme.Accent);
         BodyLabel(window, "This behaves like an immediate-mode floating window: absolute position, caption, body drag, and title-bar collapse/close controls.");
-        window.PushId("inspectorSwitch");
-        window.Switch("Enable analytics", ref state.AnalyticsEnabled, width: window.AvailableWidth);
-        window.PopId();
+        window.Id("inspectorSwitch", scopedWindow =>
+            scopedWindow.Switch("Enable analytics", ref state.AnalyticsEnabled, width: scopedWindow.AvailableWidth));
         window.Spacing(6);
         window.Menu("Hover menu", state, static (menu, state) =>
         {

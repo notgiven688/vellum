@@ -83,11 +83,11 @@ public sealed partial class Ui
     }
 
     /// <summary>Declares a tab inside the current tab bar.</summary>
-    public Response Tab(string label, Action<Ui> content)
-        => Tab(label, new UiActionState(content), static (ui, state) => state.Content(ui));
+    public Response Tab(string label, Action<Ui> content, string? id = null)
+        => Tab(label, new UiActionState(content), static (ui, state) => state.Content(ui), id);
 
-    /// <inheritdoc cref="Tab(string, Action{Ui})" />
-    public Response Tab<TState>(string label, TState state, Action<Ui, TState> content)
+    /// <inheritdoc cref="Tab(string, Action{Ui}, string?)" />
+    public Response Tab<TState>(string label, TState state, Action<Ui, TState> content, string? id = null)
     {
         ArgumentNullException.ThrowIfNull(content);
         if (_tabBarContexts.Count == 0)
@@ -105,7 +105,7 @@ public sealed partial class Ui
         if (index > 0 && Theme.TabSpacing > 0)
             Spacing(Theme.TabSpacing);
 
-        int tabId = MakeId(label);
+        int tabId = MakeId(id ?? label);
         var (x, y) = Place(w, h);
 
         bool focused = RegisterFocusable(tabId, true);

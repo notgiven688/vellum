@@ -1063,6 +1063,52 @@ public sealed class VellumTests
                 Lcd = false
             };
 
+            Response first = default, second = default;
+            ui.Frame(800, 600, Vector2.Zero, false, Input(keys: new[] { UiKey.Space }), frame =>
+            {
+                frame.Id(1, row =>
+                {
+                    row.RequestFocus("Delete");
+                    first = row.Button("Delete");
+                });
+                frame.Id(2, row =>
+                {
+                    second = row.Button("Delete");
+                });
+            });
+
+            Check("id scopes disambiguate same-label widgets", first.Activated && !second.Activated);
+        }
+
+        {
+            var renderer = new TestRenderer();
+            var ui = new Ui(renderer)
+            {
+                Font = font,
+                DefaultFontSize = 18f,
+                Lcd = false
+            };
+
+            Response primary = default, secondary = default;
+            ui.Frame(800, 600, Vector2.Zero, false, Input(keys: new[] { UiKey.Space }), frame =>
+            {
+                frame.RequestFocus("save-secondary");
+                primary = frame.Button("Save", id: "save-primary");
+                secondary = frame.Button("Save", id: "save-secondary");
+            });
+
+            Check("explicit widget ids disambiguate same-label widgets", !primary.Activated && secondary.Activated);
+        }
+
+        {
+            var renderer = new TestRenderer();
+            var ui = new Ui(renderer)
+            {
+                Font = font,
+                DefaultFontSize = 18f,
+                Lcd = false
+            };
+
             bool open = false;
             Response header = default;
             float closedWidth = 0;

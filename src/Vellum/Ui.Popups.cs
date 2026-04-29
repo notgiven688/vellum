@@ -342,6 +342,8 @@ public sealed partial class Ui
         _popupContext.Add(request.PopupId);
         _idStack.Push(request.PopupId);
 
+        try
+        {
         bool changed = false;
         if (!IsMouseDown(UiMouseButton.Left)) state.DraggingThumb = false;
 
@@ -404,17 +406,22 @@ public sealed partial class Ui
             Empty = true
         });
 
-        request.Content(this);
-
-        var inner = _layouts[^1];
-        _layouts.RemoveAt(_layouts.Count - 1);
+        LayoutScope inner;
+        try
+        {
+            request.Content(this);
+            inner = _layouts[^1];
+        }
+        finally
+        {
+            _layouts.RemoveAt(_layouts.Count - 1);
+            PopHitClip();
+            _painter.PopClip();
+        }
 
         float contentHeight = inner.Dir == LayoutDir.Horizontal
             ? inner.MaxExtent
             : inner.CursorY - inner.OriginY;
-
-        PopHitClip();
-        _painter.PopClip();
 
         state.ContentHeight = contentHeight;
         float maxScroll = MathF.Max(0, contentHeight - viewH);
@@ -455,7 +462,11 @@ public sealed partial class Ui
             RenderPopupRequest(childRequest, depth + 1);
         }
 
-        _idStack.Pop();
-        _popupContext.RemoveAt(_popupContext.Count - 1);
+        }
+        finally
+        {
+            _idStack.Pop();
+            _popupContext.RemoveAt(_popupContext.Count - 1);
+        }
     }
 }

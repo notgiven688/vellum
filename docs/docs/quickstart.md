@@ -99,7 +99,25 @@ ui.Frame(width, height, mouse, input, root =>
 });
 ```
 
-Widget IDs are derived from labels and the current ID stack. When repeated controls use the same label, wrap them in `PushId` / `PopId` or use locally unique labels.
+Widget IDs are derived from labels and the current ID scope. When repeated controls use the same label for different data objects, wrap each object in an `Id(...)` scope:
+
+```csharp
+foreach (var item in items)
+{
+    ui.Id(item.Id, row =>
+    {
+        row.TextField("Name", ref item.Name, width: 260f);
+        row.Button("Delete");
+    });
+}
+```
+
+When two widgets in the same scope need the same visible label, use a named `id:` override:
+
+```csharp
+ui.Button("Save", id: "save-primary");
+ui.Button("Save", id: "save-secondary");
+```
 
 ## Windows
 
