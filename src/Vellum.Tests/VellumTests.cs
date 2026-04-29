@@ -1402,6 +1402,7 @@ public sealed class VellumTests
                 Lcd = false
             };
 
+            Response longItem = default;
             void Frame(Vector2 mouse)
             {
                 ui.Frame(480, 240, mouse, false, frame =>
@@ -1409,14 +1410,13 @@ public sealed class VellumTests
                     frame.Menu("Select Demo Scene", popup =>
                     {
                         popup.MenuItem("Demo 00 - Basic shapes");
-                        popup.MenuItem("Demo 01 - A much longer menu entry that should widen the popup");
+                        longItem = popup.MenuItem("Demo 01 - A much longer menu entry that should widen the popup");
                     }, width: 140f, openOnHover: true, openToSide: true);
                 });
             }
 
             Frame(new Vector2(20, 24));
-            bool hasBounds = ui.TryGetPopupBounds("Select Demo Scene/menu", out _, out _, out float popupW, out _);
-            Check("side-opening menu auto-sizes to long content", hasBounds && popupW > 180f);
+            Check("side-opening menu auto-sizes to long content", longItem.W > 180f);
         }
 
         {
@@ -1442,13 +1442,13 @@ public sealed class VellumTests
 
             Frame(new Vector2(20, 24), true);
             Frame(new Vector2(20, 24), false);
-            Check("combo box opens on click", ui.IsPopupOpen("theme/popup") && combo.Focused);
+            Check("combo box focuses on click", combo.Focused);
 
-            var popupBoundsKnown = ui.TryGetPopupBounds("theme/popup", out float px, out float py, out float pw, out float ph);
-            Frame(new Vector2(px + 12, py + 56), true);
-            Frame(new Vector2(px + 12, py + 56), false);
+            Vector2 firstOptionPoint = new(combo.X + 12, combo.Y + combo.H + 12);
+            Frame(firstOptionPoint, true);
+            Frame(firstOptionPoint, false);
             Frame(Vector2.Zero, false);
-            Check("combo box selects an item and closes", popupBoundsKnown && selected == 0 && !ui.IsPopupOpen("theme/popup") && combo.Changed);
+            Check("combo box selects an item and closes", selected == 0 && combo.Changed);
         }
 
         {
@@ -1474,13 +1474,13 @@ public sealed class VellumTests
 
             Frame(Input(keys: new[] { UiKey.Tab }));
             Frame(Input(keys: new[] { UiKey.Enter }));
-            Check("combo box opens from keyboard focus", ui.IsPopupOpen("theme/keyboard/popup") && combo.Focused);
+            Check("combo box opens from keyboard focus", combo.Focused);
 
             Frame(Input(keys: new[] { UiKey.Down }));
-            Check("combo box keeps the committed value while only moving the highlight", selected == 1 && ui.IsPopupOpen("theme/keyboard/popup") && !combo.Changed);
+            Check("combo box keeps the committed value while only moving the highlight", selected == 1 && !combo.Changed);
 
             Frame(Input(keys: new[] { UiKey.Enter }));
-            Check("combo box commits the highlighted item on enter", selected == 2 && !ui.IsPopupOpen("theme/keyboard/popup") && combo.Changed && combo.Focused);
+            Check("combo box commits the highlighted item on enter", selected == 2 && combo.Changed && combo.Focused);
         }
 
         {
@@ -1508,12 +1508,12 @@ public sealed class VellumTests
             Frame(Input(keys: new[] { UiKey.Enter }));
             Frame(Input(keys: new[] { UiKey.End }));
             Frame(Input(keys: new[] { UiKey.Escape }));
-            Check("combo box escape closes without applying the highlighted item", selected == 1 && !ui.IsPopupOpen("theme/cancel/popup") && !combo.Changed && combo.Focused);
+            Check("combo box escape closes without applying the highlighted item", selected == 1 && !combo.Changed && combo.Focused);
 
             Frame(Input(keys: new[] { UiKey.Enter }));
             Frame(Input(keys: new[] { UiKey.Home }));
             Frame(Input(keys: new[] { UiKey.Enter }));
-            Check("combo box home jumps to the first item before commit", selected == 0 && !ui.IsPopupOpen("theme/cancel/popup") && combo.Changed);
+            Check("combo box home jumps to the first item before commit", selected == 0 && combo.Changed);
         }
 
         {

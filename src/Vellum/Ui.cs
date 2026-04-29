@@ -904,6 +904,8 @@ public sealed partial class Ui : IDisposable
 
     private int MakeId(Guid value) => HashMix(CurrentIdSeed, HashGuid(value));
 
+    private static int MakeChildId(int parentId, ReadOnlySpan<char> child) => HashMix(parentId, HashString(child));
+
     private static int HashMix(int a, int b) => (int)((uint)a * 2654435761u ^ (uint)b);
 
     private static int HashString(ReadOnlySpan<char> text)

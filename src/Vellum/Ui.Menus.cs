@@ -179,8 +179,7 @@ public sealed partial class Ui
 
         string resolvedId = id ?? label;
         int widgetId = MakeId(resolvedId);
-        string popupId = resolvedId + "/menu";
-        int popupWidgetId = MakeId(popupId);
+        int popupWidgetId = MakeChildId(widgetId, "menu");
         _menuPopupIds.Add(popupWidgetId);
         bool popupOpen = IsPopupOpen(popupWidgetId);
         bool menuRootActive = topLevel && IsRootMenuPopupActive();
@@ -212,7 +211,7 @@ public sealed partial class Ui
         bool allowHoverOpen = !topLevel || menuRootActive || openOnHover;
         if (enabled && !popupOpen && hover && allowHoverOpen)
         {
-            OpenPopup(popupId);
+            OpenPopupById(popupWidgetId);
             popupOpen = true;
             openedThisFrame = true;
             popupTransitionHovered = false;
@@ -223,13 +222,13 @@ public sealed partial class Ui
         {
             if (popupOpen)
             {
-                ClosePopup(popupId);
+                ClosePopupById(popupWidgetId);
                 popupOpen = false;
                 closedThisFrame = true;
             }
             else
             {
-                OpenPopup(popupId);
+                OpenPopupById(popupWidgetId);
                 popupOpen = true;
                 openedThisFrame = true;
             }
@@ -237,7 +236,7 @@ public sealed partial class Ui
 
         if (enabled && focused && popupOpen && _input.IsPressed(UiKey.Escape))
         {
-            ClosePopup(popupId);
+            ClosePopupById(popupWidgetId);
             popupOpen = false;
             closedThisFrame = true;
         }
@@ -251,7 +250,7 @@ public sealed partial class Ui
             !popupTransitionHovered &&
             !popupPathHovered)
         {
-            ClosePopup(popupId);
+            ClosePopupById(popupWidgetId);
             popupOpen = false;
             closedThisFrame = true;
         }
@@ -302,7 +301,7 @@ public sealed partial class Ui
                 float popupAnchorX = ResolveMenuPopupAnchorX(!sidePopup, x, resolvedWidth, resolvedPopupWidth);
                 float popupAnchorY = sidePopup ? y : y + resolvedHeight;
 
-                Popup(popupId, popupAnchorX, popupAnchorY, resolvedPopupWidth, maxPopupHeight, popup =>
+                Popup(popupWidgetId, popupAnchorX, popupAnchorY, resolvedPopupWidth, maxPopupHeight, popup =>
                 {
                     popup.ItemSpacing(0);
                     content(popup, state);

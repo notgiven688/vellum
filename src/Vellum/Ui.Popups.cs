@@ -75,7 +75,7 @@ public sealed partial class Ui
         float maxHeight,
         Action<Ui> content,
         bool enabled = true)
-        => QueuePopupRequest(id, anchorX, anchorY, width, maxHeight, content, enabled, isModal: false);
+        => QueuePopupRequest(MakeId(id), anchorX, anchorY, width, maxHeight, content, enabled, isModal: false, $"Popup \"{id}\"");
 
     /// <summary>Declares a modal popup centered in the viewport.</summary>
     public bool ModalPopup(string id, float width, float maxHeight, Action<Ui> content, bool enabled = true)
@@ -85,7 +85,7 @@ public sealed partial class Ui
     public bool ModalPopup<TState>(string id, float width, float maxHeight, TState state, Action<Ui, TState> content, bool enabled = true)
     {
         ArgumentNullException.ThrowIfNull(content);
-        return QueuePopupRequest(id, 0f, 0f, width, maxHeight, popup => content(popup, state), enabled, isModal: true);
+        return QueuePopupRequest(MakeId(id), 0f, 0f, width, maxHeight, popup => content(popup, state), enabled, isModal: true, $"ModalPopup \"{id}\"");
     }
 
     /// <summary>Declares a popup anchored below a widget response.</summary>
@@ -98,19 +98,29 @@ public sealed partial class Ui
         bool enabled = true)
         => Popup(id, anchor.X, anchor.Y + anchor.H, width, maxHeight, content, enabled);
 
+    private bool Popup(
+        int popupId,
+        float anchorX,
+        float anchorY,
+        float width,
+        float maxHeight,
+        Action<Ui> content,
+        bool enabled = true)
+        => QueuePopupRequest(popupId, anchorX, anchorY, width, maxHeight, content, enabled, isModal: false, "Popup");
+
     private bool QueuePopupRequest(
-        string id,
+        int popupId,
         float anchorX,
         float anchorY,
         float width,
         float maxHeight,
         Action<Ui> content,
         bool enabled,
-        bool isModal)
+        bool isModal,
+        string diagnosticName)
     {
         ArgumentNullException.ThrowIfNull(content);
 
-        int popupId = MakeId(id);
         if (!IsPopupOpen(popupId)) return false;
 
         if (!enabled)
@@ -123,7 +133,7 @@ public sealed partial class Ui
         if (!CanQueuePopupRequest(popupId, depth))
             return false;
 
-        RegisterWidgetId(popupId, isModal ? $"ModalPopup \"{id}\"" : $"Popup \"{id}\"");
+        RegisterWidgetId(popupId, diagnosticName);
 
         if (isModal)
             _modalPopupIdsCurrent.Add(popupId);

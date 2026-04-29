@@ -1566,11 +1566,10 @@ public sealed partial class Ui
         float s = size ?? DefaultFontSize;
         var pad = Theme.ComboBoxPadding;
         string resolvedId = id ?? label;
-        string popupId = resolvedId + "/popup";
-        int popupWidgetId = MakeId(popupId);
         bool selectionChanged = false;
         bool appliedPendingSelection = false;
         int widgetId = MakeId(resolvedId);
+        int popupWidgetId = MakeChildId(widgetId, "popup");
         var comboState = GetState<ComboBoxState>(widgetId);
 
         if (comboState.HasPendingSelection)
@@ -1579,7 +1578,7 @@ public sealed partial class Ui
             comboState.PendingSelectedIndex = -1;
             comboState.HasPendingSelection = false;
             appliedPendingSelection = true;
-            ClosePopup(popupId);
+            ClosePopupById(popupWidgetId);
             SetFocus(widgetId);
         }
 
@@ -1602,7 +1601,7 @@ public sealed partial class Ui
         var popupState = GetState<PopupState>(popupWidgetId);
         var (x, y) = Place(width, h);
 
-        bool popupOpen = IsPopupOpen(popupId);
+        bool popupOpen = IsPopupOpen(popupWidgetId);
         bool registeredFocus = RegisterFocusable(widgetId, enabled);
         bool focused = registeredFocus || (enabled && _focusedId == widgetId);
         bool ensureHighlightedVisible = false;
@@ -1635,13 +1634,13 @@ public sealed partial class Ui
         {
             if (popupOpen)
             {
-                ClosePopup(popupId);
+                ClosePopupById(popupWidgetId);
                 popupOpen = false;
                 comboState.HighlightedIndex = selected;
             }
             else
             {
-                OpenPopup(popupId);
+                OpenPopupById(popupWidgetId);
                 popupOpen = true;
                 openedThisFrame = true;
                 comboState.HighlightedIndex = selected;
@@ -1668,7 +1667,7 @@ public sealed partial class Ui
 
             if (_input.IsPressed(UiKey.Escape))
             {
-                ClosePopup(popupId);
+                ClosePopupById(popupWidgetId);
                 popupOpen = false;
                 comboState.HighlightedIndex = selected;
             }
@@ -1680,7 +1679,7 @@ public sealed partial class Ui
                     selectionChanged = true;
                 }
 
-                ClosePopup(popupId);
+                ClosePopupById(popupWidgetId);
                 popupOpen = false;
                 comboState.HighlightedIndex = selected;
             }
@@ -1719,7 +1718,7 @@ public sealed partial class Ui
 
         if (popupOpen)
         {
-            Popup(popupId, x, y + h, width, maxPopupHeight, popup =>
+            Popup(popupWidgetId, x, y + h, width, maxPopupHeight, popup =>
             {
                 popup.ItemSpacing(0);
                 for (int i = 0; i < options.Count; i++)
@@ -1734,7 +1733,7 @@ public sealed partial class Ui
                         comboState.HighlightedIndex = i;
                         comboState.PendingSelectedIndex = i;
                         comboState.HasPendingSelection = true;
-                        ClosePopup(popupId);
+                        ClosePopupById(popupWidgetId);
                     }
                 }
             });

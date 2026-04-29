@@ -24,8 +24,8 @@ public sealed partial class Ui
     {
         ArgumentNullException.ThrowIfNull(content);
 
-        var ctxState = GetState<ContextMenuState>(MakeId(id + "/ctx-anchor"));
         int popupWidgetId = MakeId(id);
+        var ctxState = GetState<ContextMenuState>(MakeChildId(popupWidgetId, "ctx-anchor"));
 
         if (target.Hovered && IsMousePressed(UiMouseButton.Right))
         {
