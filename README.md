@@ -15,7 +15,7 @@
 
 ## Motivation
 
-The C# ecosystem does not really have a first-class intermediate GUI library. Dear ImGui is excellent, but from C# it usually means a C wrapper plus a .NET binding. Vellum exists for cases where a small C# UI layer is enough.
+The C# ecosystem does not really have a first-class immediate-mode GUI library. Dear ImGui is excellent, but from C# it usually means a C wrapper plus a .NET binding. Vellum exists for cases where a small C# UI layer is enough.
 
 The original goal was rendering a UI window inside the [Jitter Physics](https://github.com/notgiven688/jitterphysics2) demo without pulling in a native GUI stack.
 
