@@ -67,7 +67,7 @@ Most widgets return a `Response`. Common fields are `Hovered`, `Pressed`, `Click
 
 ## Layout
 
-Vellum has simple immediate layout scopes. Use panels for framed regions and `Horizontal`, `Vertical`, `Width`, and `MaxWidth` to control placement.
+Vellum has simple immediate layout scopes. Use panels for framed regions and `Row`, `Column`, `FixedWidth`, and `MaxWidth` to control placement.
 
 ```csharp
 ui.Frame(width, height, mouse, input, root =>
@@ -80,13 +80,13 @@ ui.Frame(width, height, mouse, input, root =>
         {
             panel.Heading("Profile");
 
-            panel.Horizontal(row =>
+            panel.Row(row =>
             {
                 row.Label("Name");
                 row.TextField("name", ref name, width: 260f);
             });
 
-            panel.Horizontal(row =>
+            panel.Row(row =>
             {
                 if (row.Button("Save").Clicked)
                     Save(name);

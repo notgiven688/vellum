@@ -632,7 +632,7 @@ public sealed class VellumTests
 
         ui.Frame(400, 300, Vector2.Zero, false, frame =>
         {
-            frame.Horizontal(frame =>
+            frame.Row(frame =>
             {
                 frame.Label("Name:");
                 rowRemaining = frame.AvailableWidth;
@@ -658,7 +658,7 @@ public sealed class VellumTests
         Response rightButton = default;
         ui.Frame(400, 300, Vector2.Zero, false, frame =>
         {
-            frame.Width(140, frame =>
+            frame.FixedWidth(140, frame =>
             {
                 rightButton = frame.Button("Right", width: frame.AvailableWidth);
             }, align: UiAlign.End);
@@ -684,14 +684,14 @@ public sealed class VellumTests
         {
             ui.Frame(400, 300, mouse, mouseDown, input, frame =>
             {
-                using (frame.Horizontal())
+                using (frame.Row())
                 {
-                    using (frame.Width(splitterPaneWidth))
+                    using (frame.FixedWidth(splitterPaneWidth))
                         frame.Label("Left");
 
                     splitter = frame.Splitter("layout-splitter", ref splitterPaneWidth, 80f, 180f, thickness: 8f, height: 44f);
 
-                    using (frame.Width(frame.AvailableWidth))
+                    using (frame.FixedWidth(frame.AvailableWidth))
                         splitterRight = frame.Button("Right", width: frame.AvailableWidth);
                 }
             });
@@ -2328,7 +2328,7 @@ public sealed class VellumTests
 
             ui.Frame(400, 300, mouse, mouseDown, input, frame =>
             {
-                frame.Horizontal(frame =>
+                frame.Row(frame =>
                 {
                     anchor = frame.Button("Menu");
                     outside = frame.Button("Outside");

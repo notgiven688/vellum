@@ -44,7 +44,7 @@ public sealed partial class Ui
 
         try
         {
-            using (Horizontal())
+            using (Row())
                 content(this, state);
         }
         finally

@@ -301,10 +301,10 @@ static Response DrawHeaderPanel(Ui host, DemoState state, bool wideLayout)
         string stats = $"Theme: {ThemeLabel(state.SelectedTheme)} · Density: {DensityLabel(state.Density)} · Action: {(state.SelectedAction > 0 ? state.SelectedAction : 0)}";
         if (context.WideLayout)
         {
-            using (header.Horizontal())
+            using (header.Row())
             {
                 float summaryWidth = MathF.Max(0, MathF.Floor(header.AvailableWidth * 0.52f));
-                using (header.Width(summaryWidth))
+                using (header.FixedWidth(summaryWidth))
                 {
                     header.ProgressBar(MathF.Min(1f, state.ClickCount / 10f), header.AvailableWidth, overlay: $"Clicks: {Math.Min(state.ClickCount, 10)}/10");
                     header.Label(
@@ -314,7 +314,7 @@ static Response DrawHeaderPanel(Ui host, DemoState state, bool wideLayout)
                         wrap: TextWrapMode.WordWrap);
                 }
 
-                using (header.Width(header.AvailableWidth))
+                using (header.FixedWidth(header.AvailableWidth))
                     DrawQuickActions(header, state);
             }
         }
@@ -332,13 +332,13 @@ static void DrawBody(Ui body, DemoState state, bool wideLayout, int checkerTextu
 {
     if (wideLayout)
     {
-        using (body.Horizontal())
+        using (body.Row())
         {
             float sidebarWidth = MathF.Min(280f, MathF.Max(236f, body.AvailableWidth * 0.32f));
 
-            using (body.Width(sidebarWidth))
+            using (body.FixedWidth(sidebarWidth))
                 DrawSettingsPanel(body, state, checkerTexture);
-            using (body.Width(body.AvailableWidth))
+            using (body.FixedWidth(body.AvailableWidth))
             {
                 DrawWorkspacePanel(body, state);
                 DrawActivityPanel(body, state);
@@ -359,13 +359,13 @@ static void DrawQuickActions(Ui panel, DemoState state)
 
     if (panel.AvailableWidth >= 280f)
     {
-        using (panel.Horizontal())
+        using (panel.Row())
         {
             if (panel.Button("Click me", width: rowWidth).Clicked) state.ClickCount++;
             if (panel.Button("Reset", width: rowWidth).Clicked) state.ClickCount = 0;
         }
 
-        using (panel.Horizontal())
+        using (panel.Row())
         {
             if (panel.Button("Focus name", width: rowWidth).Clicked)
                 panel.RequestFocus("name");
@@ -417,15 +417,15 @@ static void DrawSettingsPanel(Ui host, DemoState state, int checkerTexture)
         panel.Label($"Volume: {state.Volume:0}%", color: panel.Theme.TextSecondary);
         panel.Slider("volume", ref state.Volume, 0, 100, panel.AvailableWidth, step: 1, label: "volume");
         panel.Spacing(4);
-        using (panel.Horizontal())
+        using (panel.Row())
         {
             float halfWidth = MathF.Max(0, MathF.Floor((panel.AvailableWidth - panel.Theme.Gap) * 0.5f));
-            using (panel.Width(halfWidth))
+            using (panel.FixedWidth(halfWidth))
             {
                 panel.Label("Sensitivity", color: panel.Theme.TextSecondary);
                 panel.DragFloat("sensitivity", ref state.Sensitivity, speed: 0.01f, min: 0f, max: 10f, width: panel.AvailableWidth);
             }
-            using (panel.Width(panel.AvailableWidth))
+            using (panel.FixedWidth(panel.AvailableWidth))
             {
                 panel.Label("Max retries", color: panel.Theme.TextSecondary);
                 panel.DragInt("maxRetries", ref state.MaxRetries, speed: 0.1f, min: 0, max: 10, width: panel.AvailableWidth);
@@ -525,30 +525,30 @@ static void DrawWorkspacePanel(Ui host, DemoState state)
                     {
                         frame.ItemSpacing(6);
 
-                        using (frame.Horizontal())
+                        using (frame.Row())
                         {
-                            using (frame.Width(80f))
+                            using (frame.FixedWidth(80f))
                                 frame.Label("Name", color: frame.Theme.TextSecondary);
                             frame.Separator();
-                            using (frame.Width(frame.AvailableWidth))
+                            using (frame.FixedWidth(frame.AvailableWidth))
                                 frame.TextField("profileName", ref state.Name, frame.AvailableWidth);
                         }
 
-                        using (frame.Horizontal())
+                        using (frame.Row())
                         {
-                            using (frame.Width(80f))
+                            using (frame.FixedWidth(80f))
                                 frame.Label("Email", color: frame.Theme.TextSecondary);
                             frame.Separator();
-                            using (frame.Width(frame.AvailableWidth))
+                            using (frame.FixedWidth(frame.AvailableWidth))
                                 frame.TextField("profileEmail", ref state.Email, frame.AvailableWidth);
                         }
 
-                        using (frame.Horizontal())
+                        using (frame.Row())
                         {
-                            using (frame.Width(80f))
+                            using (frame.FixedWidth(80f))
                                 frame.Label("Role", color: frame.Theme.TextSecondary);
                             frame.Separator();
-                            using (frame.Width(frame.AvailableWidth))
+                            using (frame.FixedWidth(frame.AvailableWidth))
                                 frame.TextField("profileRole", ref state.Role, frame.AvailableWidth);
                         }
                     });
@@ -566,16 +566,16 @@ static void DrawActivityPanel(Ui host, DemoState state)
 
         if (panel.AvailableWidth >= 520f)
         {
-            using (panel.Horizontal())
+            using (panel.Row())
             {
                 float leftWidth = MathF.Max(0, MathF.Floor((panel.AvailableWidth - panel.Theme.Gap) * 0.4f));
-                using (panel.Width(leftWidth))
+                using (panel.FixedWidth(leftWidth))
                 {
                     panel.Label("Actions", color: panel.Theme.TextSecondary);
                     panel.ScrollArea("actions", panel.AvailableWidth, 236, state, static (actions, state) => DrawActionButtons(actions, state));
                 }
 
-                using (panel.Width(panel.AvailableWidth))
+                using (panel.FixedWidth(panel.AvailableWidth))
                     DrawStatusCanvas(panel, state);
             }
         }
@@ -765,7 +765,7 @@ static void DrawInspector(Ui window, DemoState state)
     window.Label(state.SelectedAction > 0 ? $"Action: {state.SelectedAction}" : "Action: none", color: window.Theme.TextSecondary);
     window.Separator();
     window.Label("Performance", color: window.Theme.Accent);
-    window.Horizontal(static row =>
+    window.Row(static row =>
     {
         row.Spinner(16f, thickness: 2.5f);
         row.Label("Render loop active", color: row.Theme.TextSecondary);
@@ -894,7 +894,7 @@ static void DrawSettingsDialog(Ui modal, DemoState state)
     modal.ComboBox("modalTheme", DemoState.ThemeOptions, ref state.SelectedTheme, modal.AvailableWidth, maxPopupHeight: 140f);
     modal.Spacing(8);
 
-    using (modal.Horizontal())
+    using (modal.Row())
     {
         float halfWidth = MathF.Max(0, MathF.Floor((modal.AvailableWidth - modal.Theme.Gap) * 0.5f));
 

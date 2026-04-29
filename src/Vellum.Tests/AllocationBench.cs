@@ -30,14 +30,14 @@ internal static class AllocationBench
             string s = "line 1\nline 2\nline 3\nline 4\nline 5\nline 6\nline 7\nline 8\nline 9\nline 10";
             ui.TextArea("notes", ref s, 200, 200);
         });
-        Measure("horizontal+width nested", font, static ui =>
+        Measure("row+fixed width nested", font, static ui =>
         {
             for (int i = 0; i < 20; i++)
             {
-                using (ui.Horizontal())
+                using (ui.Row())
                 {
-                    using (ui.Width(100)) ui.Label("Left");
-                    using (ui.Width(100)) ui.Label("Right");
+                    using (ui.FixedWidth(100)) ui.Label("Left");
+                    using (ui.FixedWidth(100)) ui.Label("Right");
                 }
             }
         });

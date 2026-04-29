@@ -145,7 +145,7 @@ public sealed class WindowState
 
 /// <summary>
 /// Immediate-mode GUI context. Layout scopes are opened with lambdas
-/// (Horizontal / Vertical), widgets are methods that return a Response.
+/// (Row / Column), widgets are methods that return a Response.
 /// </summary>
 public sealed partial class Ui : IDisposable
 {
@@ -594,25 +594,25 @@ public sealed partial class Ui : IDisposable
     /// <summary>Remaining width available in the current layout scope.</summary>
     public float AvailableWidth => _layouts.Count > 0 ? GetAvailableWidth(Top) : 0;
 
-    /// <summary>Opens a horizontal layout scope for the callback.</summary>
-    public void Horizontal(Action<Ui> content) => Scope(LayoutDir.Horizontal, null, UiAlign.Start, reserveWidth: false, content);
-    /// <summary>Opens a vertical layout scope for the callback.</summary>
-    public void Vertical(Action<Ui> content) => Scope(LayoutDir.Vertical, null, UiAlign.Start, reserveWidth: false, content);
+    /// <summary>Opens a row layout scope for the callback.</summary>
+    public void Row(Action<Ui> content) => Scope(LayoutDir.Horizontal, null, UiAlign.Start, reserveWidth: false, content);
+    /// <summary>Opens a column layout scope for the callback.</summary>
+    public void Column(Action<Ui> content) => Scope(LayoutDir.Vertical, null, UiAlign.Start, reserveWidth: false, content);
 
     /// <summary>Opens a fixed-width vertical layout scope for the callback.</summary>
-    public void Width(float width, Action<Ui> content, UiAlign align = UiAlign.Start)
+    public void FixedWidth(float width, Action<Ui> content, UiAlign align = UiAlign.Start)
         => Scope(LayoutDir.Vertical, width, align, reserveWidth: true, content);
 
     /// <summary>Opens a vertical layout scope clamped to the current available width.</summary>
     public void MaxWidth(float maxWidth, Action<Ui> content, UiAlign align = UiAlign.Start)
         => Scope(LayoutDir.Vertical, MathF.Min(MathF.Max(0, maxWidth), AvailableWidth), align, reserveWidth: true, content);
 
-    /// <summary>Opens a horizontal layout scope that is closed when the returned handle is disposed.</summary>
-    public LayoutScopeHandle Horizontal() => OpenScope(LayoutDir.Horizontal, null, UiAlign.Start, reserveWidth: false);
-    /// <summary>Opens a vertical layout scope that is closed when the returned handle is disposed.</summary>
-    public LayoutScopeHandle Vertical() => OpenScope(LayoutDir.Vertical, null, UiAlign.Start, reserveWidth: false);
+    /// <summary>Opens a row layout scope that is closed when the returned handle is disposed.</summary>
+    public LayoutScopeHandle Row() => OpenScope(LayoutDir.Horizontal, null, UiAlign.Start, reserveWidth: false);
+    /// <summary>Opens a column layout scope that is closed when the returned handle is disposed.</summary>
+    public LayoutScopeHandle Column() => OpenScope(LayoutDir.Vertical, null, UiAlign.Start, reserveWidth: false);
     /// <summary>Opens a fixed-width layout scope that is closed when the returned handle is disposed.</summary>
-    public LayoutScopeHandle Width(float width, UiAlign align = UiAlign.Start)
+    public LayoutScopeHandle FixedWidth(float width, UiAlign align = UiAlign.Start)
         => OpenScope(LayoutDir.Vertical, width, align, reserveWidth: true);
     /// <summary>Opens a max-width layout scope that is closed when the returned handle is disposed.</summary>
     public LayoutScopeHandle MaxWidth(float maxWidth, UiAlign align = UiAlign.Start)

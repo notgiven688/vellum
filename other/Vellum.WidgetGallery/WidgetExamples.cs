@@ -99,7 +99,7 @@ internal static class WidgetExamples
 
         new("spinner", "Spinner", "Status", 220, 92, (ui, _) =>
         {
-            using (ui.Horizontal())
+            using (ui.Row())
             {
                 ui.Spinner(28f);
                 ui.Label("Loading");
@@ -142,14 +142,14 @@ internal static class WidgetExamples
         new("splitter", "Splitter", "Layout", 440, 146, (ui, _) =>
         {
             float left = 150f;
-            using (ui.Horizontal())
+            using (ui.Row())
             {
-                using (ui.Width(left))
+                using (ui.FixedWidth(left))
                     ui.Panel(ui.AvailableWidth, 88f, panel => panel.Label("Left pane"));
 
                 ui.Splitter("main", ref left, 100f, 240f, thickness: 8f, height: 88f);
 
-                using (ui.Width(ui.AvailableWidth))
+                using (ui.FixedWidth(ui.AvailableWidth))
                     ui.Panel(ui.AvailableWidth, 88f, panel => panel.Label("Right pane"));
             }
         }, Mouse: new Vector2(176, 42)),
