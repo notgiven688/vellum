@@ -32,6 +32,7 @@ public sealed partial class Ui
         ArgumentNullException.ThrowIfNull(content);
 
         int widgetId = MakeId(id);
+        RegisterWidgetId(widgetId, $"TabBar \"{id}\"");
         var tabState = GetState<TabBarState>(widgetId);
         float availableWidth = AvailableWidth;
 

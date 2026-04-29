@@ -119,6 +119,8 @@ ui.Button("Save", id: "save-primary");
 ui.Button("Save", id: "save-secondary");
 ```
 
+Debug builds throw when two widgets resolve to the same ID in one frame, so duplicate labels are caught early.
+
 ## Windows
 
 Windows keep runtime position, size, collapse, and close state in a `WindowState` value owned by your application.

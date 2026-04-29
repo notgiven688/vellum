@@ -1100,6 +1100,30 @@ public sealed class VellumTests
             Check("explicit widget ids disambiguate same-label widgets", !primary.Activated && secondary.Activated);
         }
 
+#if DEBUG
+        {
+            var renderer = new TestRenderer();
+            var ui = new Ui(renderer)
+            {
+                Font = font,
+                DefaultFontSize = 18f,
+                Lcd = false
+            };
+
+            var ex = Assert.Throws<InvalidOperationException>(() =>
+            {
+                ui.Frame(800, 600, Vector2.Zero, false, frame =>
+                {
+                    frame.Button("Duplicate");
+                    frame.Button("Duplicate");
+                });
+            });
+
+            Check("duplicate widget ids throw in debug builds",
+                ex.Message.Contains("Duplicate Vellum widget id", StringComparison.Ordinal));
+        }
+#endif
+
         {
             var renderer = new TestRenderer();
             var ui = new Ui(renderer)

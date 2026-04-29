@@ -44,6 +44,7 @@ public sealed partial class Ui
         const float ScrollbarGap = 4f;
 
         int widgetId = MakeId(id);
+        RegisterWidgetId(widgetId, $"ScrollArea \"{id}\"");
         var state = GetState<ScrollAreaState>(widgetId);
         var (x, y) = Place(width, height);
         float border = FrameBorderWidth;
@@ -224,6 +225,7 @@ public sealed partial class Ui
         const float ScrollbarGap = 4f;
 
         int widgetId = MakeId(id);
+        RegisterWidgetId(widgetId, $"ScrollArea \"{id}\"");
         var state = GetState<ScrollAreaState>(widgetId);
         var (x, y) = Place(width, height);
         float border = FrameBorderWidth;
@@ -410,6 +412,7 @@ public sealed partial class Ui
         enabled = ResolveEnabled(enabled);
 
         int widgetId = MakeId(id);
+        RegisterWidgetId(widgetId, $"ScrollAreaBoth \"{id}\"");
         var state = GetState<ScrollAreaState>(widgetId);
         var (x, y) = Place(width, height);
         float border = FrameBorderWidth;

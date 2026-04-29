@@ -46,6 +46,7 @@ public sealed partial class Ui
         ArgumentNullException.ThrowIfNull(content);
 
         int windowId = MakeId(id);
+        RegisterWidgetId(windowId, $"Window \"{id}\"");
         EnsureWindowOrder(windowId);
 
         if (!state.Open)
@@ -437,7 +438,19 @@ public sealed partial class Ui
                 contentW = MathF.Max(0, resolvedWidth - border * 2 - bodyPad.Horizontal - scrollbarReserve);
 
                 _hotId = hotIdBeforeContent;
+#if DEBUG
+                _debugDuplicateIdCheckSuppressionDepth++;
+                try
+                {
+                    contentPainter = RenderContentPass(contentW, out contentHeight, out hotIdAfterContent);
+                }
+                finally
+                {
+                    _debugDuplicateIdCheckSuppressionDepth--;
+                }
+#else
                 contentPainter = RenderContentPass(contentW, out contentHeight, out hotIdAfterContent);
+#endif
             }
 
             if (!bodyScrollable)

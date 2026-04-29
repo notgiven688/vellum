@@ -278,6 +278,10 @@ public sealed partial class Ui : IDisposable
     private int _hotId, _activeId, _focusedId;
     private UiCursor _requestedCursor;
     private readonly Stack<int> _idStack = new();
+#if DEBUG
+    private readonly HashSet<int> _debugRegisteredWidgetIds = new();
+    private int _debugDuplicateIdCheckSuppressionDepth;
+#endif
 
     // Per-frame focus navigation
     private bool _tabNavigationRequested;
@@ -464,6 +468,10 @@ public sealed partial class Ui : IDisposable
         UpdateMouseButtons(mouseDown);
 
         _idStack.Clear();
+#if DEBUG
+        _debugRegisteredWidgetIds.Clear();
+        _debugDuplicateIdCheckSuppressionDepth = 0;
+#endif
         _hotId = 0;
         _requestedCursor = UiCursor.Arrow;
         _tabNavigationRequested = _input.IsPressed(UiKey.Tab);
@@ -555,6 +563,10 @@ public sealed partial class Ui : IDisposable
         _layouts.Clear();
         _hitClips.Clear();
         _idStack.Clear();
+#if DEBUG
+        _debugRegisteredWidgetIds.Clear();
+        _debugDuplicateIdCheckSuppressionDepth = 0;
+#endif
         _popupContext.Clear();
         _windowContextId = 0;
         _menuMeasureOnly = false;
@@ -1059,6 +1071,7 @@ public sealed partial class Ui : IDisposable
 
     private bool RegisterFocusable(int id, bool enabled)
     {
+        RegisterWidgetId(id);
         MarkWidgetSeen(id);
 
         if (!enabled)
@@ -1196,6 +1209,23 @@ public sealed partial class Ui : IDisposable
     {
         if (id != 0)
             _seenWidgetIds.Add(id);
+    }
+
+    [Conditional("DEBUG")]
+    private void RegisterWidgetId(int id, string? message = null)
+    {
+#if DEBUG
+        if (id == 0 || _debugDuplicateIdCheckSuppressionDepth > 0 || _menuMeasureOnly)
+            return;
+
+        if (_debugRegisteredWidgetIds.Add(id))
+            return;
+
+        string suffix = string.IsNullOrWhiteSpace(message) ? string.Empty : $" ({message})";
+        throw new InvalidOperationException(
+            $"Duplicate Vellum widget id {id}{suffix}. " +
+            "Wrap repeated data in ui.Id(...), or pass a named id: value when same-label widgets share a scope.");
+#endif
     }
 
     private void ClearInteractionForMissingWidgets()

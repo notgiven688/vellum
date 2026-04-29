@@ -123,6 +123,8 @@ public sealed partial class Ui
         if (!CanQueuePopupRequest(popupId, depth))
             return false;
 
+        RegisterWidgetId(popupId, isModal ? $"ModalPopup \"{id}\"" : $"Popup \"{id}\"");
+
         if (isModal)
             _modalPopupIdsCurrent.Add(popupId);
 
