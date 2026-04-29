@@ -234,7 +234,7 @@ public sealed partial class Ui
         return string.Format(System.Globalization.CultureInfo.InvariantCulture, fmt, value);
     }
 
-    private static string BuildSliderDisplay(string? label, string valueText)
+    private static string BuildValueDisplay(string? label, string valueText)
         => string.IsNullOrWhiteSpace(label) ? valueText : $"{label} ({valueText})";
 
     private float ResolveSliderBlockWidth(float innerWidth)
@@ -1756,7 +1756,7 @@ public sealed partial class Ui
 
     /// <summary>Draws a floating-point slider.</summary>
     public Response Slider(
-        string labelOrId,
+        string label,
         ref float value,
         float min,
         float max,
@@ -1764,7 +1764,6 @@ public sealed partial class Ui
         float? step = null,
         bool enabled = true,
         string? format = null,
-        string? label = null,
         string? id = null)
     {
         enabled = ResolveEnabled(enabled);
@@ -1773,8 +1772,8 @@ public sealed partial class Ui
 
         value = SnapSliderValue(value, min, max, step);
 
-        int widgetId = MakeId(id ?? labelOrId);
-        string display = BuildSliderDisplay(label, FormatSliderValue(value, format));
+        int widgetId = MakeId(id ?? label);
+        string display = BuildValueDisplay(label, FormatSliderValue(value, format));
         float textMaxWidth = MathF.Max(0, width - FrameBorderWidth * 2 - 8f);
         var layout = LayoutText(display, DefaultFontSize, maxWidth: textMaxWidth, overflow: TextOverflowMode.Ellipsis);
         float h = MathF.Max(Theme.SliderHeight, layout.Height + FrameBorderWidth * 2 + 6f);
@@ -1856,7 +1855,7 @@ public sealed partial class Ui
 
         if (changed)
         {
-            display = BuildSliderDisplay(label, FormatSliderValue(value, format));
+            display = BuildValueDisplay(label, FormatSliderValue(value, format));
             layout = LayoutText(display, DefaultFontSize, maxWidth: textMaxWidth, overflow: TextOverflowMode.Ellipsis);
         }
 
@@ -1881,7 +1880,7 @@ public sealed partial class Ui
 
     /// <summary>Draws an integer slider.</summary>
     public Response SliderInt(
-        string labelOrId,
+        string label,
         ref int value,
         int min,
         int max,
@@ -1889,18 +1888,17 @@ public sealed partial class Ui
         int step = 1,
         bool enabled = true,
         string? format = null,
-        string? label = null,
         string? id = null)
     {
         float current = value;
-        Response response = Slider(labelOrId, ref current, min, max, width, step, enabled, format ?? "{0:0}", label, id);
+        Response response = Slider(label, ref current, min, max, width, step, enabled, format ?? "{0:0}", id: id);
         value = (int)MathF.Round(current);
         return response;
     }
 
     /// <summary>Draws a draggable floating-point value editor.</summary>
     public Response DragFloat(
-        string labelOrId,
+        string label,
         ref float value,
         float speed = 1f,
         float? min = null,
@@ -1919,13 +1917,16 @@ public sealed partial class Ui
 
         float s = size ?? DefaultFontSize;
         var pad = Theme.ButtonPadding;
-        int widgetId = MakeId(id ?? labelOrId);
+        int widgetId = MakeId(id ?? label);
         string fmt = format ?? "{0:0.00}";
 
-        string display = string.Format(System.Globalization.CultureInfo.InvariantCulture, fmt, value);
+        string valueText = string.Format(System.Globalization.CultureInfo.InvariantCulture, fmt, value);
+        string display = BuildValueDisplay(label, valueText);
         var layout = LayoutText(display, s);
         float intrinsicW = layout.Width + pad.Horizontal;
         float w = width ?? MathF.Max(96f, intrinsicW);
+        float textMaxWidth = MathF.Max(0, w - pad.Horizontal);
+        layout = LayoutText(display, s, maxWidth: textMaxWidth, overflow: TextOverflowMode.Ellipsis);
         float h = layout.Height + pad.Vertical;
 
         var (x, y) = Place(w, h);
@@ -1979,8 +1980,9 @@ public sealed partial class Ui
 
         if (changed)
         {
-            display = string.Format(System.Globalization.CultureInfo.InvariantCulture, fmt, value);
-            layout = LayoutText(display, s);
+            valueText = string.Format(System.Globalization.CultureInfo.InvariantCulture, fmt, value);
+            display = BuildValueDisplay(label, valueText);
+            layout = LayoutText(display, s, maxWidth: textMaxWidth, overflow: TextOverflowMode.Ellipsis);
         }
 
         float textX = x + MathF.Max(pad.Left, (w - layout.Width) * 0.5f);
@@ -2002,7 +2004,7 @@ public sealed partial class Ui
 
     /// <summary>Draws a draggable integer value editor.</summary>
     public Response DragInt(
-        string labelOrId,
+        string label,
         ref int value,
         float speed = 1f,
         int? min = null,
@@ -2013,7 +2015,7 @@ public sealed partial class Ui
         bool enabled = true,
         string? id = null)
     {
-        int widgetId = MakeId(id ?? labelOrId);
+        int widgetId = MakeId(id ?? label);
         var dragState = GetState<DragIntState>(widgetId);
 
         bool draggingActive = _activeId == widgetId && IsMouseDown(UiMouseButton.Left);
@@ -2022,7 +2024,7 @@ public sealed partial class Ui
 
         int startValue = value;
         Response response = DragFloat(
-            labelOrId,
+            label,
             ref dragState.FloatValue,
             speed,
             min.HasValue ? min.Value : null,

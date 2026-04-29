@@ -2112,7 +2112,7 @@ public sealed class VellumTests
             {
                 ui.Frame(320, 180, mouse, mouseDown, input, frame =>
                 {
-                    slider = frame.Slider("amount", ref value, 0, 100, 180, step: 10, enabled: enabled);
+                    slider = frame.Slider("Amount", ref value, 0, 100, 180, step: 10, enabled: enabled, id: "amount");
                 });
                 changedOnPress |= slider.Changed;
             }
@@ -2142,7 +2142,7 @@ public sealed class VellumTests
 
             ui.Frame(320, 180, Vector2.Zero, false, frame =>
             {
-                slider = frame.Slider("keyboard", ref value, 0, 100, 180, step: 5);
+                slider = frame.Slider("Keyboard", ref value, 0, 100, 180, step: 5, id: "keyboard");
             });
 
             float innerWidth = MathF.Max(0, slider.W - ui.Theme.BorderWidth * 2f);
@@ -2156,27 +2156,27 @@ public sealed class VellumTests
 
             ui.Frame(320, 180, sliderFocusPoint, true, frame =>
             {
-                slider = frame.Slider("keyboard", ref value, 0, 100, 180, step: 5);
+                slider = frame.Slider("Keyboard", ref value, 0, 100, 180, step: 5, id: "keyboard");
             });
             ui.Frame(320, 180, sliderFocusPoint, false, frame =>
             {
-                slider = frame.Slider("keyboard", ref value, 0, 100, 180, step: 5);
+                slider = frame.Slider("Keyboard", ref value, 0, 100, 180, step: 5, id: "keyboard");
             });
             ui.Frame(320, 180, Vector2.Zero, false, Input(keys: new[] { UiKey.Right }), frame =>
             {
-                slider = frame.Slider("keyboard", ref value, 0, 100, 180, step: 5);
+                slider = frame.Slider("Keyboard", ref value, 0, 100, 180, step: 5, id: "keyboard");
             });
             Check("focused slider responds to keyboard nudging", MathF.Abs(value - 45) < 0.1f && slider.Changed && slider.Focused);
 
             ui.Frame(320, 180, Vector2.Zero, false, Input(keys: new[] { UiKey.End }), frame =>
             {
-                slider = frame.Slider("keyboard", ref value, 0, 100, 180, step: 5);
+                slider = frame.Slider("Keyboard", ref value, 0, 100, 180, step: 5, id: "keyboard");
             });
             Check("end moves the slider to max", MathF.Abs(value - 100) < 0.1f && slider.Changed);
 
             ui.Frame(320, 180, Vector2.Zero, false, Input(keys: new[] { UiKey.Home }), frame =>
             {
-                slider = frame.Slider("keyboard", ref value, 0, 100, 180, step: 5);
+                slider = frame.Slider("Keyboard", ref value, 0, 100, 180, step: 5, id: "keyboard");
             });
             Check("home moves the slider to min", MathF.Abs(value - 0) < 0.1f && slider.Changed);
         }
@@ -2195,11 +2195,11 @@ public sealed class VellumTests
 
             ui.Frame(320, 180, Vector2.Zero, false, Input(keys: new[] { UiKey.Tab }), frame =>
             {
-                slider = frame.SliderInt("steps", ref intValue, 0, 10, 180, step: 2);
+                slider = frame.SliderInt("Steps", ref intValue, 0, 10, 180, step: 2, id: "steps");
             });
             ui.Frame(320, 180, Vector2.Zero, false, Input(keys: new[] { UiKey.Right }), frame =>
             {
-                slider = frame.SliderInt("steps", ref intValue, 0, 10, 180, step: 2);
+                slider = frame.SliderInt("Steps", ref intValue, 0, 10, 180, step: 2, id: "steps");
             });
 
             Check("slider int rounds to the stepped value", intValue == 6 && slider.Changed);
@@ -2219,14 +2219,76 @@ public sealed class VellumTests
 
             ui.Frame(320, 180, new Vector2(188, 24), true, frame =>
             {
-                slider = frame.Slider("disabled", ref value, 0, 100, 180, step: 10, enabled: false);
+                slider = frame.Slider("Disabled", ref value, 0, 100, 180, step: 10, enabled: false, id: "disabled");
             });
             ui.Frame(320, 180, new Vector2(188, 24), false, frame =>
             {
-                slider = frame.Slider("disabled", ref value, 0, 100, 180, step: 10, enabled: false);
+                slider = frame.Slider("Disabled", ref value, 0, 100, 180, step: 10, enabled: false, id: "disabled");
             });
 
             Check("disabled slider ignores pointer input", MathF.Abs(value - 20) < 0.1f && slider.Disabled && !slider.Changed);
+        }
+
+        {
+            var renderer = new TestRenderer();
+            var ui = new Ui(renderer)
+            {
+                Font = font,
+                DefaultFontSize = 18f,
+                Lcd = false
+            };
+
+            float value = 1f;
+            Response drag = default;
+            bool changedDuringDrag = false;
+
+            void Frame(Vector2 mouse, bool mouseDown)
+            {
+                ui.Frame(320, 180, mouse, mouseDown, frame =>
+                {
+                    drag = frame.DragFloat("Gain", ref value, speed: 0.1f, min: 0f, max: 5f, width: 180, id: "gain");
+                });
+                changedDuringDrag |= drag.Changed;
+            }
+
+            Frame(new Vector2(40, 24), false);
+            Frame(new Vector2(40, 24), true);
+            Frame(new Vector2(60, 24), true);
+            Frame(new Vector2(60, 24), false);
+
+            Check("drag float updates value from horizontal dragging",
+                MathF.Abs(value - 3f) < 0.1f && changedDuringDrag && drag.W >= 180f);
+        }
+
+        {
+            var renderer = new TestRenderer();
+            var ui = new Ui(renderer)
+            {
+                Font = font,
+                DefaultFontSize = 18f,
+                Lcd = false
+            };
+
+            int value = 3;
+            Response drag = default;
+            bool changedDuringDrag = false;
+
+            void Frame(Vector2 mouse, bool mouseDown)
+            {
+                ui.Frame(320, 180, mouse, mouseDown, frame =>
+                {
+                    drag = frame.DragInt("Count", ref value, speed: 0.25f, min: 0, max: 10, width: 180, id: "count");
+                });
+                changedDuringDrag |= drag.Changed;
+            }
+
+            Frame(new Vector2(40, 24), false);
+            Frame(new Vector2(40, 24), true);
+            Frame(new Vector2(52, 24), true);
+            Frame(new Vector2(52, 24), false);
+
+            Check("drag int updates rounded value from horizontal dragging",
+                value == 6 && changedDuringDrag && drag.W >= 180f);
         }
 
         Console.WriteLine($"Ui slider: {passed} passed, {failed} failed\n");
@@ -2701,7 +2763,7 @@ public sealed class VellumTests
             frame.RadioValue("Warm", ref radioValue, 1, width: 180);
             frame.ProgressBar(0.6f, 180, 20, "60%");
             frame.Histogram(histogramValues, 180, 40, "max. 1.80 ms", scaleMin: 0f, scaleMax: 2f);
-            frame.Slider("slider", ref sliderValue, 0, 100, 180, step: 5, label: "amount");
+            frame.Slider("Amount", ref sliderValue, 0, 100, 180, step: 5, id: "slider");
             frame.Selectable("System", true, width: 180);
             frame.MenuItem("Open recent", selected: false, width: 180);
             frame.Image(7, 180, 40, tint: ui.Theme.Accent);

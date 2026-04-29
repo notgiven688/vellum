@@ -415,7 +415,7 @@ static void DrawSettingsPanel(Ui host, DemoState state, int checkerTexture)
         panel.RadioValue("Relaxed", ref state.Density, 2, width: panel.AvailableWidth);
         panel.Spacing(4);
         panel.Label($"Volume: {state.Volume:0}%", color: panel.Theme.TextSecondary);
-        panel.Slider("volume", ref state.Volume, 0, 100, panel.AvailableWidth, step: 1, label: "volume");
+        panel.Slider("Volume", ref state.Volume, 0, 100, panel.AvailableWidth, step: 1, id: "volume");
         panel.Spacing(4);
         using (panel.Row())
         {
@@ -423,12 +423,12 @@ static void DrawSettingsPanel(Ui host, DemoState state, int checkerTexture)
             using (panel.FixedWidth(halfWidth))
             {
                 panel.Label("Sensitivity", color: panel.Theme.TextSecondary);
-                panel.DragFloat("sensitivity", ref state.Sensitivity, speed: 0.01f, min: 0f, max: 10f, width: panel.AvailableWidth);
+                panel.DragFloat("Sensitivity", ref state.Sensitivity, speed: 0.01f, min: 0f, max: 10f, width: panel.AvailableWidth, id: "sensitivity");
             }
             using (panel.FixedWidth(panel.AvailableWidth))
             {
                 panel.Label("Max retries", color: panel.Theme.TextSecondary);
-                panel.DragInt("maxRetries", ref state.MaxRetries, speed: 0.1f, min: 0, max: 10, width: panel.AvailableWidth);
+                panel.DragInt("Max retries", ref state.MaxRetries, speed: 0.1f, min: 0, max: 10, width: panel.AvailableWidth, id: "maxRetries");
             }
         }
         panel.Spacing(4);

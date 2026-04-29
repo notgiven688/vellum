@@ -65,25 +65,25 @@ internal static class WidgetExamples
         new("slider", "Slider", "Controls", 360, 96, (ui, _) =>
         {
             float volume = 65f;
-            ui.Slider("volume", ref volume, 0f, 100f, 260f, label: "Volume");
+            ui.Slider("Volume", ref volume, 0f, 100f, 260f, id: "volume");
         }),
 
         new("slider-int", "SliderInt", "Controls", 360, 96, (ui, _) =>
         {
             int retries = 3;
-            ui.SliderInt("retries", ref retries, 0, 8, 260f, label: "Retries");
+            ui.SliderInt("Retries", ref retries, 0, 8, 260f, id: "retries");
         }),
 
         new("drag-float", "DragFloat", "Controls", 320, 92, (ui, _) =>
         {
             float value = 1.25f;
-            ui.DragFloat("gain", ref value, speed: 0.05f, min: 0f, max: 4f, width: 160f);
+            ui.DragFloat("Gain", ref value, speed: 0.05f, min: 0f, max: 4f, width: 160f, id: "gain");
         }),
 
         new("drag-int", "DragInt", "Controls", 320, 92, (ui, _) =>
         {
             int value = 12;
-            ui.DragInt("count", ref value, speed: 1f, min: 0, max: 99, width: 160f);
+            ui.DragInt("Count", ref value, speed: 1f, min: 0, max: 99, width: 160f, id: "count");
         }),
 
         new("progress-bar", "ProgressBar", "Status", 360, 92, (ui, _) =>
