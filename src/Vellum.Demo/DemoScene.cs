@@ -376,7 +376,7 @@ internal static class DemoScene
                     page.Spacing(8);
                     page.Checkbox("Lock fields", ref state.ProfileLocked);
                     page.Spacing(6);
-                    page.Disabled(state.ProfileLocked, state, static (page, state) =>
+                    using (page.Disabled(state.ProfileLocked))
                     {
                         page.Panel(page.AvailableWidth, state, static (frame, state) =>
                         {
@@ -409,7 +409,7 @@ internal static class DemoScene
                                     frame.TextField("profileRole", ref state.Role, frame.AvailableWidth);
                             }
                         });
-                    });
+                    }
                 });
             });
         });
@@ -608,8 +608,8 @@ internal static class DemoScene
         window.Spacing(4);
         window.Label("Floating window", color: window.Theme.Accent);
         BodyLabel(window, "This behaves like an immediate-mode floating window: absolute position, caption, body drag, and title-bar collapse/close controls.");
-        window.Id("inspectorSwitch", scopedWindow =>
-            scopedWindow.Switch("Enable analytics", ref state.AnalyticsEnabled, width: scopedWindow.AvailableWidth));
+        using (window.Id("inspectorSwitch"))
+            window.Switch("Enable analytics", ref state.AnalyticsEnabled, width: window.AvailableWidth);
         window.Spacing(6);
         window.Menu("Hover menu", state, static (menu, state) =>
         {

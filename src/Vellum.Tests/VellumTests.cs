@@ -335,6 +335,8 @@ public sealed class VellumTests
         "Vellum.ThemePresets",
         "Vellum.TrueTypeFont",
         "Vellum.Ui",
+        "Vellum.Ui+DisabledScopeHandle",
+        "Vellum.Ui+IdScopeHandle",
         "Vellum.Ui+LayoutScopeHandle",
         "Vellum.UiAlign",
         "Vellum.UiCanvas",
@@ -1066,18 +1068,48 @@ public sealed class VellumTests
             Response first = default, second = default;
             ui.Frame(800, 600, Vector2.Zero, false, Input(keys: new[] { UiKey.Space }), frame =>
             {
-                frame.Id(1, row =>
+                using (frame.Id(1))
                 {
-                    row.RequestFocus("Delete");
-                    first = row.Button("Delete");
-                });
-                frame.Id(2, row =>
+                    frame.RequestFocus("Delete");
+                    first = frame.Button("Delete");
+                }
+
+                using (frame.Id(2))
                 {
-                    second = row.Button("Delete");
-                });
+                    second = frame.Button("Delete");
+                }
             });
 
             Check("id scopes disambiguate same-label widgets", first.Activated && !second.Activated);
+        }
+
+        {
+            var renderer = new TestRenderer();
+            var ui = new Ui(renderer)
+            {
+                Font = font,
+                DefaultFontSize = 18f,
+                Lcd = false
+            };
+
+            Response disabled = default, enabled = default, conditionallyEnabled = default;
+            ui.Frame(800, 600, Vector2.Zero, false, frame =>
+            {
+                using (frame.Disabled())
+                {
+                    disabled = frame.Button("Disabled");
+                }
+
+                enabled = frame.Button("Enabled");
+
+                using (frame.Disabled(false))
+                {
+                    conditionallyEnabled = frame.Button("Conditionally enabled");
+                }
+            });
+
+            Check("disabled scope handles restore enabled state",
+                disabled.Disabled && !enabled.Disabled && !conditionallyEnabled.Disabled);
         }
 
         {
@@ -2472,6 +2504,27 @@ public sealed class VellumTests
             {
                 Font = font,
                 DefaultFontSize = 18f,
+                Lcd = false
+            };
+
+            Assert.Throws<InvalidOperationException>(() =>
+            {
+                ui.Frame(300, 200, Vector2.Zero, false, frame =>
+                {
+                    frame.Label("Before throw");
+                    throw new InvalidOperationException("boom");
+                });
+            });
+
+            Check("frame callback ends the renderer frame when content throws", renderer.EndFrameCalls == 1);
+        }
+
+        {
+            var renderer = new TestRenderer();
+            var ui = new Ui(renderer)
+            {
+                Font = font,
+                DefaultFontSize = 18f,
                 Lcd = false,
                 StateRetentionFrames = 0
             };
@@ -2738,6 +2791,7 @@ public sealed class VellumTests
     {
         public int CreateTextureCalls { get; private set; }
         public int DestroyTextureCalls { get; private set; }
+        public int EndFrameCalls { get; private set; }
         public RenderList? LastRenderList { get; private set; }
         public RenderFrameInfo LastFrame { get; private set; }
         private int _nextTextureId = 1;
@@ -2749,7 +2803,7 @@ public sealed class VellumTests
         }
 
         public void Render(RenderList renderList) => LastRenderList = CloneRenderList(renderList);
-        public void EndFrame() { }
+        public void EndFrame() => EndFrameCalls++;
 
         public int CreateTexture(byte[] rgba, int width, int height)
         {

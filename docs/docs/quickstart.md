@@ -104,13 +104,15 @@ Widget IDs are derived from labels and the current ID scope. When repeated contr
 ```csharp
 foreach (var item in items)
 {
-    ui.Id(item.Id, row =>
+    using (ui.Id(item.Id))
     {
-        row.TextField("Name", ref item.Name, width: 260f);
-        row.Button("Delete");
-    });
+        ui.TextField("Name", ref item.Name, width: 260f);
+        ui.Button("Delete");
+    }
 }
 ```
+
+Callback scopes are also available for the same pattern when that reads better.
 
 When two widgets in the same scope need the same visible label, use a named `id:` override:
 

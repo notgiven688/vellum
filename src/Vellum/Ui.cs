@@ -327,9 +327,10 @@ public sealed partial class Ui : IDisposable
     /// <summary>Runs a complete UI frame using explicit frame scale and simple left-button mouse input.</summary>
     public void Frame(RenderFrameInfo frame, Vector2 mousePos, bool mouseDown, Action<Ui> content)
     {
+        ArgumentNullException.ThrowIfNull(content);
         BeginFrame(frame, mousePos, mouseDown);
-        content(this);
-        EndFrame();
+        try { content(this); }
+        finally { EndFrame(); }
     }
 
     /// <inheritdoc cref="Frame(int, int, Vector2, bool, Action{Ui})" />
@@ -339,9 +340,10 @@ public sealed partial class Ui : IDisposable
     /// <inheritdoc cref="Frame(RenderFrameInfo, Vector2, bool, Action{Ui})" />
     public void Frame<TState>(RenderFrameInfo frame, Vector2 mousePos, bool mouseDown, TState state, Action<Ui, TState> content)
     {
+        ArgumentNullException.ThrowIfNull(content);
         BeginFrame(frame, mousePos, mouseDown);
-        content(this, state);
-        EndFrame();
+        try { content(this, state); }
+        finally { EndFrame(); }
     }
 
     /// <summary>Runs a complete scale-1 UI frame using a full input snapshot.</summary>
@@ -362,9 +364,10 @@ public sealed partial class Ui : IDisposable
         UiInputState input,
         Action<Ui> content)
     {
+        ArgumentNullException.ThrowIfNull(content);
         BeginFrame(frame, mousePos, mouseDown, input);
-        content(this);
-        EndFrame();
+        try { content(this); }
+        finally { EndFrame(); }
     }
 
     /// <inheritdoc cref="Frame(int, int, Vector2, bool, UiInputState, Action{Ui})" />
@@ -387,9 +390,10 @@ public sealed partial class Ui : IDisposable
         TState state,
         Action<Ui, TState> content)
     {
+        ArgumentNullException.ThrowIfNull(content);
         BeginFrame(frame, mousePos, mouseDown, input);
-        content(this, state);
-        EndFrame();
+        try { content(this, state); }
+        finally { EndFrame(); }
     }
 
     /// <summary>Runs a complete scale-1 UI frame, deriving left-button state from <paramref name="input"/>.</summary>
@@ -408,9 +412,10 @@ public sealed partial class Ui : IDisposable
         UiInputState input,
         Action<Ui> content)
     {
+        ArgumentNullException.ThrowIfNull(content);
         BeginFrame(frame, mousePos, input);
-        content(this);
-        EndFrame();
+        try { content(this); }
+        finally { EndFrame(); }
     }
 
     /// <inheritdoc cref="Frame(int, int, Vector2, UiInputState, Action{Ui})" />
@@ -431,9 +436,10 @@ public sealed partial class Ui : IDisposable
         TState state,
         Action<Ui, TState> content)
     {
+        ArgumentNullException.ThrowIfNull(content);
         BeginFrame(frame, mousePos, input);
-        content(this, state);
-        EndFrame();
+        try { content(this, state); }
+        finally { EndFrame(); }
     }
 
     /// <summary>Begins a scale-1 frame using simple left-button mouse input.</summary>
@@ -737,40 +743,82 @@ public sealed partial class Ui : IDisposable
 
     private bool ResolveEnabled(bool enabled) => enabled && _disabledDepth == 0;
 
+    private void EnterDisabledScope(bool disabled)
+    {
+        if (disabled)
+            _disabledDepth++;
+    }
+
+    private void ExitDisabledScope(bool disabled)
+    {
+        if (disabled)
+            _disabledDepth--;
+    }
+
+    /// <summary>Runs a disabled scope until disposed.</summary>
+    public DisabledScopeHandle Disabled() => Disabled(disabled: true);
+
+    /// <summary>Runs a disabled scope until disposed when <paramref name="disabled"/> is true.</summary>
+    public DisabledScopeHandle Disabled(bool disabled)
+    {
+        EnterDisabledScope(disabled);
+        return new DisabledScopeHandle(this, disabled);
+    }
+
     /// <summary>Runs content in a disabled scope.</summary>
     public void Disabled(Action<Ui> content)
     {
         ArgumentNullException.ThrowIfNull(content);
-        _disabledDepth++;
-        try { content(this); }
-        finally { _disabledDepth--; }
+        using (Disabled())
+            content(this);
     }
 
     /// <inheritdoc cref="Disabled(Action{Ui})" />
     public void Disabled<TState>(TState state, Action<Ui, TState> content)
     {
         ArgumentNullException.ThrowIfNull(content);
-        _disabledDepth++;
-        try { content(this, state); }
-        finally { _disabledDepth--; }
+        using (Disabled())
+            content(this, state);
     }
 
     /// <summary>Runs content in a disabled scope when <paramref name="disabled"/> is true.</summary>
     public void Disabled(bool disabled, Action<Ui> content)
     {
         ArgumentNullException.ThrowIfNull(content);
-        if (disabled) _disabledDepth++;
-        try { content(this); }
-        finally { if (disabled) _disabledDepth--; }
+        using (Disabled(disabled))
+            content(this);
     }
 
     /// <inheritdoc cref="Disabled(bool, Action{Ui})" />
     public void Disabled<TState>(bool disabled, TState state, Action<Ui, TState> content)
     {
         ArgumentNullException.ThrowIfNull(content);
-        if (disabled) _disabledDepth++;
-        try { content(this, state); }
-        finally { if (disabled) _disabledDepth--; }
+        using (Disabled(disabled))
+            content(this, state);
+    }
+
+    /// <summary>Disposable handle returned by explicit disabled scope methods.</summary>
+    public ref struct DisabledScopeHandle
+    {
+        private Ui? _ui;
+        private readonly bool _active;
+
+        internal DisabledScopeHandle(Ui ui, bool active)
+        {
+            _ui = ui;
+            _active = active;
+        }
+
+        /// <summary>Closes the disabled scope.</summary>
+        public void Dispose()
+        {
+            Ui? ui = _ui;
+            if (ui == null)
+                return;
+
+            _ui = null;
+            ui.ExitDisabledScope(_active);
+        }
     }
 
     private float GetAvailableWidth(in LayoutScope scope)
@@ -928,6 +976,16 @@ public sealed partial class Ui : IDisposable
 
     private void ExitIdScope() => _idStack.Pop();
 
+    /// <summary>Runs a nested id scope until disposed.</summary>
+    public IdScopeHandle Id(string name) => Id(name.AsSpan());
+
+    /// <summary>Runs a nested id scope until disposed.</summary>
+    public IdScopeHandle Id(ReadOnlySpan<char> name)
+    {
+        EnterIdScope(name);
+        return new IdScopeHandle(this);
+    }
+
     /// <summary>Runs content inside a nested id scope.</summary>
     public void Id(string name, Action<Ui> content) => Id(name.AsSpan(), content);
 
@@ -935,9 +993,8 @@ public sealed partial class Ui : IDisposable
     public void Id(ReadOnlySpan<char> name, Action<Ui> content)
     {
         ArgumentNullException.ThrowIfNull(content);
-        EnterIdScope(name);
-        try { content(this); }
-        finally { ExitIdScope(); }
+        using (Id(name))
+            content(this);
     }
 
     /// <summary>Runs content inside a nested id scope.</summary>
@@ -947,81 +1004,119 @@ public sealed partial class Ui : IDisposable
     public void Id<TState>(ReadOnlySpan<char> name, TState state, Action<Ui, TState> content)
     {
         ArgumentNullException.ThrowIfNull(content);
-        EnterIdScope(name);
-        try { content(this, state); }
-        finally { ExitIdScope(); }
+        using (Id(name))
+            content(this, state);
+    }
+
+    /// <summary>Runs a nested id scope until disposed.</summary>
+    public IdScopeHandle Id(int value)
+    {
+        EnterIdScope(value);
+        return new IdScopeHandle(this);
     }
 
     /// <summary>Runs content inside a nested id scope.</summary>
     public void Id(int value, Action<Ui> content)
     {
         ArgumentNullException.ThrowIfNull(content);
-        EnterIdScope(value);
-        try { content(this); }
-        finally { ExitIdScope(); }
+        using (Id(value))
+            content(this);
     }
 
     /// <summary>Runs content inside a nested id scope.</summary>
     public void Id<TState>(int value, TState state, Action<Ui, TState> content)
     {
         ArgumentNullException.ThrowIfNull(content);
+        using (Id(value))
+            content(this, state);
+    }
+
+    /// <summary>Runs a nested id scope until disposed.</summary>
+    public IdScopeHandle Id(long value)
+    {
         EnterIdScope(value);
-        try { content(this, state); }
-        finally { ExitIdScope(); }
+        return new IdScopeHandle(this);
     }
 
     /// <summary>Runs content inside a nested id scope.</summary>
     public void Id(long value, Action<Ui> content)
     {
         ArgumentNullException.ThrowIfNull(content);
-        EnterIdScope(value);
-        try { content(this); }
-        finally { ExitIdScope(); }
+        using (Id(value))
+            content(this);
     }
 
     /// <summary>Runs content inside a nested id scope.</summary>
     public void Id<TState>(long value, TState state, Action<Ui, TState> content)
     {
         ArgumentNullException.ThrowIfNull(content);
+        using (Id(value))
+            content(this, state);
+    }
+
+    /// <summary>Runs a nested id scope until disposed.</summary>
+    public IdScopeHandle Id(ulong value)
+    {
         EnterIdScope(value);
-        try { content(this, state); }
-        finally { ExitIdScope(); }
+        return new IdScopeHandle(this);
     }
 
     /// <summary>Runs content inside a nested id scope.</summary>
     public void Id(ulong value, Action<Ui> content)
     {
         ArgumentNullException.ThrowIfNull(content);
-        EnterIdScope(value);
-        try { content(this); }
-        finally { ExitIdScope(); }
+        using (Id(value))
+            content(this);
     }
 
     /// <summary>Runs content inside a nested id scope.</summary>
     public void Id<TState>(ulong value, TState state, Action<Ui, TState> content)
     {
         ArgumentNullException.ThrowIfNull(content);
+        using (Id(value))
+            content(this, state);
+    }
+
+    /// <summary>Runs a nested id scope until disposed.</summary>
+    public IdScopeHandle Id(Guid value)
+    {
         EnterIdScope(value);
-        try { content(this, state); }
-        finally { ExitIdScope(); }
+        return new IdScopeHandle(this);
     }
 
     /// <summary>Runs content inside a nested id scope.</summary>
     public void Id(Guid value, Action<Ui> content)
     {
         ArgumentNullException.ThrowIfNull(content);
-        EnterIdScope(value);
-        try { content(this); }
-        finally { ExitIdScope(); }
+        using (Id(value))
+            content(this);
     }
 
     /// <summary>Runs content inside a nested id scope.</summary>
     public void Id<TState>(Guid value, TState state, Action<Ui, TState> content)
     {
         ArgumentNullException.ThrowIfNull(content);
-        EnterIdScope(value);
-        try { content(this, state); }
-        finally { ExitIdScope(); }
+        using (Id(value))
+            content(this, state);
+    }
+
+    /// <summary>Disposable handle returned by explicit id scope methods.</summary>
+    public ref struct IdScopeHandle
+    {
+        private Ui? _ui;
+
+        internal IdScopeHandle(Ui ui) => _ui = ui;
+
+        /// <summary>Closes the id scope.</summary>
+        public void Dispose()
+        {
+            Ui? ui = _ui;
+            if (ui == null)
+                return;
+
+            _ui = null;
+            ui.ExitIdScope();
+        }
     }
 
     /// <summary>Requests keyboard focus for the widget with the given id.</summary>
