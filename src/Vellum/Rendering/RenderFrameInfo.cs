@@ -7,37 +7,29 @@ namespace Vellum.Rendering;
 /// <param name="LogicalHeight">Height of the Vellum layout/input coordinate space in logical pixels.</param>
 /// <param name="FramebufferWidth">Width of the render target in physical framebuffer pixels.</param>
 /// <param name="FramebufferHeight">Height of the render target in physical framebuffer pixels.</param>
-/// <param name="ScaleX">Physical pixels per logical pixel on the X axis.</param>
-/// <param name="ScaleY">Physical pixels per logical pixel on the Y axis.</param>
 public readonly record struct RenderFrameInfo(
     int LogicalWidth,
     int LogicalHeight,
     int FramebufferWidth,
-    int FramebufferHeight,
-    float ScaleX,
-    float ScaleY)
+    int FramebufferHeight)
 {
     /// <summary>
     /// Creates a scale-1 frame where logical and framebuffer sizes are identical.
     /// </summary>
     public RenderFrameInfo(int width, int height)
-        : this(width, height, width, height, 1f, 1f)
+        : this(width, height, width, height)
     {
     }
 
     /// <summary>
-    /// Creates a frame and derives scale from framebuffer size divided by logical size.
+    /// Physical pixels per logical pixel on the X axis.
     /// </summary>
-    public RenderFrameInfo(int logicalWidth, int logicalHeight, int framebufferWidth, int framebufferHeight)
-        : this(
-            logicalWidth,
-            logicalHeight,
-            framebufferWidth,
-            framebufferHeight,
-            logicalWidth > 0 ? framebufferWidth / (float)logicalWidth : 1f,
-            logicalHeight > 0 ? framebufferHeight / (float)logicalHeight : 1f)
-    {
-    }
+    public float ScaleX => LogicalWidth > 0 ? FramebufferWidth / (float)LogicalWidth : 1f;
+
+    /// <summary>
+    /// Physical pixels per logical pixel on the Y axis.
+    /// </summary>
+    public float ScaleY => LogicalHeight > 0 ? FramebufferHeight / (float)LogicalHeight : 1f;
 
     /// <summary>
     /// Largest framebuffer scale factor for this frame.
@@ -54,13 +46,6 @@ public readonly record struct RenderFrameInfo(
         int framebufferWidth = FramebufferWidth > 0 ? FramebufferWidth : logicalWidth;
         int framebufferHeight = FramebufferHeight > 0 ? FramebufferHeight : logicalHeight;
 
-        float scaleX = logicalWidth > 0 && framebufferWidth > 0
-            ? framebufferWidth / (float)logicalWidth
-            : float.IsFinite(ScaleX) && ScaleX > 0 ? ScaleX : 1f;
-        float scaleY = logicalHeight > 0 && framebufferHeight > 0
-            ? framebufferHeight / (float)logicalHeight
-            : float.IsFinite(ScaleY) && ScaleY > 0 ? ScaleY : 1f;
-
-        return new RenderFrameInfo(logicalWidth, logicalHeight, framebufferWidth, framebufferHeight, scaleX, scaleY);
+        return new RenderFrameInfo(logicalWidth, logicalHeight, framebufferWidth, framebufferHeight);
     }
 }

@@ -37,7 +37,7 @@ public sealed class PublicValueTests
     }
 
     [Fact]
-    public void RenderFrameInfo_Constructors_Derive_Scale_And_MaxScale()
+    public void RenderFrameInfo_Derives_Scale_And_MaxScale()
     {
         RenderFrameInfo simple = new(320, 180);
         RenderFrameInfo scaled = new(320, 180, 640, 540);
@@ -50,9 +50,9 @@ public sealed class PublicValueTests
     }
 
     [Fact]
-    public void RenderFrameInfo_Normalized_Clamps_Invalid_Values()
+    public void RenderFrameInfo_Normalized_Clamps_Invalid_Sizes()
     {
-        RenderFrameInfo raw = new(320, 180, -5, 0, float.NaN, float.NegativeInfinity);
+        RenderFrameInfo raw = new(320, 180, -5, 0);
         RenderFrameInfo normalized = raw.Normalized();
 
         Assert.Equal(320, normalized.LogicalWidth);
