@@ -1585,6 +1585,67 @@ public sealed class VellumTests
                 Lcd = false
             };
 
+            var primaryState = new WindowState(new Vector2(16, 16));
+            var secondaryState = new WindowState(new Vector2(48, 48));
+            Response primary = default;
+            Response secondary = default;
+
+            ui.Frame(360, 260, Vector2.Zero, false, frame =>
+            {
+                primary = frame.Window("Inspector", primaryState, 160, content =>
+                {
+                    content.Button("Inside", width: content.AvailableWidth);
+                }, id: "primary");
+
+                secondary = frame.Window("Inspector", secondaryState, 160, content =>
+                {
+                    content.Button("Inside", width: content.AvailableWidth);
+                }, id: "secondary");
+            });
+
+            Check(
+                "explicit window ids disambiguate same-title windows",
+                primary.W > 0f &&
+                secondary.W > 0f &&
+                MathF.Abs(primary.X - secondary.X) > 0.1f &&
+                MathF.Abs(primary.Y - secondary.Y) > 0.1f);
+        }
+
+#if DEBUG
+        {
+            var renderer = new TestRenderer();
+            var ui = new Ui(renderer)
+            {
+                Font = font,
+                DefaultFontSize = 18f,
+                Lcd = false
+            };
+
+            var firstState = new WindowState(new Vector2(16, 16));
+            var secondState = new WindowState(new Vector2(48, 48));
+            var ex = Assert.Throws<InvalidOperationException>(() =>
+            {
+                ui.Frame(360, 260, Vector2.Zero, false, frame =>
+                {
+                    frame.Window("Duplicate", firstState, 160, content => content.Label("First"));
+                    frame.Window("Duplicate", secondState, 160, content => content.Label("Second"));
+                });
+            });
+
+            Check("duplicate window title ids throw in debug builds",
+                ex.Message.Contains("Window \"Duplicate\"", StringComparison.Ordinal));
+        }
+#endif
+
+        {
+            var renderer = new TestRenderer();
+            var ui = new Ui(renderer)
+            {
+                Font = font,
+                DefaultFontSize = 18f,
+                Lcd = false
+            };
+
             var windowState = new WindowState(new Vector2(16, 16));
             Response window = default;
             Response underlying = default;
@@ -1595,10 +1656,10 @@ public sealed class VellumTests
                 ui.Frame(320, 220, mouse, false, input, frame =>
                 {
                     underlying = frame.Button("Under", width: 220);
-                    window = frame.Window("inspector", "Inspector", windowState, 180, content =>
+                    window = frame.Window("Inspector", windowState, 180, content =>
                     {
                         inside = content.Button("Inside", width: content.AvailableWidth);
-                    });
+                    }, id: "inspector");
                 });
             }
 
@@ -1632,10 +1693,10 @@ public sealed class VellumTests
             {
                 ui.Frame(320, 220, mouse, false, frame =>
                 {
-                    window = frame.Window("plain", "Plain", windowState, 180, content =>
+                    window = frame.Window("Plain", windowState, 180, content =>
                     {
                         inside = content.Button("Inside", width: content.AvailableWidth);
-                    }, header: false);
+                    }, header: false, id: "plain");
                 });
             }
 
@@ -1664,10 +1725,10 @@ public sealed class VellumTests
             {
                 ui.Frame(320, 260, mouse, false, frame =>
                 {
-                    window = frame.Window("inspector-width", "Inspector", windowState, 180, content =>
+                    window = frame.Window("Inspector", windowState, 180, content =>
                     {
                         inside = content.Button("Inside", width: content.AvailableWidth);
-                    }, resizable: true);
+                    }, resizable: true, id: "inspector-width");
                 });
             }
 
@@ -1694,10 +1755,10 @@ public sealed class VellumTests
             {
                 ui.Frame(320, 220, mouse, false, input, frame =>
                 {
-                    window = frame.Window("drag", "Draggable", windowState, 180, content =>
+                    window = frame.Window("Draggable", windowState, 180, content =>
                     {
                         content.Label("Window body");
-                    });
+                    }, id: "drag");
                 });
             }
 
@@ -1731,10 +1792,10 @@ public sealed class VellumTests
             {
                 ui.Frame(320, 220, mouse, false, input, frame =>
                 {
-                    frame.Window("drag-blocked", "Draggable", windowState, 180, content =>
+                    frame.Window("Draggable", windowState, 180, content =>
                     {
                         button = content.Button("Inside", width: content.AvailableWidth);
-                    });
+                    }, id: "drag-blocked");
                 });
             }
 
@@ -1770,7 +1831,7 @@ public sealed class VellumTests
             {
                 ui.Frame(360, 260, mouse, mouseDown, frame =>
                 {
-                    window = frame.Window("collapse-scroll", "Scrollable", windowState, 180, content =>
+                    window = frame.Window("Scrollable", windowState, 180, content =>
                     {
                         header = content.CollapsingHeader("Timings", ref sectionOpen, width: content.AvailableWidth);
                         if (sectionOpen)
@@ -1778,7 +1839,7 @@ public sealed class VellumTests
                             for (int i = 0; i < 18; i++)
                                 content.Label($"Row {i}");
                         }
-                    }, resizable: true);
+                    }, resizable: true, id: "collapse-scroll");
                 });
             }
 
@@ -1811,12 +1872,12 @@ public sealed class VellumTests
             {
                 ui.Frame(360, 260, mouse, false, input, frame =>
                 {
-                    window = frame.Window("scrollable", "Scrollable", windowState, 180, content =>
+                    window = frame.Window("Scrollable", windowState, 180, content =>
                     {
                         firstRow = content.Label("Row 0");
                         for (int i = 1; i < 18; i++)
                             content.Label($"Row {i}");
-                    });
+                    }, id: "scrollable");
                 });
             }
 
@@ -1853,12 +1914,12 @@ public sealed class VellumTests
             {
                 ui.Frame(360, 260, mouse, false, input, frame =>
                 {
-                    window = frame.Window("scrollable-resize", "Scrollable", windowState, 180, content =>
+                    window = frame.Window("Scrollable", windowState, 180, content =>
                     {
                         firstRow = content.Label("Row 0");
                         for (int i = 1; i < 18; i++)
                             content.Label($"Row {i}");
-                    }, resizable: true);
+                    }, resizable: true, id: "scrollable-resize");
                 });
             }
 
@@ -1894,11 +1955,11 @@ public sealed class VellumTests
             {
                 ui.Frame(320, 220, mouse, false, input, frame =>
                 {
-                    window = frame.Window("collapse", "Collapsible", windowState, 180, content =>
+                    window = frame.Window("Collapsible", windowState, 180, content =>
                     {
                         content.Label("Window body");
                         content.Button("Inside", width: content.AvailableWidth);
-                    });
+                    }, id: "collapse");
                 });
             }
 
@@ -1933,10 +1994,10 @@ public sealed class VellumTests
             {
                 ui.Frame(320, 220, mouse, false, input, frame =>
                 {
-                    window = frame.Window("close", "Closable", windowState, 180, content =>
+                    window = frame.Window("Closable", windowState, 180, content =>
                     {
                         content.Label("Window body");
-                    });
+                    }, id: "close");
                 });
             }
 
@@ -1970,10 +2031,10 @@ public sealed class VellumTests
             {
                 ui.Frame(320, 220, mouse, false, input, frame =>
                 {
-                    window = frame.Window("fixed-close", "Not Closable", windowState, 180, content =>
+                    window = frame.Window("Not Closable", windowState, 180, content =>
                     {
                         content.Label("Window body");
-                    }, closable: false);
+                    }, closable: false, id: "fixed-close");
                 });
             }
 

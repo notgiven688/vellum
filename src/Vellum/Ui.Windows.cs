@@ -26,7 +26,6 @@ public sealed partial class Ui
     private sealed class WindowRequest
     {
         public int WindowId;
-        public required string Id;
         public required string Title;
         public required WindowState State;
         public float Width;
@@ -39,14 +38,14 @@ public sealed partial class Ui
     private enum WindowTitleIcon { Collapse, Expand, Close }
 
     /// <summary>Declares a floating window.</summary>
-    public Response Window(string id, string title, WindowState state, float width, Action<Ui> content,
-        bool resizable = false, bool closable = true, bool header = true)
+    public Response Window(string title, WindowState state, float width, Action<Ui> content,
+        bool resizable = false, bool closable = true, bool header = true, string? id = null)
     {
         ArgumentNullException.ThrowIfNull(state);
         ArgumentNullException.ThrowIfNull(content);
 
-        int windowId = MakeId(id);
-        RegisterWidgetId(windowId, $"Window \"{id}\"");
+        int windowId = MakeId(id ?? title);
+        RegisterWidgetId(windowId, $"Window \"{title}\"");
         EnsureWindowOrder(windowId);
 
         if (!state.Open)
@@ -79,7 +78,6 @@ public sealed partial class Ui
         _windowRequests[windowId] = new WindowRequest
         {
             WindowId = windowId,
-            Id = id,
             Title = title,
             State = state,
             Width = effectiveWidth,
@@ -227,7 +225,7 @@ public sealed partial class Ui
         float border = FrameBorderWidth;
         var bodyPad = Theme.PanelPadding;
         var titlePad = Theme.ButtonPadding;
-        string titleText = string.IsNullOrEmpty(request.Title) ? request.Id : request.Title;
+        string titleText = request.Title;
         bool collapsedAtFrameStart = request.State.Collapsed;
         bool resizable = request.Resizable;
         bool hasHeader = request.Header;

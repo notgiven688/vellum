@@ -132,7 +132,7 @@ WindowState inspector = new(new Vector2(40f, 40f), new Vector2(360f, 260f));
 
 ui.Frame(width, height, mouse, input, root =>
 {
-    root.Window("inspector", "Inspector", inspector, width: 360f, body =>
+    root.Window("Inspector", inspector, 360f, body =>
     {
         body.Label("Selected entity");
         body.Separator();

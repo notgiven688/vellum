@@ -229,14 +229,14 @@ internal static class WidgetExamples
         new("window", "Window", "Windows", 460, 250, (ui, _) =>
         {
             var state = new WindowState(new Vector2(32f, 30f), new Vector2(300f, 160f));
-            ui.Window("inspector", "Inspector", state, 300f, window =>
+            ui.Window("Inspector", state, 300f, window =>
             {
                 string entityName = "Camera";
                 window.Label("Selected entity", color: window.Theme.Accent);
                 window.TextField("entity", ref entityName, window.AvailableWidth);
                 bool visible = true;
                 window.Checkbox("Visible", ref visible);
-            }, resizable: true);
+            }, resizable: true, id: "inspector");
         }),
     ];
 }
