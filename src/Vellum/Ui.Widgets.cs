@@ -468,7 +468,7 @@ public sealed partial class Ui
         _painter = contentPainter;
 
         if (!string.IsNullOrEmpty(id))
-            PushId(id);
+            EnterIdScope(id);
 
         _layouts.Add(new LayoutScope
         {
@@ -499,7 +499,7 @@ public sealed partial class Ui
             _layouts.RemoveAt(_layouts.Count - 1);
 
             if (!string.IsNullOrEmpty(id))
-                PopId();
+                ExitIdScope();
 
             _painter = parentPainter;
 
@@ -534,7 +534,7 @@ public sealed partial class Ui
         _painter = contentPainter;
 
         if (!string.IsNullOrEmpty(id))
-            PushId(id);
+            EnterIdScope(id);
 
         _layouts.Add(new LayoutScope
         {
@@ -565,7 +565,7 @@ public sealed partial class Ui
             _layouts.RemoveAt(_layouts.Count - 1);
 
             if (!string.IsNullOrEmpty(id))
-                PopId();
+                ExitIdScope();
 
             _painter = parentPainter;
 
@@ -616,7 +616,7 @@ public sealed partial class Ui
         }
 
         if (!string.IsNullOrEmpty(id))
-            PushId(id);
+            EnterIdScope(id);
 
         _layouts.Add(new LayoutScope
         {
@@ -639,7 +639,7 @@ public sealed partial class Ui
             _layouts.RemoveAt(_layouts.Count - 1);
 
             if (!string.IsNullOrEmpty(id))
-                PopId();
+                ExitIdScope();
 
             if (clip)
             {
@@ -676,7 +676,7 @@ public sealed partial class Ui
         }
 
         if (!string.IsNullOrEmpty(id))
-            PushId(id);
+            EnterIdScope(id);
 
         _layouts.Add(new LayoutScope
         {
@@ -699,7 +699,7 @@ public sealed partial class Ui
             _layouts.RemoveAt(_layouts.Count - 1);
 
             if (!string.IsNullOrEmpty(id))
-                PopId();
+                ExitIdScope();
 
             if (clip)
             {
@@ -1518,7 +1518,7 @@ public sealed partial class Ui
             DrawTextLayout(shortcutLayout!.Value, shortcutX, contentY, Theme.TextSecondary);
         }
 
-        PushId(id);
+        EnterIdScope(id);
         _layouts.Add(new LayoutScope
         {
             OriginX = contentX,
@@ -1535,7 +1535,7 @@ public sealed partial class Ui
         finally
         {
             _layouts.RemoveAt(_layouts.Count - 1);
-            PopId();
+            ExitIdScope();
         }
 
         Advance(resolvedWidth, resolvedHeight);

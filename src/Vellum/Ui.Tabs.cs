@@ -37,7 +37,7 @@ public sealed partial class Ui
         float availableWidth = AvailableWidth;
 
         var ctx = new TabBarContext { State = tabState };
-        PushId(id);
+        EnterIdScope(id);
         _tabBarContexts.Push(ctx);
 
         var (rowX, rowY) = Place(0, 0);
@@ -50,7 +50,7 @@ public sealed partial class Ui
         finally
         {
             _tabBarContexts.Pop();
-            PopId();
+            ExitIdScope();
         }
 
         if (ctx.HeaderBottom > rowY)
