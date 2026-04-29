@@ -1402,6 +1402,58 @@ public sealed class VellumTests
                 Lcd = false
             };
 
+            bool clicked = false;
+            Response menu = default;
+            Response customLabel = default;
+
+            ui.Frame(320, 180, new Vector2(20, 24), true, frame =>
+            {
+                menu = frame.MenuItem("Custom row", (item, text) =>
+                {
+                    customLabel = item.Label(text);
+                }, id: "custom-menu-item", width: 180);
+            });
+            ui.Frame(320, 180, new Vector2(20, 24), false, frame =>
+            {
+                menu = frame.MenuItem("Custom row", (item, text) =>
+                {
+                    customLabel = item.Label(text);
+                }, id: "custom-menu-item", width: 180);
+                clicked = menu.Clicked;
+            });
+
+            Check("custom menu item uses named id and renders content", clicked && customLabel.W > 0f && menu.W >= 180f);
+        }
+
+        {
+            var renderer = new TestRenderer();
+            var ui = new Ui(renderer)
+            {
+                Font = font,
+                DefaultFontSize = 18f,
+                Lcd = false
+            };
+
+            var ex = Assert.Throws<ArgumentException>(() =>
+            {
+                ui.Frame(320, 180, Vector2.Zero, false, frame =>
+                {
+                    frame.MenuItem("Custom row", static (item, text) => item.Label(text));
+                });
+            });
+
+            Check("custom menu item requires a named id", ex.ParamName == "id");
+        }
+
+        {
+            var renderer = new TestRenderer();
+            var ui = new Ui(renderer)
+            {
+                Font = font,
+                DefaultFontSize = 18f,
+                Lcd = false
+            };
+
             Response longItem = default;
             void Frame(Vector2 mouse)
             {
@@ -1531,10 +1583,10 @@ public sealed class VellumTests
 
             ui.Frame(320, 180, new Vector2(40, 40), false, frame =>
             {
-                panel = frame.Panel("settings", 200, 96, content =>
+                panel = frame.Panel(200, 96, content =>
                 {
                     button = content.Button("Inside", width: content.AvailableWidth);
-                });
+                }, id: "settings");
             });
 
             Check(

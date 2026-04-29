@@ -429,31 +429,15 @@ public sealed partial class Ui
     }
 
     /// <summary>Draws an auto-height panel using the current available width.</summary>
-    public Response Panel(Action<Ui> content)
-        => Panel(null, AvailableWidth, content);
+    public Response Panel(Action<Ui> content, string? id = null)
+        => Panel(AvailableWidth, content, id);
 
-    /// <inheritdoc cref="Panel(Action{Ui})" />
-    public Response Panel<TState>(TState state, Action<Ui, TState> content)
-        => Panel(null, AvailableWidth, state, content);
-
-    /// <summary>Draws an auto-height panel with an optional id.</summary>
-    public Response Panel(string? id, Action<Ui> content)
-        => Panel(id, AvailableWidth, content);
-
-    /// <inheritdoc cref="Panel(string?, Action{Ui})" />
-    public Response Panel<TState>(string? id, TState state, Action<Ui, TState> content)
-        => Panel(id, AvailableWidth, state, content);
+    /// <inheritdoc cref="Panel(Action{Ui}, string?)" />
+    public Response Panel<TState>(TState state, Action<Ui, TState> content, string? id = null)
+        => Panel(AvailableWidth, state, content, id);
 
     /// <summary>Draws an auto-height panel with explicit width.</summary>
-    public Response Panel(float width, Action<Ui> content)
-        => Panel(null, width, content);
-
-    /// <inheritdoc cref="Panel(float, Action{Ui})" />
-    public Response Panel<TState>(float width, TState state, Action<Ui, TState> content)
-        => Panel(null, width, state, content);
-
-    /// <summary>Draws an auto-height panel with optional id and explicit width.</summary>
-    public Response Panel(string? id, float width, Action<Ui> content)
+    public Response Panel(float width, Action<Ui> content, string? id = null)
     {
         float resolvedWidth = MathF.Max(0, width);
         var (x, y) = Place(resolvedWidth, 0);
@@ -518,8 +502,8 @@ public sealed partial class Ui
         return new Response(x, y, resolvedWidth, resolvedHeight, hover, false, false);
     }
 
-    /// <inheritdoc cref="Panel(string?, float, Action{Ui})" />
-    public Response Panel<TState>(string? id, float width, TState state, Action<Ui, TState> content)
+    /// <inheritdoc cref="Panel(float, Action{Ui}, string?)" />
+    public Response Panel<TState>(float width, TState state, Action<Ui, TState> content, string? id = null)
     {
         float resolvedWidth = MathF.Max(0, width);
         var (x, y) = Place(resolvedWidth, 0);
@@ -585,15 +569,7 @@ public sealed partial class Ui
     }
 
     /// <summary>Draws a fixed-size panel.</summary>
-    public Response Panel(float width, float height, Action<Ui> content, bool clip = true)
-        => Panel(null, width, height, content, clip);
-
-    /// <inheritdoc cref="Panel(float, float, Action{Ui}, bool)" />
-    public Response Panel<TState>(float width, float height, TState state, Action<Ui, TState> content, bool clip = true)
-        => Panel(null, width, height, state, content, clip);
-
-    /// <summary>Draws a fixed-size panel with an optional id.</summary>
-    public Response Panel(string? id, float width, float height, Action<Ui> content, bool clip = true)
+    public Response Panel(float width, float height, Action<Ui> content, bool clip = true, string? id = null)
     {
         float resolvedWidth = MathF.Max(0, width);
         float resolvedHeight = MathF.Max(0, height);
@@ -652,8 +628,8 @@ public sealed partial class Ui
         return new Response(x, y, resolvedWidth, resolvedHeight, hover, false, false);
     }
 
-    /// <inheritdoc cref="Panel(string?, float, float, Action{Ui}, bool)" />
-    public Response Panel<TState>(string? id, float width, float height, TState state, Action<Ui, TState> content, bool clip = true)
+    /// <inheritdoc cref="Panel(float, float, Action{Ui}, bool, string?)" />
+    public Response Panel<TState>(float width, float height, TState state, Action<Ui, TState> content, bool clip = true, string? id = null)
     {
         float resolvedWidth = MathF.Max(0, width);
         float resolvedHeight = MathF.Max(0, height);
@@ -1434,16 +1410,15 @@ public sealed partial class Ui
 
     /// <summary>Draws a menu item row that renders custom content when activated.</summary>
     public Response MenuItem(
-        string id,
         Action<Ui> content,
         bool selected = false,
         float? width = null,
         float? size = null,
         bool enabled = true,
         bool closeOnActivate = false,
-        string? shortcut = null)
+        string? shortcut = null,
+        string? id = null)
         => MenuItem(
-            id,
             new UiActionState(content),
             static (ui, state) => state.Content(ui),
             selected,
@@ -1451,11 +1426,11 @@ public sealed partial class Ui
             size,
             enabled,
             closeOnActivate,
-            shortcut);
+            shortcut,
+            id);
 
-    /// <inheritdoc cref="MenuItem(string, Action{Ui}, bool, float?, float?, bool, bool, string?)" />
+    /// <inheritdoc cref="MenuItem(Action{Ui}, bool, float?, float?, bool, bool, string?, string?)" />
     public Response MenuItem<TState>(
-        string id,
         TState state,
         Action<Ui, TState> content,
         bool selected = false,
@@ -1463,9 +1438,12 @@ public sealed partial class Ui
         float? size = null,
         bool enabled = true,
         bool closeOnActivate = false,
-        string? shortcut = null)
+        string? shortcut = null,
+        string? id = null)
     {
         ArgumentNullException.ThrowIfNull(content);
+        if (string.IsNullOrWhiteSpace(id))
+            throw new ArgumentException("Custom menu items require a named id.", nameof(id));
 
         enabled = ResolveEnabled(enabled);
         float s = size ?? DefaultFontSize;

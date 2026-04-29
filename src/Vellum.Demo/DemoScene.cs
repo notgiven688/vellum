@@ -134,12 +134,12 @@ internal static class DemoScene
             _ => "theme-x"
         };
         var row = (Color: swatchColor, Label: label);
-        if (menu.MenuItem(id, row, static (item, row) =>
+        if (menu.MenuItem(row, static (item, row) =>
         {
             item.Canvas(14f, 14f, row.Color, static (canvas, color) =>
                 canvas.FillRect(0f, 0f, canvas.Width, canvas.Height, color, radius: 3f));
             item.Label(row.Label);
-        }, selected: state.SelectedTheme == index, closeOnActivate: true, shortcut: shortcut).Clicked)
+        }, id: id, selected: state.SelectedTheme == index, closeOnActivate: true, shortcut: shortcut).Clicked)
         {
             state.SelectedTheme = index;
         }
