@@ -26,7 +26,6 @@ public sealed partial class Ui
     private sealed class WindowRequest
     {
         public int WindowId;
-        public required string Id;
         public required string Title;
         public required WindowState State;
         public float Width;
@@ -39,13 +38,14 @@ public sealed partial class Ui
     private enum WindowTitleIcon { Collapse, Expand, Close }
 
     /// <summary>Declares a floating window.</summary>
-    public Response Window(string id, string title, WindowState state, float width, Action<Ui> content,
-        bool resizable = false, bool closable = true, bool header = true)
+    public Response Window(string title, WindowState state, float width, Action<Ui> content,
+        bool resizable = false, bool closable = true, bool header = true, UiId? id = null)
     {
         ArgumentNullException.ThrowIfNull(state);
         ArgumentNullException.ThrowIfNull(content);
 
-        int windowId = MakeId(id);
+        int windowId = MakeWidgetId(UiWidgetKind.Window, ResolveWidgetId(id, title));
+        RegisterWidgetId(windowId, $"Window \"{title}\"");
         EnsureWindowOrder(windowId);
 
         if (!state.Open)
@@ -78,7 +78,6 @@ public sealed partial class Ui
         _windowRequests[windowId] = new WindowRequest
         {
             WindowId = windowId,
-            Id = id,
             Title = title,
             State = state,
             Width = effectiveWidth,
@@ -226,7 +225,7 @@ public sealed partial class Ui
         float border = FrameBorderWidth;
         var bodyPad = Theme.PanelPadding;
         var titlePad = Theme.ButtonPadding;
-        string titleText = string.IsNullOrEmpty(request.Title) ? request.Id : request.Title;
+        string titleText = request.Title;
         bool collapsedAtFrameStart = request.State.Collapsed;
         bool resizable = request.Resizable;
         bool hasHeader = request.Header;
@@ -295,7 +294,7 @@ public sealed partial class Ui
         float bodyRegionH = scrollableBody
             ? MathF.Max(0, (fixedHeight ? fixedOuterHeight : maxOuterHeight) - border * 2 - titleBarHeight)
             : 0f;
-        int scrollId = HashMix(request.WindowId, HashString("scroll"));
+        int scrollId = HashMix(request.WindowId, UiId.HashString("scroll"));
         float scrollbarReserve = bodyScrollable ? Theme.ScrollbarWidth + ScrollbarGap : 0f;
         float contentW = MathF.Max(0, resolvedWidth - border * 2 - bodyPad.Horizontal - scrollbarReserve);
         bool scrollTrackHovered = false;
@@ -437,7 +436,19 @@ public sealed partial class Ui
                 contentW = MathF.Max(0, resolvedWidth - border * 2 - bodyPad.Horizontal - scrollbarReserve);
 
                 _hotId = hotIdBeforeContent;
+#if DEBUG
+                _idTrackingDisabledDepth++;
+                try
+                {
+                    contentPainter = RenderContentPass(contentW, out contentHeight, out hotIdAfterContent);
+                }
+                finally
+                {
+                    _idTrackingDisabledDepth--;
+                }
+#else
                 contentPainter = RenderContentPass(contentW, out contentHeight, out hotIdAfterContent);
+#endif
             }
 
             if (!bodyScrollable)
@@ -489,8 +500,8 @@ public sealed partial class Ui
             buttonY,
             titleButtonSize,
             titleButtonSize);
-        int collapseButtonId = HashMix(request.WindowId, HashString("collapse"));
-        int closeButtonId = HashMix(request.WindowId, HashString("close"));
+        int collapseButtonId = HashMix(request.WindowId, UiId.HashString("collapse"));
+        int closeButtonId = HashMix(request.WindowId, UiId.HashString("close"));
         bool titleButtonsInteractive = hasHeader &&
             _openPopupIds.Count == 0 &&
             !_popupDismissedThisPress &&
@@ -559,7 +570,7 @@ public sealed partial class Ui
             float gripX = x + resolvedWidth - border - ResizeGripSize;
             float gripY = y + resolvedHeight - border - ResizeGripSize;
             gripRect = new ClipRect(gripX, gripY, ResizeGripSize, ResizeGripSize);
-            gripId = HashMix(request.WindowId, HashString("resize"));
+            gripId = HashMix(request.WindowId, UiId.HashString("resize"));
             MarkWidgetSeen(gripId);
 
             bool gripInteractive =

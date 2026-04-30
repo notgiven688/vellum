@@ -17,7 +17,8 @@ public sealed partial class Ui
         float? size = null,
         bool enabled = true,
         bool defaultOpen = false,
-        bool selected = false)
+        bool selected = false,
+        UiId? id = null)
         => TreeNode(
             label,
             new UiActionState(children),
@@ -25,9 +26,10 @@ public sealed partial class Ui
             size,
             enabled,
             defaultOpen,
-            selected);
+            selected,
+            id);
 
-    /// <inheritdoc cref="TreeNode(string, Action{Ui}, float?, bool, bool, bool)" />
+    /// <inheritdoc cref="TreeNode(string, Action{Ui}, float?, bool, bool, bool, UiId?)" />
     public Response TreeNode<TState>(
         string label,
         TState state,
@@ -35,16 +37,18 @@ public sealed partial class Ui
         float? size = null,
         bool enabled = true,
         bool defaultOpen = false,
-        bool selected = false)
+        bool selected = false,
+        UiId? id = null)
     {
         ArgumentNullException.ThrowIfNull(children);
 
         enabled = ResolveEnabled(enabled);
         float s = size ?? DefaultFontSize;
         var pad = Theme.TreeNodePadding;
-        int id = MakeId(label);
+        UiId resolvedId = ResolveWidgetId(id, label);
+        int widgetId = MakeWidgetId(UiWidgetKind.TreeNode, resolvedId);
 
-        var nodeState = GetState<TreeNodeState>(id);
+        var nodeState = GetState<TreeNodeState>(widgetId);
         if (!nodeState.Initialized)
         {
             nodeState.Open = defaultOpen;
@@ -60,20 +64,20 @@ public sealed partial class Ui
 
         var (x, y) = Place(w, h);
 
-        bool focused = RegisterFocusable(id, enabled);
+        bool focused = RegisterFocusable(widgetId, enabled);
         bool hover = enabled && PointIn(x, y, w, h);
-        if (hover) _hotId = id;
+        if (hover) _hotId = widgetId;
         if (hover) RequestCursor(UiCursor.PointingHand);
 
-        if (enabled && _hotId == id && IsMousePressed(UiMouseButton.Left))
+        if (enabled && _hotId == widgetId && IsMousePressed(UiMouseButton.Left))
         {
-            _activeId = id;
-            SetFocus(id);
+            _activeId = widgetId;
+            SetFocus(widgetId);
             focused = true;
         }
 
-        bool pressed = enabled && _activeId == id && IsMouseDown(UiMouseButton.Left);
-        bool clicked = enabled && IsMouseReleased(UiMouseButton.Left) && _activeId == id && _hotId == id;
+        bool pressed = enabled && _activeId == widgetId && IsMouseDown(UiMouseButton.Left);
+        bool clicked = enabled && IsMouseReleased(UiMouseButton.Left) && _activeId == widgetId && _hotId == widgetId;
         if (enabled && focused && (_input.IsPressed(UiKey.Enter) || _input.IsPressed(UiKey.Space)))
             clicked = true;
 
@@ -127,12 +131,14 @@ public sealed partial class Ui
         string label,
         bool selected = false,
         float? size = null,
-        bool enabled = true)
+        bool enabled = true,
+        UiId? id = null)
     {
         enabled = ResolveEnabled(enabled);
         float s = size ?? DefaultFontSize;
         var pad = Theme.TreeNodePadding;
-        int id = MakeId(label);
+        UiId resolvedId = ResolveWidgetId(id, label);
+        int widgetId = MakeWidgetId(UiWidgetKind.TreeLeaf, resolvedId);
 
         var labelLayout = LayoutText(label, s);
         float arrowSize = MathF.Max(8f, s * 0.55f);
@@ -143,20 +149,20 @@ public sealed partial class Ui
 
         var (x, y) = Place(w, h);
 
-        bool focused = RegisterFocusable(id, enabled);
+        bool focused = RegisterFocusable(widgetId, enabled);
         bool hover = enabled && PointIn(x, y, w, h);
-        if (hover) _hotId = id;
+        if (hover) _hotId = widgetId;
         if (hover) RequestCursor(UiCursor.PointingHand);
 
-        if (enabled && _hotId == id && IsMousePressed(UiMouseButton.Left))
+        if (enabled && _hotId == widgetId && IsMousePressed(UiMouseButton.Left))
         {
-            _activeId = id;
-            SetFocus(id);
+            _activeId = widgetId;
+            SetFocus(widgetId);
             focused = true;
         }
 
-        bool pressed = enabled && _activeId == id && IsMouseDown(UiMouseButton.Left);
-        bool clicked = enabled && IsMouseReleased(UiMouseButton.Left) && _activeId == id && _hotId == id;
+        bool pressed = enabled && _activeId == widgetId && IsMouseDown(UiMouseButton.Left);
+        bool clicked = enabled && IsMouseReleased(UiMouseButton.Left) && _activeId == widgetId && _hotId == widgetId;
         if (enabled && focused && (_input.IsPressed(UiKey.Enter) || _input.IsPressed(UiKey.Space)))
             clicked = true;
 

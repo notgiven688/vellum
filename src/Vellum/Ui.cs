@@ -144,8 +144,64 @@ public sealed class WindowState
 }
 
 /// <summary>
+/// Identifies a Vellum widget kind. Used by <see cref="Ui.RequestFocus(UiWidgetKind, UiId)"/>
+/// to disambiguate widgets that share a label across kinds.
+/// </summary>
+public enum UiWidgetKind
+{
+    /// <summary>A clickable button.</summary>
+    Button = 1,
+    /// <summary>A checkbox bound to a boolean.</summary>
+    Checkbox,
+    /// <summary>An on/off switch bound to a boolean.</summary>
+    Switch,
+    /// <summary>A radio button.</summary>
+    RadioButton,
+    /// <summary>A selectable row.</summary>
+    Selectable,
+    /// <summary>A menu opened from a menu bar or as a submenu.</summary>
+    Menu,
+    /// <summary>A menu item row.</summary>
+    MenuItem,
+    /// <summary>A combo box.</summary>
+    ComboBox,
+    /// <summary>A floating-point slider.</summary>
+    Slider,
+    /// <summary>An integer slider.</summary>
+    SliderInt,
+    /// <summary>A floating-point drag field.</summary>
+    DragFloat,
+    /// <summary>An integer drag field.</summary>
+    DragInt,
+    /// <summary>A collapsing header.</summary>
+    CollapsingHeader,
+    /// <summary>A single-line text field.</summary>
+    TextField,
+    /// <summary>A multi-line text area.</summary>
+    TextArea,
+    /// <summary>A draggable splitter.</summary>
+    Splitter,
+    /// <summary>A tab bar.</summary>
+    TabBar,
+    /// <summary>A tab inside a tab bar.</summary>
+    Tab,
+    /// <summary>An expandable tree node.</summary>
+    TreeNode,
+    /// <summary>A leaf row in a tree.</summary>
+    TreeLeaf,
+    /// <summary>A vertical scroll area.</summary>
+    ScrollArea,
+    /// <summary>A scroll area that scrolls in both directions.</summary>
+    ScrollAreaBoth,
+    /// <summary>A floating window.</summary>
+    Window,
+    /// <summary>A popup container.</summary>
+    Popup
+}
+
+/// <summary>
 /// Immediate-mode GUI context. Layout scopes are opened with lambdas
-/// (Horizontal / Vertical), widgets are methods that return a Response.
+/// (Row / Column), widgets are methods that return a Response.
 /// </summary>
 public sealed partial class Ui : IDisposable
 {
@@ -278,6 +334,10 @@ public sealed partial class Ui : IDisposable
     private int _hotId, _activeId, _focusedId;
     private UiCursor _requestedCursor;
     private readonly Stack<int> _idStack = new();
+#if DEBUG
+    private readonly HashSet<int> _debugRegisteredWidgetIds = new();
+    private int _idTrackingDisabledDepth;
+#endif
 
     // Per-frame focus navigation
     private bool _tabNavigationRequested;
@@ -323,9 +383,10 @@ public sealed partial class Ui : IDisposable
     /// <summary>Runs a complete UI frame using explicit frame scale and simple left-button mouse input.</summary>
     public void Frame(RenderFrameInfo frame, Vector2 mousePos, bool mouseDown, Action<Ui> content)
     {
+        ArgumentNullException.ThrowIfNull(content);
         BeginFrame(frame, mousePos, mouseDown);
-        content(this);
-        EndFrame();
+        try { content(this); }
+        finally { EndFrame(); }
     }
 
     /// <inheritdoc cref="Frame(int, int, Vector2, bool, Action{Ui})" />
@@ -335,9 +396,10 @@ public sealed partial class Ui : IDisposable
     /// <inheritdoc cref="Frame(RenderFrameInfo, Vector2, bool, Action{Ui})" />
     public void Frame<TState>(RenderFrameInfo frame, Vector2 mousePos, bool mouseDown, TState state, Action<Ui, TState> content)
     {
+        ArgumentNullException.ThrowIfNull(content);
         BeginFrame(frame, mousePos, mouseDown);
-        content(this, state);
-        EndFrame();
+        try { content(this, state); }
+        finally { EndFrame(); }
     }
 
     /// <summary>Runs a complete scale-1 UI frame using a full input snapshot.</summary>
@@ -358,9 +420,10 @@ public sealed partial class Ui : IDisposable
         UiInputState input,
         Action<Ui> content)
     {
+        ArgumentNullException.ThrowIfNull(content);
         BeginFrame(frame, mousePos, mouseDown, input);
-        content(this);
-        EndFrame();
+        try { content(this); }
+        finally { EndFrame(); }
     }
 
     /// <inheritdoc cref="Frame(int, int, Vector2, bool, UiInputState, Action{Ui})" />
@@ -383,9 +446,10 @@ public sealed partial class Ui : IDisposable
         TState state,
         Action<Ui, TState> content)
     {
+        ArgumentNullException.ThrowIfNull(content);
         BeginFrame(frame, mousePos, mouseDown, input);
-        content(this, state);
-        EndFrame();
+        try { content(this, state); }
+        finally { EndFrame(); }
     }
 
     /// <summary>Runs a complete scale-1 UI frame, deriving left-button state from <paramref name="input"/>.</summary>
@@ -404,9 +468,10 @@ public sealed partial class Ui : IDisposable
         UiInputState input,
         Action<Ui> content)
     {
+        ArgumentNullException.ThrowIfNull(content);
         BeginFrame(frame, mousePos, input);
-        content(this);
-        EndFrame();
+        try { content(this); }
+        finally { EndFrame(); }
     }
 
     /// <inheritdoc cref="Frame(int, int, Vector2, UiInputState, Action{Ui})" />
@@ -427,9 +492,10 @@ public sealed partial class Ui : IDisposable
         TState state,
         Action<Ui, TState> content)
     {
+        ArgumentNullException.ThrowIfNull(content);
         BeginFrame(frame, mousePos, input);
-        content(this, state);
-        EndFrame();
+        try { content(this, state); }
+        finally { EndFrame(); }
     }
 
     /// <summary>Begins a scale-1 frame using simple left-button mouse input.</summary>
@@ -464,6 +530,11 @@ public sealed partial class Ui : IDisposable
         UpdateMouseButtons(mouseDown);
 
         _idStack.Clear();
+        _disabledDepth = 0;
+#if DEBUG
+        _debugRegisteredWidgetIds.Clear();
+        _idTrackingDisabledDepth = 0;
+#endif
         _hotId = 0;
         _requestedCursor = UiCursor.Arrow;
         _tabNavigationRequested = _input.IsPressed(UiKey.Tab);
@@ -510,6 +581,7 @@ public sealed partial class Ui : IDisposable
     public void EndFrame()
     {
         ThrowIfDisposed();
+        DebugVerifyScopesClosed();
 
         RenderQueuedWindows();
         _hitClips.Clear();
@@ -555,6 +627,10 @@ public sealed partial class Ui : IDisposable
         _layouts.Clear();
         _hitClips.Clear();
         _idStack.Clear();
+#if DEBUG
+        _debugRegisteredWidgetIds.Clear();
+        _idTrackingDisabledDepth = 0;
+#endif
         _popupContext.Clear();
         _windowContextId = 0;
         _menuMeasureOnly = false;
@@ -571,6 +647,11 @@ public sealed partial class Ui : IDisposable
         _hotId = 0;
         _activeId = 0;
         _focusedId = 0;
+        _firstFocusableId = 0;
+        _lastFocusableId = 0;
+        _pendingFocusId = 0;
+        _requestedFocusId = 0;
+        _sawFocusedWidget = false;
         _disposed = true;
         GC.SuppressFinalize(this);
     }
@@ -582,25 +663,25 @@ public sealed partial class Ui : IDisposable
     /// <summary>Remaining width available in the current layout scope.</summary>
     public float AvailableWidth => _layouts.Count > 0 ? GetAvailableWidth(Top) : 0;
 
-    /// <summary>Opens a horizontal layout scope for the callback.</summary>
-    public void Horizontal(Action<Ui> content) => Scope(LayoutDir.Horizontal, null, UiAlign.Start, reserveWidth: false, content);
-    /// <summary>Opens a vertical layout scope for the callback.</summary>
-    public void Vertical(Action<Ui> content) => Scope(LayoutDir.Vertical, null, UiAlign.Start, reserveWidth: false, content);
+    /// <summary>Opens a row layout scope for the callback.</summary>
+    public void Row(Action<Ui> content) => Scope(LayoutDir.Horizontal, null, UiAlign.Start, reserveWidth: false, content);
+    /// <summary>Opens a column layout scope for the callback.</summary>
+    public void Column(Action<Ui> content) => Scope(LayoutDir.Vertical, null, UiAlign.Start, reserveWidth: false, content);
 
     /// <summary>Opens a fixed-width vertical layout scope for the callback.</summary>
-    public void Width(float width, Action<Ui> content, UiAlign align = UiAlign.Start)
+    public void FixedWidth(float width, Action<Ui> content, UiAlign align = UiAlign.Start)
         => Scope(LayoutDir.Vertical, width, align, reserveWidth: true, content);
 
     /// <summary>Opens a vertical layout scope clamped to the current available width.</summary>
     public void MaxWidth(float maxWidth, Action<Ui> content, UiAlign align = UiAlign.Start)
         => Scope(LayoutDir.Vertical, MathF.Min(MathF.Max(0, maxWidth), AvailableWidth), align, reserveWidth: true, content);
 
-    /// <summary>Opens a horizontal layout scope that is closed when the returned handle is disposed.</summary>
-    public LayoutScopeHandle Horizontal() => OpenScope(LayoutDir.Horizontal, null, UiAlign.Start, reserveWidth: false);
-    /// <summary>Opens a vertical layout scope that is closed when the returned handle is disposed.</summary>
-    public LayoutScopeHandle Vertical() => OpenScope(LayoutDir.Vertical, null, UiAlign.Start, reserveWidth: false);
+    /// <summary>Opens a row layout scope that is closed when the returned handle is disposed.</summary>
+    public LayoutScopeHandle Row() => OpenScope(LayoutDir.Horizontal, null, UiAlign.Start, reserveWidth: false);
+    /// <summary>Opens a column layout scope that is closed when the returned handle is disposed.</summary>
+    public LayoutScopeHandle Column() => OpenScope(LayoutDir.Vertical, null, UiAlign.Start, reserveWidth: false);
     /// <summary>Opens a fixed-width layout scope that is closed when the returned handle is disposed.</summary>
-    public LayoutScopeHandle Width(float width, UiAlign align = UiAlign.Start)
+    public LayoutScopeHandle FixedWidth(float width, UiAlign align = UiAlign.Start)
         => OpenScope(LayoutDir.Vertical, width, align, reserveWidth: true);
     /// <summary>Opens a max-width layout scope that is closed when the returned handle is disposed.</summary>
     public LayoutScopeHandle MaxWidth(float maxWidth, UiAlign align = UiAlign.Start)
@@ -614,9 +695,10 @@ public sealed partial class Ui : IDisposable
 
     private void Scope(LayoutDir dir, float? width, UiAlign align, bool reserveWidth, Action<Ui> content)
     {
+        ArgumentNullException.ThrowIfNull(content);
         BeginScope(dir, width, align, reserveWidth);
-        content(this);
-        EndScope();
+        try { content(this); }
+        finally { EndScope(); }
     }
 
     private void BeginScope(LayoutDir dir, float? width, UiAlign align, bool reserveWidth)
@@ -724,40 +806,82 @@ public sealed partial class Ui : IDisposable
 
     private bool ResolveEnabled(bool enabled) => enabled && _disabledDepth == 0;
 
+    private void EnterDisabledScope(bool disabled)
+    {
+        if (disabled)
+            _disabledDepth++;
+    }
+
+    private void ExitDisabledScope(bool disabled)
+    {
+        if (disabled)
+            _disabledDepth--;
+    }
+
+    /// <summary>Runs a disabled scope until disposed.</summary>
+    public DisabledScopeHandle Disabled() => Disabled(disabled: true);
+
+    /// <summary>Runs a disabled scope until disposed when <paramref name="disabled"/> is true.</summary>
+    public DisabledScopeHandle Disabled(bool disabled)
+    {
+        EnterDisabledScope(disabled);
+        return new DisabledScopeHandle(this, disabled);
+    }
+
     /// <summary>Runs content in a disabled scope.</summary>
     public void Disabled(Action<Ui> content)
     {
         ArgumentNullException.ThrowIfNull(content);
-        _disabledDepth++;
-        try { content(this); }
-        finally { _disabledDepth--; }
+        using (Disabled())
+            content(this);
     }
 
     /// <inheritdoc cref="Disabled(Action{Ui})" />
     public void Disabled<TState>(TState state, Action<Ui, TState> content)
     {
         ArgumentNullException.ThrowIfNull(content);
-        _disabledDepth++;
-        try { content(this, state); }
-        finally { _disabledDepth--; }
+        using (Disabled())
+            content(this, state);
     }
 
     /// <summary>Runs content in a disabled scope when <paramref name="disabled"/> is true.</summary>
     public void Disabled(bool disabled, Action<Ui> content)
     {
         ArgumentNullException.ThrowIfNull(content);
-        if (disabled) _disabledDepth++;
-        try { content(this); }
-        finally { if (disabled) _disabledDepth--; }
+        using (Disabled(disabled))
+            content(this);
     }
 
     /// <inheritdoc cref="Disabled(bool, Action{Ui})" />
     public void Disabled<TState>(bool disabled, TState state, Action<Ui, TState> content)
     {
         ArgumentNullException.ThrowIfNull(content);
-        if (disabled) _disabledDepth++;
-        try { content(this, state); }
-        finally { if (disabled) _disabledDepth--; }
+        using (Disabled(disabled))
+            content(this, state);
+    }
+
+    /// <summary>Disposable handle returned by explicit disabled scope methods.</summary>
+    public ref struct DisabledScopeHandle
+    {
+        private Ui? _ui;
+        private readonly bool _active;
+
+        internal DisabledScopeHandle(Ui ui, bool active)
+        {
+            _ui = ui;
+            _active = active;
+        }
+
+        /// <summary>Closes the disabled scope.</summary>
+        public void Dispose()
+        {
+            Ui? ui = _ui;
+            if (ui == null)
+                return;
+
+            _ui = null;
+            ui.ExitDisabledScope(_active);
+        }
     }
 
     private float GetAvailableWidth(in LayoutScope scope)
@@ -828,41 +952,207 @@ public sealed partial class Ui : IDisposable
     // ID generation
     // -------------------------------------------------------------------------
 
-    private int MakeId(string label)
-    {
-        int parent = _idStack.Count > 0 ? _idStack.Peek() : unchecked((int)0x9e3779b1);
-        return HashMix(parent, HashString(label));
-    }
+    private int CurrentIdSeed => _idStack.Count > 0 ? _idStack.Peek() : unchecked((int)0x9e3779b1);
+
+    private int MakeId(ReadOnlySpan<char> label) => HashMix(CurrentIdSeed, UiId.HashString(label));
+
+    private int MakeId(UiId id) => HashMix(CurrentIdSeed, id.Hash);
+
+    private static bool HasSpecifiedId(UiId? id) => id.HasValue && id.Value.IsSpecified;
+
+    private static UiId ResolveWidgetId(UiId? id, string fallback)
+        => HasSpecifiedId(id) ? id!.Value : UiId.FromString(fallback);
+
+    private int MakeWidgetId(UiWidgetKind kind, ReadOnlySpan<char> label)
+        => HashMix(HashMix(CurrentIdSeed, UiId.HashInt((int)kind)), UiId.HashString(label));
+
+    private int MakeWidgetId(UiWidgetKind kind, UiId id)
+        => HashMix(HashMix(CurrentIdSeed, UiId.HashInt((int)kind)), id.Hash);
+
+    private int MakePopupId(ReadOnlySpan<char> id) => MakeWidgetId(UiWidgetKind.Popup, id);
+
+    private int MakeId(int value) => HashMix(CurrentIdSeed, UiId.HashInt(value));
+
+    private int MakeId(long value) => HashMix(CurrentIdSeed, UiId.HashLong(value));
+
+    private int MakeId(ulong value) => HashMix(CurrentIdSeed, UiId.HashLong(unchecked((long)value)));
+
+    private int MakeId(Guid value) => HashMix(CurrentIdSeed, UiId.HashGuid(value));
+
+    private static int MakeChildId(int parentId, ReadOnlySpan<char> child) => HashMix(parentId, UiId.HashString(child));
 
     private static int HashMix(int a, int b) => (int)((uint)a * 2654435761u ^ (uint)b);
 
-    private static int HashString(string text)
-    {
-        unchecked
-        {
-            uint hash = 2166136261;
-            foreach (char ch in text)
-            {
-                hash ^= ch;
-                hash *= 16777619;
-            }
+    private void EnterIdScope(ReadOnlySpan<char> name) => _idStack.Push(MakeId(name));
 
-            return (int)hash;
+    private void EnterIdScope(UiId id) => _idStack.Push(MakeId(id));
+
+    private void EnterIdScope(int value) => _idStack.Push(MakeId(value));
+
+    private void EnterIdScope(long value) => _idStack.Push(MakeId(value));
+
+    private void EnterIdScope(ulong value) => _idStack.Push(MakeId(value));
+
+    private void EnterIdScope(Guid value) => _idStack.Push(MakeId(value));
+
+    private void ExitIdScope() => _idStack.Pop();
+
+    /// <summary>Runs a nested id scope until disposed.</summary>
+    public IdScopeHandle Id(string name) => Id(name.AsSpan());
+
+    /// <summary>Runs a nested id scope until disposed.</summary>
+    public IdScopeHandle Id(ReadOnlySpan<char> name)
+    {
+        EnterIdScope(name);
+        return new IdScopeHandle(this);
+    }
+
+    /// <summary>Runs content inside a nested id scope.</summary>
+    public void Id(string name, Action<Ui> content) => Id(name.AsSpan(), content);
+
+    /// <summary>Runs content inside a nested id scope.</summary>
+    public void Id(ReadOnlySpan<char> name, Action<Ui> content)
+    {
+        ArgumentNullException.ThrowIfNull(content);
+        using (Id(name))
+            content(this);
+    }
+
+    /// <summary>Runs content inside a nested id scope.</summary>
+    public void Id<TState>(string name, TState state, Action<Ui, TState> content) => Id(name.AsSpan(), state, content);
+
+    /// <summary>Runs content inside a nested id scope.</summary>
+    public void Id<TState>(ReadOnlySpan<char> name, TState state, Action<Ui, TState> content)
+    {
+        ArgumentNullException.ThrowIfNull(content);
+        using (Id(name))
+            content(this, state);
+    }
+
+    /// <summary>Runs a nested id scope until disposed.</summary>
+    public IdScopeHandle Id(int value)
+    {
+        EnterIdScope(value);
+        return new IdScopeHandle(this);
+    }
+
+    /// <summary>Runs content inside a nested id scope.</summary>
+    public void Id(int value, Action<Ui> content)
+    {
+        ArgumentNullException.ThrowIfNull(content);
+        using (Id(value))
+            content(this);
+    }
+
+    /// <summary>Runs content inside a nested id scope.</summary>
+    public void Id<TState>(int value, TState state, Action<Ui, TState> content)
+    {
+        ArgumentNullException.ThrowIfNull(content);
+        using (Id(value))
+            content(this, state);
+    }
+
+    /// <summary>Runs a nested id scope until disposed.</summary>
+    public IdScopeHandle Id(long value)
+    {
+        EnterIdScope(value);
+        return new IdScopeHandle(this);
+    }
+
+    /// <summary>Runs content inside a nested id scope.</summary>
+    public void Id(long value, Action<Ui> content)
+    {
+        ArgumentNullException.ThrowIfNull(content);
+        using (Id(value))
+            content(this);
+    }
+
+    /// <summary>Runs content inside a nested id scope.</summary>
+    public void Id<TState>(long value, TState state, Action<Ui, TState> content)
+    {
+        ArgumentNullException.ThrowIfNull(content);
+        using (Id(value))
+            content(this, state);
+    }
+
+    /// <summary>Runs a nested id scope until disposed.</summary>
+    public IdScopeHandle Id(ulong value)
+    {
+        EnterIdScope(value);
+        return new IdScopeHandle(this);
+    }
+
+    /// <summary>Runs content inside a nested id scope.</summary>
+    public void Id(ulong value, Action<Ui> content)
+    {
+        ArgumentNullException.ThrowIfNull(content);
+        using (Id(value))
+            content(this);
+    }
+
+    /// <summary>Runs content inside a nested id scope.</summary>
+    public void Id<TState>(ulong value, TState state, Action<Ui, TState> content)
+    {
+        ArgumentNullException.ThrowIfNull(content);
+        using (Id(value))
+            content(this, state);
+    }
+
+    /// <summary>Runs a nested id scope until disposed.</summary>
+    public IdScopeHandle Id(Guid value)
+    {
+        EnterIdScope(value);
+        return new IdScopeHandle(this);
+    }
+
+    /// <summary>Runs content inside a nested id scope.</summary>
+    public void Id(Guid value, Action<Ui> content)
+    {
+        ArgumentNullException.ThrowIfNull(content);
+        using (Id(value))
+            content(this);
+    }
+
+    /// <summary>Runs content inside a nested id scope.</summary>
+    public void Id<TState>(Guid value, TState state, Action<Ui, TState> content)
+    {
+        ArgumentNullException.ThrowIfNull(content);
+        using (Id(value))
+            content(this, state);
+    }
+
+    /// <summary>Disposable handle returned by explicit id scope methods.</summary>
+    public ref struct IdScopeHandle
+    {
+        private Ui? _ui;
+
+        internal IdScopeHandle(Ui ui) => _ui = ui;
+
+        /// <summary>Closes the id scope.</summary>
+        public void Dispose()
+        {
+            Ui? ui = _ui;
+            if (ui == null)
+                return;
+
+            _ui = null;
+            ui.ExitIdScope();
         }
     }
 
-    /// <summary>Pushes an id seed for subsequent widgets.</summary>
-    public void PushId(string name) => _idStack.Push(MakeId(name));
-    /// <summary>Pops the most recent id seed.</summary>
-    public void PopId() => _idStack.Pop();
-
-    /// <summary>Requests keyboard focus for the widget with the given id.</summary>
-    public void RequestFocus(string id)
+    /// <summary>Requests keyboard focus for the widget identified by <paramref name="kind"/> and <paramref name="id"/>.</summary>
+    /// <remarks>
+    /// <paramref name="id"/> is the widget's resolved identifier — its label by default, or the
+    /// value passed via the widget's <c>id:</c> parameter when one was supplied. The argument
+    /// converts implicitly from <see cref="string"/>, <see cref="int"/>, <see cref="long"/>,
+    /// <see cref="ulong"/>, and <see cref="System.Guid"/>.
+    /// </remarks>
+    public void RequestFocus(UiWidgetKind kind, UiId id)
     {
         _focusedId = 0;
         _pendingFocusId = 0;
         _sawFocusedWidget = false;
-        _requestedFocusId = MakeId(id);
+        _requestedFocusId = id.IsSpecified ? MakeWidgetId(kind, id) : 0;
     }
 
     /// <summary>Clears keyboard focus.</summary>
@@ -873,10 +1163,6 @@ public sealed partial class Ui : IDisposable
         _requestedFocusId = 0;
         _sawFocusedWidget = false;
     }
-
-    /// <summary>Returns whether the widget with the given id has keyboard focus.</summary>
-    public bool HasFocus(string id)
-        => _requestedFocusId == 0 && _focusedId == MakeId(id);
 
     // -------------------------------------------------------------------------
     // Persistent widget state and focus
@@ -900,11 +1186,12 @@ public sealed partial class Ui : IDisposable
 
     private bool RegisterFocusable(int id, bool enabled)
     {
+        RegisterWidgetId(id);
         MarkWidgetSeen(id);
 
         if (!enabled)
         {
-            if (_focusedId == id) _focusedId = 0;
+            if (_focusedId == id) ClearFocus(id);
             return false;
         }
 
@@ -913,13 +1200,14 @@ public sealed partial class Ui : IDisposable
 
         if (_requestedFocusId == id)
         {
-            _focusedId = id;
+            SetFocus(id);
             _requestedFocusId = 0;
             _pendingFocusId = 0;
             _tabNavigationRequested = false;
         }
 
-        if (_firstFocusableId == 0) _firstFocusableId = id;
+        if (_firstFocusableId == 0)
+            _firstFocusableId = id;
         int previousFocusableId = _lastFocusableId;
         _lastFocusableId = id;
 
@@ -927,7 +1215,8 @@ public sealed partial class Ui : IDisposable
         {
             if (_focusedId == 0)
             {
-                if (!_tabNavigationBackward) _pendingFocusId = id;
+                if (!_tabNavigationBackward)
+                    _pendingFocusId = id;
             }
             else if (_tabNavigationBackward)
             {
@@ -940,7 +1229,8 @@ public sealed partial class Ui : IDisposable
             }
         }
 
-        if (_focusedId == id) _sawFocusedWidget = true;
+        if (_focusedId == id)
+            _sawFocusedWidget = true;
         return _focusedId == id;
     }
 
@@ -950,36 +1240,37 @@ public sealed partial class Ui : IDisposable
 
         if (_firstFocusableId == 0)
         {
-            _focusedId = 0;
+            ClearFocus();
             return;
         }
 
         if (_focusedId == 0)
         {
-            _focusedId = _tabNavigationBackward ? _lastFocusableId : _firstFocusableId;
+            SetFocus(_tabNavigationBackward ? _lastFocusableId : _firstFocusableId);
             return;
         }
 
         if (_pendingFocusId == -1)
         {
-            _focusedId = _lastFocusableId;
+            SetFocus(_lastFocusableId);
             return;
         }
 
         if (_pendingFocusId != 0)
         {
-            _focusedId = _pendingFocusId;
+            SetFocus(_pendingFocusId);
             return;
         }
 
-        _focusedId = _tabNavigationBackward ? _lastFocusableId : _firstFocusableId;
+        SetFocus(_tabNavigationBackward ? _lastFocusableId : _firstFocusableId);
     }
 
     private void SetFocus(int id) => _focusedId = id;
 
     private void ClearFocus(int id)
     {
-        if (_focusedId == id) _focusedId = 0;
+        if (_focusedId == id)
+            _focusedId = 0;
     }
 
     private void UpdateMouseButtons(bool legacyPrimaryDown)
@@ -1037,6 +1328,42 @@ public sealed partial class Ui : IDisposable
     {
         if (id != 0)
             _seenWidgetIds.Add(id);
+    }
+
+    [Conditional("DEBUG")]
+    private void DebugVerifyScopesClosed()
+    {
+#if DEBUG
+        if (_layouts.Count > 1)
+            throw new InvalidOperationException(
+                $"Vellum scope leak: {_layouts.Count - 1} unclosed Row/Column/FixedWidth/MaxWidth handle(s). " +
+                "Wrap layout handles in 'using (...)'.");
+        if (_idStack.Count > 0)
+            throw new InvalidOperationException(
+                $"Vellum scope leak: {_idStack.Count} unclosed Id(...) handle(s). " +
+                "Wrap Id handles in 'using (...)'.");
+        if (_disabledDepth > 0)
+            throw new InvalidOperationException(
+                $"Vellum scope leak: {_disabledDepth} unclosed Disabled(...) handle(s). " +
+                "Wrap Disabled handles in 'using (...)'.");
+#endif
+    }
+
+    [Conditional("DEBUG")]
+    private void RegisterWidgetId(int id, string? message = null)
+    {
+#if DEBUG
+        if (id == 0 || _idTrackingDisabledDepth > 0)
+            return;
+
+        if (_debugRegisteredWidgetIds.Add(id))
+            return;
+
+        string suffix = string.IsNullOrWhiteSpace(message) ? string.Empty : $" ({message})";
+        throw new InvalidOperationException(
+            $"Duplicate Vellum widget id {id}{suffix}. " +
+            "Wrap repeated data in ui.Id(...), or pass a named id: value when same-label widgets share a scope.");
+#endif
     }
 
     private void ClearInteractionForMissingWidgets()

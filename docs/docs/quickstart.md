@@ -67,7 +67,7 @@ Most widgets return a `Response`. Common fields are `Hovered`, `Pressed`, `Click
 
 ## Layout
 
-Vellum has simple immediate layout scopes. Use panels for framed regions and `Horizontal`, `Vertical`, `Width`, and `MaxWidth` to control placement.
+Vellum has simple immediate layout scopes. Use panels for framed regions and `Row`, `Column`, `FixedWidth`, and `MaxWidth` to control placement.
 
 ```csharp
 ui.Frame(width, height, mouse, input, root =>
@@ -80,13 +80,13 @@ ui.Frame(width, height, mouse, input, root =>
         {
             panel.Heading("Profile");
 
-            panel.Horizontal(row =>
+            panel.Row(row =>
             {
                 row.Label("Name");
                 row.TextField("name", ref name, width: 260f);
             });
 
-            panel.Horizontal(row =>
+            panel.Row(row =>
             {
                 if (row.Button("Save").Clicked)
                     Save(name);
@@ -99,7 +99,29 @@ ui.Frame(width, height, mouse, input, root =>
 });
 ```
 
-Widget IDs are derived from labels and the current ID stack. When repeated controls use the same label, wrap them in `PushId` / `PopId` or use locally unique labels.
+Widget IDs are derived from labels and the current ID scope. When repeated controls use the same label for different data objects, wrap each object in an `Id(...)` scope:
+
+```csharp
+foreach (var item in items)
+{
+    using (ui.Id(item.Id))
+    {
+        ui.TextField("Name", ref item.Name, width: 260f);
+        ui.Button("Delete");
+    }
+}
+```
+
+Callback scopes are also available for the same pattern when that reads better.
+
+When two widgets in the same scope need the same visible label, use a named `id:` override:
+
+```csharp
+ui.Button("Save", id: "save-primary");
+ui.Button("Save", id: "save-secondary");
+```
+
+Debug builds throw when two widgets resolve to the same ID in one frame, so duplicate labels are caught early.
 
 ## Windows
 
@@ -110,7 +132,7 @@ WindowState inspector = new(new Vector2(40f, 40f), new Vector2(360f, 260f));
 
 ui.Frame(width, height, mouse, input, root =>
 {
-    root.Window("inspector", "Inspector", inspector, width: 360f, body =>
+    root.Window("Inspector", inspector, 360f, body =>
     {
         body.Label("Selected entity");
         body.Separator();

@@ -31,25 +31,26 @@ public sealed partial class Ui
     {
         ArgumentNullException.ThrowIfNull(content);
 
-        int widgetId = MakeId(id);
+        int widgetId = MakeWidgetId(UiWidgetKind.TabBar, id.AsSpan());
+        RegisterWidgetId(widgetId, $"TabBar \"{id}\"");
         var tabState = GetState<TabBarState>(widgetId);
         float availableWidth = AvailableWidth;
 
         var ctx = new TabBarContext { State = tabState };
-        PushId(id);
+        EnterIdScope(id.AsSpan());
         _tabBarContexts.Push(ctx);
 
         var (rowX, rowY) = Place(0, 0);
 
         try
         {
-            using (Horizontal())
+            using (Row())
                 content(this, state);
         }
         finally
         {
             _tabBarContexts.Pop();
-            PopId();
+            ExitIdScope();
         }
 
         if (ctx.HeaderBottom > rowY)
@@ -83,11 +84,11 @@ public sealed partial class Ui
     }
 
     /// <summary>Declares a tab inside the current tab bar.</summary>
-    public Response Tab(string label, Action<Ui> content)
-        => Tab(label, new UiActionState(content), static (ui, state) => state.Content(ui));
+    public Response Tab(string label, Action<Ui> content, UiId? id = null)
+        => Tab(label, new UiActionState(content), static (ui, state) => state.Content(ui), id);
 
-    /// <inheritdoc cref="Tab(string, Action{Ui})" />
-    public Response Tab<TState>(string label, TState state, Action<Ui, TState> content)
+    /// <inheritdoc cref="Tab(string, Action{Ui}, UiId?)" />
+    public Response Tab<TState>(string label, TState state, Action<Ui, TState> content, UiId? id = null)
     {
         ArgumentNullException.ThrowIfNull(content);
         if (_tabBarContexts.Count == 0)
@@ -105,7 +106,8 @@ public sealed partial class Ui
         if (index > 0 && Theme.TabSpacing > 0)
             Spacing(Theme.TabSpacing);
 
-        int tabId = MakeId(label);
+        UiId resolvedId = ResolveWidgetId(id, label);
+        int tabId = MakeWidgetId(UiWidgetKind.Tab, resolvedId);
         var (x, y) = Place(w, h);
 
         bool focused = RegisterFocusable(tabId, true);

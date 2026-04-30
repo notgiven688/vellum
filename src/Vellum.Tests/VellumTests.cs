@@ -335,6 +335,8 @@ public sealed class VellumTests
         "Vellum.ThemePresets",
         "Vellum.TrueTypeFont",
         "Vellum.Ui",
+        "Vellum.Ui+DisabledScopeHandle",
+        "Vellum.Ui+IdScopeHandle",
         "Vellum.Ui+LayoutScopeHandle",
         "Vellum.UiAlign",
         "Vellum.UiCanvas",
@@ -342,7 +344,9 @@ public sealed class VellumTests
         "Vellum.UiFonts",
         "Vellum.UiInputState",
         "Vellum.UiKey",
+        "Vellum.UiId",
         "Vellum.UiMouseButton",
+        "Vellum.UiWidgetKind",
         "Vellum.WindowState",
         "Vellum.Rendering.ClipRect",
         "Vellum.Rendering.Color",
@@ -632,7 +636,7 @@ public sealed class VellumTests
 
         ui.Frame(400, 300, Vector2.Zero, false, frame =>
         {
-            frame.Horizontal(frame =>
+            frame.Row(frame =>
             {
                 frame.Label("Name:");
                 rowRemaining = frame.AvailableWidth;
@@ -658,7 +662,7 @@ public sealed class VellumTests
         Response rightButton = default;
         ui.Frame(400, 300, Vector2.Zero, false, frame =>
         {
-            frame.Width(140, frame =>
+            frame.FixedWidth(140, frame =>
             {
                 rightButton = frame.Button("Right", width: frame.AvailableWidth);
             }, align: UiAlign.End);
@@ -684,14 +688,14 @@ public sealed class VellumTests
         {
             ui.Frame(400, 300, mouse, mouseDown, input, frame =>
             {
-                using (frame.Horizontal())
+                using (frame.Row())
                 {
-                    using (frame.Width(splitterPaneWidth))
+                    using (frame.FixedWidth(splitterPaneWidth))
                         frame.Label("Left");
 
                     splitter = frame.Splitter("layout-splitter", ref splitterPaneWidth, 80f, 180f, thickness: 8f, height: 44f);
 
-                    using (frame.Width(frame.AvailableWidth))
+                    using (frame.FixedWidth(frame.AvailableWidth))
                         splitterRight = frame.Button("Right", width: frame.AvailableWidth);
                 }
             });
@@ -980,18 +984,18 @@ public sealed class VellumTests
 
             ui.Frame(800, 600, Vector2.Zero, false, frame =>
             {
-                frame.RequestFocus("second");
+                frame.RequestFocus(UiWidgetKind.TextField, "second");
                 first = frame.TextField("first", ref firstText, 140);
                 second = frame.TextField("second", ref secondText, 140);
             });
 
-            Check("request focus moves focus to a later widget in the same frame", !first.Focused && second.Focused && ui.HasFocus("second"));
+            Check("request focus moves focus to a later widget in the same frame", !first.Focused && second.Focused);
 
             ui.ClearFocus();
             Response late = default;
             ui.Frame(800, 600, Vector2.Zero, false, frame =>
             {
-                frame.RequestFocus("late");
+                frame.RequestFocus(UiWidgetKind.TextField, "late");
                 frame.Label("Waiting");
             });
             ui.Frame(800, 600, Vector2.Zero, false, frame =>
@@ -999,7 +1003,7 @@ public sealed class VellumTests
                 late = frame.TextField("late", ref secondText, 140);
             });
 
-            Check("request focus persists until the widget appears", late.Focused && ui.HasFocus("late"));
+            Check("request focus persists until the widget appears", late.Focused);
         }
 
         {
@@ -1047,12 +1051,214 @@ public sealed class VellumTests
             Response button = default;
             ui.Frame(800, 600, Vector2.Zero, false, Input(keys: new[] { UiKey.Space }), frame =>
             {
-                frame.RequestFocus("Go");
+                frame.RequestFocus(UiWidgetKind.Button, "Go");
                 button = frame.Button("Go");
             });
 
             Check("response activated covers keyboard button activation", button.Activated && button.Clicked);
         }
+
+        {
+            var renderer = new TestRenderer();
+            var ui = new Ui(renderer)
+            {
+                Font = font,
+                DefaultFontSize = 18f,
+                Lcd = false
+            };
+
+            Response first = default, second = default;
+            ui.Frame(800, 600, Vector2.Zero, false, Input(keys: new[] { UiKey.Space }), frame =>
+            {
+                using (frame.Id(1))
+                {
+                    frame.RequestFocus(UiWidgetKind.Button, "Delete");
+                    first = frame.Button("Delete");
+                }
+
+                using (frame.Id(2))
+                {
+                    second = frame.Button("Delete");
+                }
+            });
+
+            Check("id scopes disambiguate same-label widgets", first.Activated && !second.Activated);
+        }
+
+        {
+            var renderer = new TestRenderer();
+            var ui = new Ui(renderer)
+            {
+                Font = font,
+                DefaultFontSize = 18f,
+                Lcd = false
+            };
+
+            Response disabled = default, enabled = default, conditionallyEnabled = default;
+            ui.Frame(800, 600, Vector2.Zero, false, frame =>
+            {
+                using (frame.Disabled())
+                {
+                    disabled = frame.Button("Disabled");
+                }
+
+                enabled = frame.Button("Enabled");
+
+                using (frame.Disabled(false))
+                {
+                    conditionallyEnabled = frame.Button("Conditionally enabled");
+                }
+            });
+
+            Check("disabled scope handles restore enabled state",
+                disabled.Disabled && !enabled.Disabled && !conditionallyEnabled.Disabled);
+        }
+
+        {
+            var renderer = new TestRenderer();
+            var ui = new Ui(renderer)
+            {
+                Font = font,
+                DefaultFontSize = 18f,
+                Lcd = false
+            };
+
+            Response primary = default, secondary = default;
+            ui.Frame(800, 600, Vector2.Zero, false, Input(keys: new[] { UiKey.Space }), frame =>
+            {
+                frame.RequestFocus(UiWidgetKind.Button, "save-secondary");
+                primary = frame.Button("Save", id: "save-primary");
+                secondary = frame.Button("Save", id: "save-secondary");
+            });
+
+            Check("explicit widget ids disambiguate same-label widgets", !primary.Activated && secondary.Activated);
+        }
+
+        {
+            var renderer = new TestRenderer();
+            var ui = new Ui(renderer)
+            {
+                Font = font,
+                DefaultFontSize = 18f,
+                Lcd = false
+            };
+
+            string? inheritedId = null;
+            Response first = default, second = default;
+            ui.Frame(800, 600, Vector2.Zero, false, Input(keys: new[] { UiKey.Space }), frame =>
+            {
+                frame.RequestFocus(UiWidgetKind.Button, "Alpha");
+                first = frame.Button("Alpha", id: inheritedId);
+                second = frame.Button("Beta", id: inheritedId);
+            });
+
+            Check("null string widget ids fall back to label identity", first.Activated && !second.Activated);
+        }
+
+#if DEBUG
+        {
+            var renderer = new TestRenderer();
+            var ui = new Ui(renderer) { Font = font, DefaultFontSize = 18f, Lcd = false };
+
+            bool layoutLeak = false;
+            try
+            {
+                ui.Frame(800, 600, Vector2.Zero, false, frame => { frame.Row(); });
+            }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("scope leak"))
+            {
+                layoutLeak = true;
+            }
+            Check("missing using on Row() is detected as a scope leak", layoutLeak);
+
+            bool idLeak = false;
+            try
+            {
+                ui.Frame(800, 600, Vector2.Zero, false, frame => { frame.Id("orphan"); });
+            }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("scope leak"))
+            {
+                idLeak = true;
+            }
+            Check("missing using on Id() is detected as a scope leak", idLeak);
+
+            bool disabledLeak = false;
+            try
+            {
+                ui.Frame(800, 600, Vector2.Zero, false, frame => { frame.Disabled(); });
+            }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("scope leak"))
+            {
+                disabledLeak = true;
+            }
+            Check("missing using on Disabled() is detected as a scope leak", disabledLeak);
+        }
+#endif
+
+        {
+            var renderer = new TestRenderer();
+            var ui = new Ui(renderer)
+            {
+                Font = font,
+                DefaultFontSize = 18f,
+                Lcd = false
+            };
+
+            string text = "Ada";
+            Response button = default, field = default;
+            ui.Frame(800, 600, Vector2.Zero, false, frame =>
+            {
+                button = frame.Button("Name");
+                field = frame.TextField("Name", ref text, 180);
+            });
+
+            Check("widget kind disambiguates same-label widgets", button.W > 0f && field.W > 0f);
+        }
+
+        {
+            var renderer = new TestRenderer();
+            var ui = new Ui(renderer)
+            {
+                Font = font,
+                DefaultFontSize = 18f,
+                Lcd = false
+            };
+
+            ui.OpenPopup("Settings");
+            Response button = default;
+            bool popupRendered = false;
+            ui.Frame(800, 600, Vector2.Zero, false, frame =>
+            {
+                button = frame.Button("Settings");
+                popupRendered = frame.Popup("Settings", button, 160, 120, popup => popup.Label("Popup content"));
+            });
+
+            Check("popup ids do not collide with same-label widgets", button.W > 0f && popupRendered);
+        }
+
+#if DEBUG
+        {
+            var renderer = new TestRenderer();
+            var ui = new Ui(renderer)
+            {
+                Font = font,
+                DefaultFontSize = 18f,
+                Lcd = false
+            };
+
+            var ex = Assert.Throws<InvalidOperationException>(() =>
+            {
+                ui.Frame(800, 600, Vector2.Zero, false, frame =>
+                {
+                    frame.Button("Duplicate");
+                    frame.Button("Duplicate");
+                });
+            });
+
+            Check("duplicate widget ids throw in debug builds",
+                ex.Message.Contains("Duplicate Vellum widget id", StringComparison.Ordinal));
+        }
+#endif
 
         {
             var renderer = new TestRenderer();
@@ -1300,6 +1506,59 @@ public sealed class VellumTests
                 Lcd = false
             };
 
+            bool clicked = false;
+            Response menu = default;
+            Response customLabel = default;
+
+            ui.Frame(320, 180, new Vector2(20, 24), true, frame =>
+            {
+                menu = frame.MenuItem("Custom row", (item, text) =>
+                {
+                    customLabel = item.Label(text);
+                }, id: "custom-menu-item", width: 180);
+            });
+            ui.Frame(320, 180, new Vector2(20, 24), false, frame =>
+            {
+                menu = frame.MenuItem("Custom row", (item, text) =>
+                {
+                    customLabel = item.Label(text);
+                }, id: "custom-menu-item", width: 180);
+                clicked = menu.Clicked;
+            });
+
+            Check("custom menu item uses named id and renders content", clicked && customLabel.W > 0f && menu.W >= 180f);
+        }
+
+        {
+            var renderer = new TestRenderer();
+            var ui = new Ui(renderer)
+            {
+                Font = font,
+                DefaultFontSize = 18f,
+                Lcd = false
+            };
+
+            var ex = Assert.Throws<ArgumentException>(() =>
+            {
+                ui.Frame(320, 180, Vector2.Zero, false, frame =>
+                {
+                    frame.MenuItem("Custom row", static (item, text) => item.Label(text));
+                });
+            });
+
+            Check("custom menu item requires a named id", ex.ParamName == "id");
+        }
+
+        {
+            var renderer = new TestRenderer();
+            var ui = new Ui(renderer)
+            {
+                Font = font,
+                DefaultFontSize = 18f,
+                Lcd = false
+            };
+
+            Response longItem = default;
             void Frame(Vector2 mouse)
             {
                 ui.Frame(480, 240, mouse, false, frame =>
@@ -1307,14 +1566,14 @@ public sealed class VellumTests
                     frame.Menu("Select Demo Scene", popup =>
                     {
                         popup.MenuItem("Demo 00 - Basic shapes");
-                        popup.MenuItem("Demo 01 - A much longer menu entry that should widen the popup");
+                        longItem = popup.MenuItem("Demo 01 - A much longer menu entry that should widen the popup");
                     }, width: 140f, openOnHover: true, openToSide: true);
                 });
             }
 
             Frame(new Vector2(20, 24));
-            bool hasBounds = ui.TryGetPopupBounds("Select Demo Scene/menu", out _, out _, out float popupW, out _);
-            Check("side-opening menu auto-sizes to long content", hasBounds && popupW > 180f);
+            bool hasBounds = ui.TryGetChildPopupBounds(UiWidgetKind.Menu, "Select Demo Scene", "menu", out _, out _, out float popupW, out _);
+            Check("side-opening menu auto-sizes to long content", hasBounds && longItem.W > 180f && popupW > 180f);
         }
 
         {
@@ -1340,13 +1599,42 @@ public sealed class VellumTests
 
             Frame(new Vector2(20, 24), true);
             Frame(new Vector2(20, 24), false);
-            Check("combo box opens on click", ui.IsPopupOpen("theme/popup") && combo.Focused);
+            Check("combo box opens on click", combo.Focused && ui.IsChildPopupOpen(UiWidgetKind.ComboBox, "theme", "popup"));
 
-            var popupBoundsKnown = ui.TryGetPopupBounds("theme/popup", out float px, out float py, out float pw, out float ph);
+            bool popupBoundsKnown = ui.TryGetChildPopupBounds(UiWidgetKind.ComboBox, "theme", "popup", out float px, out float py, out _, out _);
             Frame(new Vector2(px + 12, py + 56), true);
             Frame(new Vector2(px + 12, py + 56), false);
             Frame(Vector2.Zero, false);
-            Check("combo box selects an item and closes", popupBoundsKnown && selected == 0 && !ui.IsPopupOpen("theme/popup") && combo.Changed);
+            Check("combo box selects an item and closes", popupBoundsKnown && selected == 0 && !ui.IsChildPopupOpen(UiWidgetKind.ComboBox, "theme", "popup") && combo.Changed);
+        }
+
+        {
+            var renderer = new TestRenderer();
+            var ui = new Ui(renderer)
+            {
+                Font = font,
+                DefaultFontSize = 18f,
+                Lcd = false
+            };
+
+            string[] options = ["Same", "Other", "Same"];
+            int selected = 1;
+            Response combo = default;
+
+            void Frame(Vector2 mouse, bool mouseDown)
+            {
+                ui.Frame(360, 220, mouse, mouseDown, frame =>
+                {
+                    combo = frame.ComboBox("duplicates", options, ref selected, 180);
+                });
+            }
+
+            Frame(new Vector2(20, 24), true);
+            Frame(new Vector2(20, 24), false);
+            bool popupBoundsKnown = ui.TryGetChildPopupBounds(UiWidgetKind.ComboBox, "duplicates", "popup", out _, out _, out _, out _);
+
+            Check("combo box duplicate labels keep distinct row ids",
+                popupBoundsKnown && selected == 1 && ui.IsChildPopupOpen(UiWidgetKind.ComboBox, "duplicates", "popup") && combo.Focused);
         }
 
         {
@@ -1372,13 +1660,13 @@ public sealed class VellumTests
 
             Frame(Input(keys: new[] { UiKey.Tab }));
             Frame(Input(keys: new[] { UiKey.Enter }));
-            Check("combo box opens from keyboard focus", ui.IsPopupOpen("theme/keyboard/popup") && combo.Focused);
+            Check("combo box opens from keyboard focus", ui.IsChildPopupOpen(UiWidgetKind.ComboBox, "theme/keyboard", "popup") && combo.Focused);
 
             Frame(Input(keys: new[] { UiKey.Down }));
-            Check("combo box keeps the committed value while only moving the highlight", selected == 1 && ui.IsPopupOpen("theme/keyboard/popup") && !combo.Changed);
+            Check("combo box keeps the committed value while only moving the highlight", selected == 1 && ui.IsChildPopupOpen(UiWidgetKind.ComboBox, "theme/keyboard", "popup") && !combo.Changed);
 
             Frame(Input(keys: new[] { UiKey.Enter }));
-            Check("combo box commits the highlighted item on enter", selected == 2 && !ui.IsPopupOpen("theme/keyboard/popup") && combo.Changed && combo.Focused);
+            Check("combo box commits the highlighted item on enter", selected == 2 && !ui.IsChildPopupOpen(UiWidgetKind.ComboBox, "theme/keyboard", "popup") && combo.Changed && combo.Focused);
         }
 
         {
@@ -1406,12 +1694,12 @@ public sealed class VellumTests
             Frame(Input(keys: new[] { UiKey.Enter }));
             Frame(Input(keys: new[] { UiKey.End }));
             Frame(Input(keys: new[] { UiKey.Escape }));
-            Check("combo box escape closes without applying the highlighted item", selected == 1 && !ui.IsPopupOpen("theme/cancel/popup") && !combo.Changed && combo.Focused);
+            Check("combo box escape closes without applying the highlighted item", selected == 1 && !ui.IsChildPopupOpen(UiWidgetKind.ComboBox, "theme/cancel", "popup") && !combo.Changed && combo.Focused);
 
             Frame(Input(keys: new[] { UiKey.Enter }));
             Frame(Input(keys: new[] { UiKey.Home }));
             Frame(Input(keys: new[] { UiKey.Enter }));
-            Check("combo box home jumps to the first item before commit", selected == 0 && !ui.IsPopupOpen("theme/cancel/popup") && combo.Changed);
+            Check("combo box home jumps to the first item before commit", selected == 0 && !ui.IsChildPopupOpen(UiWidgetKind.ComboBox, "theme/cancel", "popup") && combo.Changed);
         }
 
         {
@@ -1428,10 +1716,10 @@ public sealed class VellumTests
 
             ui.Frame(320, 180, new Vector2(40, 40), false, frame =>
             {
-                panel = frame.Panel("settings", 200, 96, content =>
+                panel = frame.Panel(200, 96, content =>
                 {
                     button = content.Button("Inside", width: content.AvailableWidth);
-                });
+                }, id: "settings");
             });
 
             Check(
@@ -1482,6 +1770,67 @@ public sealed class VellumTests
                 Lcd = false
             };
 
+            var primaryState = new WindowState(new Vector2(16, 16));
+            var secondaryState = new WindowState(new Vector2(48, 48));
+            Response primary = default;
+            Response secondary = default;
+
+            ui.Frame(360, 260, Vector2.Zero, false, frame =>
+            {
+                primary = frame.Window("Inspector", primaryState, 160, content =>
+                {
+                    content.Button("Inside", width: content.AvailableWidth);
+                }, id: "primary");
+
+                secondary = frame.Window("Inspector", secondaryState, 160, content =>
+                {
+                    content.Button("Inside", width: content.AvailableWidth);
+                }, id: "secondary");
+            });
+
+            Check(
+                "explicit window ids disambiguate same-title windows",
+                primary.W > 0f &&
+                secondary.W > 0f &&
+                MathF.Abs(primary.X - secondary.X) > 0.1f &&
+                MathF.Abs(primary.Y - secondary.Y) > 0.1f);
+        }
+
+#if DEBUG
+        {
+            var renderer = new TestRenderer();
+            var ui = new Ui(renderer)
+            {
+                Font = font,
+                DefaultFontSize = 18f,
+                Lcd = false
+            };
+
+            var firstState = new WindowState(new Vector2(16, 16));
+            var secondState = new WindowState(new Vector2(48, 48));
+            var ex = Assert.Throws<InvalidOperationException>(() =>
+            {
+                ui.Frame(360, 260, Vector2.Zero, false, frame =>
+                {
+                    frame.Window("Duplicate", firstState, 160, content => content.Label("First"));
+                    frame.Window("Duplicate", secondState, 160, content => content.Label("Second"));
+                });
+            });
+
+            Check("duplicate window title ids throw in debug builds",
+                ex.Message.Contains("Window \"Duplicate\"", StringComparison.Ordinal));
+        }
+#endif
+
+        {
+            var renderer = new TestRenderer();
+            var ui = new Ui(renderer)
+            {
+                Font = font,
+                DefaultFontSize = 18f,
+                Lcd = false
+            };
+
             var windowState = new WindowState(new Vector2(16, 16));
             Response window = default;
             Response underlying = default;
@@ -1492,10 +1841,10 @@ public sealed class VellumTests
                 ui.Frame(320, 220, mouse, false, input, frame =>
                 {
                     underlying = frame.Button("Under", width: 220);
-                    window = frame.Window("inspector", "Inspector", windowState, 180, content =>
+                    window = frame.Window("Inspector", windowState, 180, content =>
                     {
                         inside = content.Button("Inside", width: content.AvailableWidth);
-                    });
+                    }, id: "inspector");
                 });
             }
 
@@ -1529,10 +1878,10 @@ public sealed class VellumTests
             {
                 ui.Frame(320, 220, mouse, false, frame =>
                 {
-                    window = frame.Window("plain", "Plain", windowState, 180, content =>
+                    window = frame.Window("Plain", windowState, 180, content =>
                     {
                         inside = content.Button("Inside", width: content.AvailableWidth);
-                    }, header: false);
+                    }, header: false, id: "plain");
                 });
             }
 
@@ -1561,10 +1910,10 @@ public sealed class VellumTests
             {
                 ui.Frame(320, 260, mouse, false, frame =>
                 {
-                    window = frame.Window("inspector-width", "Inspector", windowState, 180, content =>
+                    window = frame.Window("Inspector", windowState, 180, content =>
                     {
                         inside = content.Button("Inside", width: content.AvailableWidth);
-                    }, resizable: true);
+                    }, resizable: true, id: "inspector-width");
                 });
             }
 
@@ -1591,10 +1940,10 @@ public sealed class VellumTests
             {
                 ui.Frame(320, 220, mouse, false, input, frame =>
                 {
-                    window = frame.Window("drag", "Draggable", windowState, 180, content =>
+                    window = frame.Window("Draggable", windowState, 180, content =>
                     {
                         content.Label("Window body");
-                    });
+                    }, id: "drag");
                 });
             }
 
@@ -1628,10 +1977,10 @@ public sealed class VellumTests
             {
                 ui.Frame(320, 220, mouse, false, input, frame =>
                 {
-                    frame.Window("drag-blocked", "Draggable", windowState, 180, content =>
+                    frame.Window("Draggable", windowState, 180, content =>
                     {
                         button = content.Button("Inside", width: content.AvailableWidth);
-                    });
+                    }, id: "drag-blocked");
                 });
             }
 
@@ -1667,7 +2016,7 @@ public sealed class VellumTests
             {
                 ui.Frame(360, 260, mouse, mouseDown, frame =>
                 {
-                    window = frame.Window("collapse-scroll", "Scrollable", windowState, 180, content =>
+                    window = frame.Window("Scrollable", windowState, 180, content =>
                     {
                         header = content.CollapsingHeader("Timings", ref sectionOpen, width: content.AvailableWidth);
                         if (sectionOpen)
@@ -1675,7 +2024,7 @@ public sealed class VellumTests
                             for (int i = 0; i < 18; i++)
                                 content.Label($"Row {i}");
                         }
-                    }, resizable: true);
+                    }, resizable: true, id: "collapse-scroll");
                 });
             }
 
@@ -1708,12 +2057,12 @@ public sealed class VellumTests
             {
                 ui.Frame(360, 260, mouse, false, input, frame =>
                 {
-                    window = frame.Window("scrollable", "Scrollable", windowState, 180, content =>
+                    window = frame.Window("Scrollable", windowState, 180, content =>
                     {
                         firstRow = content.Label("Row 0");
                         for (int i = 1; i < 18; i++)
                             content.Label($"Row {i}");
-                    });
+                    }, id: "scrollable");
                 });
             }
 
@@ -1750,12 +2099,12 @@ public sealed class VellumTests
             {
                 ui.Frame(360, 260, mouse, false, input, frame =>
                 {
-                    window = frame.Window("scrollable-resize", "Scrollable", windowState, 180, content =>
+                    window = frame.Window("Scrollable", windowState, 180, content =>
                     {
                         firstRow = content.Label("Row 0");
                         for (int i = 1; i < 18; i++)
                             content.Label($"Row {i}");
-                    }, resizable: true);
+                    }, resizable: true, id: "scrollable-resize");
                 });
             }
 
@@ -1791,11 +2140,11 @@ public sealed class VellumTests
             {
                 ui.Frame(320, 220, mouse, false, input, frame =>
                 {
-                    window = frame.Window("collapse", "Collapsible", windowState, 180, content =>
+                    window = frame.Window("Collapsible", windowState, 180, content =>
                     {
                         content.Label("Window body");
                         content.Button("Inside", width: content.AvailableWidth);
-                    });
+                    }, id: "collapse");
                 });
             }
 
@@ -1830,10 +2179,10 @@ public sealed class VellumTests
             {
                 ui.Frame(320, 220, mouse, false, input, frame =>
                 {
-                    window = frame.Window("close", "Closable", windowState, 180, content =>
+                    window = frame.Window("Closable", windowState, 180, content =>
                     {
                         content.Label("Window body");
-                    });
+                    }, id: "close");
                 });
             }
 
@@ -1867,10 +2216,10 @@ public sealed class VellumTests
             {
                 ui.Frame(320, 220, mouse, false, input, frame =>
                 {
-                    window = frame.Window("fixed-close", "Not Closable", windowState, 180, content =>
+                    window = frame.Window("Not Closable", windowState, 180, content =>
                     {
                         content.Label("Window body");
-                    }, closable: false);
+                    }, closable: false, id: "fixed-close");
                 });
             }
 
@@ -1948,7 +2297,7 @@ public sealed class VellumTests
             {
                 ui.Frame(320, 180, mouse, mouseDown, input, frame =>
                 {
-                    slider = frame.Slider("amount", ref value, 0, 100, 180, step: 10, enabled: enabled);
+                    slider = frame.Slider("Amount", ref value, 0, 100, 180, step: 10, enabled: enabled, id: "amount");
                 });
                 changedOnPress |= slider.Changed;
             }
@@ -1978,7 +2327,7 @@ public sealed class VellumTests
 
             ui.Frame(320, 180, Vector2.Zero, false, frame =>
             {
-                slider = frame.Slider("keyboard", ref value, 0, 100, 180, step: 5);
+                slider = frame.Slider("Keyboard", ref value, 0, 100, 180, step: 5, id: "keyboard");
             });
 
             float innerWidth = MathF.Max(0, slider.W - ui.Theme.BorderWidth * 2f);
@@ -1992,27 +2341,27 @@ public sealed class VellumTests
 
             ui.Frame(320, 180, sliderFocusPoint, true, frame =>
             {
-                slider = frame.Slider("keyboard", ref value, 0, 100, 180, step: 5);
+                slider = frame.Slider("Keyboard", ref value, 0, 100, 180, step: 5, id: "keyboard");
             });
             ui.Frame(320, 180, sliderFocusPoint, false, frame =>
             {
-                slider = frame.Slider("keyboard", ref value, 0, 100, 180, step: 5);
+                slider = frame.Slider("Keyboard", ref value, 0, 100, 180, step: 5, id: "keyboard");
             });
             ui.Frame(320, 180, Vector2.Zero, false, Input(keys: new[] { UiKey.Right }), frame =>
             {
-                slider = frame.Slider("keyboard", ref value, 0, 100, 180, step: 5);
+                slider = frame.Slider("Keyboard", ref value, 0, 100, 180, step: 5, id: "keyboard");
             });
             Check("focused slider responds to keyboard nudging", MathF.Abs(value - 45) < 0.1f && slider.Changed && slider.Focused);
 
             ui.Frame(320, 180, Vector2.Zero, false, Input(keys: new[] { UiKey.End }), frame =>
             {
-                slider = frame.Slider("keyboard", ref value, 0, 100, 180, step: 5);
+                slider = frame.Slider("Keyboard", ref value, 0, 100, 180, step: 5, id: "keyboard");
             });
             Check("end moves the slider to max", MathF.Abs(value - 100) < 0.1f && slider.Changed);
 
             ui.Frame(320, 180, Vector2.Zero, false, Input(keys: new[] { UiKey.Home }), frame =>
             {
-                slider = frame.Slider("keyboard", ref value, 0, 100, 180, step: 5);
+                slider = frame.Slider("Keyboard", ref value, 0, 100, 180, step: 5, id: "keyboard");
             });
             Check("home moves the slider to min", MathF.Abs(value - 0) < 0.1f && slider.Changed);
         }
@@ -2031,11 +2380,11 @@ public sealed class VellumTests
 
             ui.Frame(320, 180, Vector2.Zero, false, Input(keys: new[] { UiKey.Tab }), frame =>
             {
-                slider = frame.SliderInt("steps", ref intValue, 0, 10, 180, step: 2);
+                slider = frame.SliderInt("Steps", ref intValue, 0, 10, 180, step: 2, id: "steps");
             });
             ui.Frame(320, 180, Vector2.Zero, false, Input(keys: new[] { UiKey.Right }), frame =>
             {
-                slider = frame.SliderInt("steps", ref intValue, 0, 10, 180, step: 2);
+                slider = frame.SliderInt("Steps", ref intValue, 0, 10, 180, step: 2, id: "steps");
             });
 
             Check("slider int rounds to the stepped value", intValue == 6 && slider.Changed);
@@ -2055,14 +2404,76 @@ public sealed class VellumTests
 
             ui.Frame(320, 180, new Vector2(188, 24), true, frame =>
             {
-                slider = frame.Slider("disabled", ref value, 0, 100, 180, step: 10, enabled: false);
+                slider = frame.Slider("Disabled", ref value, 0, 100, 180, step: 10, enabled: false, id: "disabled");
             });
             ui.Frame(320, 180, new Vector2(188, 24), false, frame =>
             {
-                slider = frame.Slider("disabled", ref value, 0, 100, 180, step: 10, enabled: false);
+                slider = frame.Slider("Disabled", ref value, 0, 100, 180, step: 10, enabled: false, id: "disabled");
             });
 
             Check("disabled slider ignores pointer input", MathF.Abs(value - 20) < 0.1f && slider.Disabled && !slider.Changed);
+        }
+
+        {
+            var renderer = new TestRenderer();
+            var ui = new Ui(renderer)
+            {
+                Font = font,
+                DefaultFontSize = 18f,
+                Lcd = false
+            };
+
+            float value = 1f;
+            Response drag = default;
+            bool changedDuringDrag = false;
+
+            void Frame(Vector2 mouse, bool mouseDown)
+            {
+                ui.Frame(320, 180, mouse, mouseDown, frame =>
+                {
+                    drag = frame.DragFloat("Gain", ref value, speed: 0.1f, min: 0f, max: 5f, width: 180, id: "gain");
+                });
+                changedDuringDrag |= drag.Changed;
+            }
+
+            Frame(new Vector2(40, 24), false);
+            Frame(new Vector2(40, 24), true);
+            Frame(new Vector2(60, 24), true);
+            Frame(new Vector2(60, 24), false);
+
+            Check("drag float updates value from horizontal dragging",
+                MathF.Abs(value - 3f) < 0.1f && changedDuringDrag && drag.W >= 180f);
+        }
+
+        {
+            var renderer = new TestRenderer();
+            var ui = new Ui(renderer)
+            {
+                Font = font,
+                DefaultFontSize = 18f,
+                Lcd = false
+            };
+
+            int value = 3;
+            Response drag = default;
+            bool changedDuringDrag = false;
+
+            void Frame(Vector2 mouse, bool mouseDown)
+            {
+                ui.Frame(320, 180, mouse, mouseDown, frame =>
+                {
+                    drag = frame.DragInt("Count", ref value, speed: 0.25f, min: 0, max: 10, width: 180, id: "count");
+                });
+                changedDuringDrag |= drag.Changed;
+            }
+
+            Frame(new Vector2(40, 24), false);
+            Frame(new Vector2(40, 24), true);
+            Frame(new Vector2(52, 24), true);
+            Frame(new Vector2(52, 24), false);
+
+            Check("drag int updates rounded value from horizontal dragging",
+                value == 6 && changedDuringDrag && drag.W >= 180f);
         }
 
         Console.WriteLine($"Ui slider: {passed} passed, {failed} failed\n");
@@ -2258,7 +2669,7 @@ public sealed class VellumTests
 
             ui.Frame(400, 300, mouse, mouseDown, input, frame =>
             {
-                frame.Horizontal(frame =>
+                frame.Row(frame =>
                 {
                     anchor = frame.Button("Menu");
                     outside = frame.Button("Outside");
@@ -2402,6 +2813,27 @@ public sealed class VellumTests
             {
                 Font = font,
                 DefaultFontSize = 18f,
+                Lcd = false
+            };
+
+            Assert.Throws<InvalidOperationException>(() =>
+            {
+                ui.Frame(300, 200, Vector2.Zero, false, frame =>
+                {
+                    frame.Label("Before throw");
+                    throw new InvalidOperationException("boom");
+                });
+            });
+
+            Check("frame callback ends the renderer frame when content throws", renderer.EndFrameCalls == 1);
+        }
+
+        {
+            var renderer = new TestRenderer();
+            var ui = new Ui(renderer)
+            {
+                Font = font,
+                DefaultFontSize = 18f,
                 Lcd = false,
                 StateRetentionFrames = 0
             };
@@ -2516,7 +2948,7 @@ public sealed class VellumTests
             frame.RadioValue("Warm", ref radioValue, 1, width: 180);
             frame.ProgressBar(0.6f, 180, 20, "60%");
             frame.Histogram(histogramValues, 180, 40, "max. 1.80 ms", scaleMin: 0f, scaleMax: 2f);
-            frame.Slider("slider", ref sliderValue, 0, 100, 180, step: 5, label: "amount");
+            frame.Slider("Amount", ref sliderValue, 0, 100, 180, step: 5, id: "slider");
             frame.Selectable("System", true, width: 180);
             frame.MenuItem("Open recent", selected: false, width: 180);
             frame.Image(7, 180, 40, tint: ui.Theme.Accent);
@@ -2668,6 +3100,7 @@ public sealed class VellumTests
     {
         public int CreateTextureCalls { get; private set; }
         public int DestroyTextureCalls { get; private set; }
+        public int EndFrameCalls { get; private set; }
         public RenderList? LastRenderList { get; private set; }
         public RenderFrameInfo LastFrame { get; private set; }
         private int _nextTextureId = 1;
@@ -2679,7 +3112,7 @@ public sealed class VellumTests
         }
 
         public void Render(RenderList renderList) => LastRenderList = CloneRenderList(renderList);
-        public void EndFrame() { }
+        public void EndFrame() => EndFrameCalls++;
 
         public int CreateTexture(byte[] rgba, int width, int height)
         {

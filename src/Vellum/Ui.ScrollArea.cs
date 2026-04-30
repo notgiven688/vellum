@@ -43,7 +43,8 @@ public sealed partial class Ui
         enabled = ResolveEnabled(enabled);
         const float ScrollbarGap = 4f;
 
-        int widgetId = MakeId(id);
+        int widgetId = MakeWidgetId(UiWidgetKind.ScrollArea, id.AsSpan());
+        RegisterWidgetId(widgetId, $"ScrollArea \"{id}\"");
         var state = GetState<ScrollAreaState>(widgetId);
         var (x, y) = Place(width, height);
         float border = FrameBorderWidth;
@@ -139,10 +140,18 @@ public sealed partial class Ui
             Empty = true
         });
 
-        content(this);
-
-        var inner = _layouts[^1];
-        _layouts.RemoveAt(_layouts.Count - 1);
+        LayoutScope inner;
+        try
+        {
+            content(this);
+            inner = _layouts[^1];
+        }
+        finally
+        {
+            _layouts.RemoveAt(_layouts.Count - 1);
+            PopHitClip();
+            _painter.PopClip();
+        }
 
         float contentWidth = inner.Dir == LayoutDir.Horizontal
             ? inner.CursorX - inner.OriginX
@@ -150,9 +159,6 @@ public sealed partial class Ui
         float contentHeight = inner.Dir == LayoutDir.Horizontal
             ? inner.MaxExtent
             : inner.CursorY - inner.OriginY;
-
-        PopHitClip();
-        _painter.PopClip();
 
         state.ContentHeight = contentHeight;
         float maxScroll = MathF.Max(0, contentHeight - viewH);
@@ -218,7 +224,8 @@ public sealed partial class Ui
         enabled = ResolveEnabled(enabled);
         const float ScrollbarGap = 4f;
 
-        int widgetId = MakeId(id);
+        int widgetId = MakeWidgetId(UiWidgetKind.ScrollArea, id.AsSpan());
+        RegisterWidgetId(widgetId, $"ScrollArea \"{id}\"");
         var state = GetState<ScrollAreaState>(widgetId);
         var (x, y) = Place(width, height);
         float border = FrameBorderWidth;
@@ -314,10 +321,18 @@ public sealed partial class Ui
             Empty = true
         });
 
-        content(this, contentState);
-
-        var inner = _layouts[^1];
-        _layouts.RemoveAt(_layouts.Count - 1);
+        LayoutScope inner;
+        try
+        {
+            content(this, contentState);
+            inner = _layouts[^1];
+        }
+        finally
+        {
+            _layouts.RemoveAt(_layouts.Count - 1);
+            PopHitClip();
+            _painter.PopClip();
+        }
 
         float contentWidth = inner.Dir == LayoutDir.Horizontal
             ? inner.CursorX - inner.OriginX
@@ -325,9 +340,6 @@ public sealed partial class Ui
         float contentHeight = inner.Dir == LayoutDir.Horizontal
             ? inner.MaxExtent
             : inner.CursorY - inner.OriginY;
-
-        PopHitClip();
-        _painter.PopClip();
 
         state.ContentHeight = contentHeight;
         float maxScroll = MathF.Max(0, contentHeight - viewH);
@@ -399,7 +411,8 @@ public sealed partial class Ui
     {
         enabled = ResolveEnabled(enabled);
 
-        int widgetId = MakeId(id);
+        int widgetId = MakeWidgetId(UiWidgetKind.ScrollAreaBoth, id.AsSpan());
+        RegisterWidgetId(widgetId, $"ScrollAreaBoth \"{id}\"");
         var state = GetState<ScrollAreaState>(widgetId);
         var (x, y) = Place(width, height);
         float border = FrameBorderWidth;
@@ -563,10 +576,18 @@ public sealed partial class Ui
             Empty = true
         });
 
-        content(this, contentState);
-
-        var inner = _layouts[^1];
-        _layouts.RemoveAt(_layouts.Count - 1);
+        LayoutScope inner;
+        try
+        {
+            content(this, contentState);
+            inner = _layouts[^1];
+        }
+        finally
+        {
+            _layouts.RemoveAt(_layouts.Count - 1);
+            PopHitClip();
+            _painter.PopClip();
+        }
 
         float contentWidth = inner.Dir == LayoutDir.Horizontal
             ? inner.CursorX - inner.OriginX
@@ -574,9 +595,6 @@ public sealed partial class Ui
         float contentHeight = inner.Dir == LayoutDir.Horizontal
             ? inner.MaxExtent
             : inner.CursorY - inner.OriginY;
-
-        PopHitClip();
-        _painter.PopClip();
 
         state.ContentWidth = contentWidth;
         state.ContentHeight = contentHeight;

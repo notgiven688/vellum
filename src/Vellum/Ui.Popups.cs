@@ -28,10 +28,10 @@ public sealed partial class Ui
     }
 
     /// <summary>Marks a popup as open. The popup is rendered when declared with the same id.</summary>
-    public void OpenPopup(string id) => OpenPopupById(MakeId(id));
+    public void OpenPopup(string id) => OpenPopupById(MakePopupId(id));
 
     /// <summary>Closes the popup with the given id.</summary>
-    public void ClosePopup(string id) => ClosePopupById(MakeId(id));
+    public void ClosePopup(string id) => ClosePopupById(MakePopupId(id));
 
     /// <summary>Closes the popup currently being rendered and its descendants.</summary>
     public void CloseCurrentPopup()
@@ -45,12 +45,33 @@ public sealed partial class Ui
     public void CloseAllPopups() => _openPopupIds.Clear();
 
     /// <summary>Returns whether the popup with the given id is open.</summary>
-    public bool IsPopupOpen(string id) => IsPopupOpen(MakeId(id));
+    public bool IsPopupOpen(string id) => IsPopupOpen(MakePopupId(id));
 
     /// <summary>Gets the last known bounds of an open popup.</summary>
     public bool TryGetPopupBounds(string id, out float x, out float y, out float width, out float height)
     {
-        if (TryGetKnownPopupRect(MakeId(id), out var rect))
+        if (TryGetKnownPopupRect(MakePopupId(id), out var rect))
+        {
+            x = rect.X;
+            y = rect.Y;
+            width = rect.W;
+            height = rect.H;
+            return true;
+        }
+
+        x = 0;
+        y = 0;
+        width = 0;
+        height = 0;
+        return false;
+    }
+
+    internal bool IsChildPopupOpen(UiWidgetKind parentKind, string parentId, string childId)
+        => IsPopupOpen(MakeChildId(MakeWidgetId(parentKind, parentId.AsSpan()), childId));
+
+    internal bool TryGetChildPopupBounds(UiWidgetKind parentKind, string parentId, string childId, out float x, out float y, out float width, out float height)
+    {
+        if (TryGetKnownPopupRect(MakeChildId(MakeWidgetId(parentKind, parentId.AsSpan()), childId), out var rect))
         {
             x = rect.X;
             y = rect.Y;
@@ -75,7 +96,7 @@ public sealed partial class Ui
         float maxHeight,
         Action<Ui> content,
         bool enabled = true)
-        => QueuePopupRequest(id, anchorX, anchorY, width, maxHeight, content, enabled, isModal: false);
+        => QueuePopupRequest(MakePopupId(id), anchorX, anchorY, width, maxHeight, content, enabled, isModal: false, $"Popup \"{id}\"");
 
     /// <summary>Declares a modal popup centered in the viewport.</summary>
     public bool ModalPopup(string id, float width, float maxHeight, Action<Ui> content, bool enabled = true)
@@ -85,7 +106,7 @@ public sealed partial class Ui
     public bool ModalPopup<TState>(string id, float width, float maxHeight, TState state, Action<Ui, TState> content, bool enabled = true)
     {
         ArgumentNullException.ThrowIfNull(content);
-        return QueuePopupRequest(id, 0f, 0f, width, maxHeight, popup => content(popup, state), enabled, isModal: true);
+        return QueuePopupRequest(MakePopupId(id), 0f, 0f, width, maxHeight, popup => content(popup, state), enabled, isModal: true, $"ModalPopup \"{id}\"");
     }
 
     /// <summary>Declares a popup anchored below a widget response.</summary>
@@ -98,19 +119,29 @@ public sealed partial class Ui
         bool enabled = true)
         => Popup(id, anchor.X, anchor.Y + anchor.H, width, maxHeight, content, enabled);
 
+    private bool Popup(
+        int popupId,
+        float anchorX,
+        float anchorY,
+        float width,
+        float maxHeight,
+        Action<Ui> content,
+        bool enabled = true)
+        => QueuePopupRequest(popupId, anchorX, anchorY, width, maxHeight, content, enabled, isModal: false, "Popup");
+
     private bool QueuePopupRequest(
-        string id,
+        int popupId,
         float anchorX,
         float anchorY,
         float width,
         float maxHeight,
         Action<Ui> content,
         bool enabled,
-        bool isModal)
+        bool isModal,
+        string diagnosticName)
     {
         ArgumentNullException.ThrowIfNull(content);
 
-        int popupId = MakeId(id);
         if (!IsPopupOpen(popupId)) return false;
 
         if (!enabled)
@@ -122,6 +153,8 @@ public sealed partial class Ui
         int depth = _popupContext.Count;
         if (!CanQueuePopupRequest(popupId, depth))
             return false;
+
+        RegisterWidgetId(popupId, diagnosticName);
 
         if (isModal)
             _modalPopupIdsCurrent.Add(popupId);
@@ -342,6 +375,8 @@ public sealed partial class Ui
         _popupContext.Add(request.PopupId);
         _idStack.Push(request.PopupId);
 
+        try
+        {
         bool changed = false;
         if (!IsMouseDown(UiMouseButton.Left)) state.DraggingThumb = false;
 
@@ -404,17 +439,22 @@ public sealed partial class Ui
             Empty = true
         });
 
-        request.Content(this);
-
-        var inner = _layouts[^1];
-        _layouts.RemoveAt(_layouts.Count - 1);
+        LayoutScope inner;
+        try
+        {
+            request.Content(this);
+            inner = _layouts[^1];
+        }
+        finally
+        {
+            _layouts.RemoveAt(_layouts.Count - 1);
+            PopHitClip();
+            _painter.PopClip();
+        }
 
         float contentHeight = inner.Dir == LayoutDir.Horizontal
             ? inner.MaxExtent
             : inner.CursorY - inner.OriginY;
-
-        PopHitClip();
-        _painter.PopClip();
 
         state.ContentHeight = contentHeight;
         float maxScroll = MathF.Max(0, contentHeight - viewH);
@@ -455,7 +495,11 @@ public sealed partial class Ui
             RenderPopupRequest(childRequest, depth + 1);
         }
 
-        _idStack.Pop();
-        _popupContext.RemoveAt(_popupContext.Count - 1);
+        }
+        finally
+        {
+            _idStack.Pop();
+            _popupContext.RemoveAt(_popupContext.Count - 1);
+        }
     }
 }

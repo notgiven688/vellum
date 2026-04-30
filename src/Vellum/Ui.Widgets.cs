@@ -234,7 +234,7 @@ public sealed partial class Ui
         return string.Format(System.Globalization.CultureInfo.InvariantCulture, fmt, value);
     }
 
-    private static string BuildSliderDisplay(string? label, string valueText)
+    private static string BuildValueDisplay(string? label, string valueText)
         => string.IsNullOrWhiteSpace(label) ? valueText : $"{label} ({valueText})";
 
     private float ResolveSliderBlockWidth(float innerWidth)
@@ -356,7 +356,7 @@ public sealed partial class Ui
         if (max < min) (min, max) = (max, min);
         beforeSize = Math.Clamp(beforeSize, min, max);
 
-        int widgetId = MakeId(id);
+        int widgetId = MakeWidgetId(UiWidgetKind.Splitter, id.AsSpan());
         float w = MathF.Max(1f, thickness);
         float h = MathF.Max(1f, height ?? (DefaultFontSize + 6f));
         var (x, y) = Place(w, h);
@@ -429,31 +429,15 @@ public sealed partial class Ui
     }
 
     /// <summary>Draws an auto-height panel using the current available width.</summary>
-    public Response Panel(Action<Ui> content)
-        => Panel(null, AvailableWidth, content);
+    public Response Panel(Action<Ui> content, UiId? id = null)
+        => Panel(AvailableWidth, content, id);
 
-    /// <inheritdoc cref="Panel(Action{Ui})" />
-    public Response Panel<TState>(TState state, Action<Ui, TState> content)
-        => Panel(null, AvailableWidth, state, content);
-
-    /// <summary>Draws an auto-height panel with an optional id.</summary>
-    public Response Panel(string? id, Action<Ui> content)
-        => Panel(id, AvailableWidth, content);
-
-    /// <inheritdoc cref="Panel(string?, Action{Ui})" />
-    public Response Panel<TState>(string? id, TState state, Action<Ui, TState> content)
-        => Panel(id, AvailableWidth, state, content);
+    /// <inheritdoc cref="Panel(Action{Ui}, UiId?)" />
+    public Response Panel<TState>(TState state, Action<Ui, TState> content, UiId? id = null)
+        => Panel(AvailableWidth, state, content, id);
 
     /// <summary>Draws an auto-height panel with explicit width.</summary>
-    public Response Panel(float width, Action<Ui> content)
-        => Panel(null, width, content);
-
-    /// <inheritdoc cref="Panel(float, Action{Ui})" />
-    public Response Panel<TState>(float width, TState state, Action<Ui, TState> content)
-        => Panel(null, width, state, content);
-
-    /// <summary>Draws an auto-height panel with optional id and explicit width.</summary>
-    public Response Panel(string? id, float width, Action<Ui> content)
+    public Response Panel(float width, Action<Ui> content, UiId? id = null)
     {
         float resolvedWidth = MathF.Max(0, width);
         var (x, y) = Place(resolvedWidth, 0);
@@ -467,8 +451,8 @@ public sealed partial class Ui
         var contentPainter = AcquireDeferredPainter();
         _painter = contentPainter;
 
-        if (!string.IsNullOrEmpty(id))
-            PushId(id);
+        if (HasSpecifiedId(id))
+            EnterIdScope(id.GetValueOrDefault());
 
         _layouts.Add(new LayoutScope
         {
@@ -483,6 +467,7 @@ public sealed partial class Ui
         });
 
         float innerH;
+        bool contentCompleted = false;
         try
         {
             content(this);
@@ -491,15 +476,19 @@ public sealed partial class Ui
             innerH = inner.Dir == LayoutDir.Horizontal
                 ? inner.MaxExtent
                 : inner.CursorY - inner.OriginY;
+            contentCompleted = true;
         }
         finally
         {
             _layouts.RemoveAt(_layouts.Count - 1);
 
-            if (!string.IsNullOrEmpty(id))
-                PopId();
+            if (HasSpecifiedId(id))
+                ExitIdScope();
 
             _painter = parentPainter;
+
+            if (!contentCompleted)
+                ReleaseDeferredPainter(contentPainter);
         }
 
         float resolvedHeight = MathF.Max(0, innerH + border * 2 + pad.Vertical);
@@ -513,8 +502,8 @@ public sealed partial class Ui
         return new Response(x, y, resolvedWidth, resolvedHeight, hover, false, false);
     }
 
-    /// <inheritdoc cref="Panel(string?, float, Action{Ui})" />
-    public Response Panel<TState>(string? id, float width, TState state, Action<Ui, TState> content)
+    /// <inheritdoc cref="Panel(float, Action{Ui}, UiId?)" />
+    public Response Panel<TState>(float width, TState state, Action<Ui, TState> content, UiId? id = null)
     {
         float resolvedWidth = MathF.Max(0, width);
         var (x, y) = Place(resolvedWidth, 0);
@@ -528,8 +517,8 @@ public sealed partial class Ui
         var contentPainter = AcquireDeferredPainter();
         _painter = contentPainter;
 
-        if (!string.IsNullOrEmpty(id))
-            PushId(id);
+        if (HasSpecifiedId(id))
+            EnterIdScope(id.GetValueOrDefault());
 
         _layouts.Add(new LayoutScope
         {
@@ -544,6 +533,7 @@ public sealed partial class Ui
         });
 
         float innerH;
+        bool contentCompleted = false;
         try
         {
             content(this, state);
@@ -552,15 +542,19 @@ public sealed partial class Ui
             innerH = inner.Dir == LayoutDir.Horizontal
                 ? inner.MaxExtent
                 : inner.CursorY - inner.OriginY;
+            contentCompleted = true;
         }
         finally
         {
             _layouts.RemoveAt(_layouts.Count - 1);
 
-            if (!string.IsNullOrEmpty(id))
-                PopId();
+            if (HasSpecifiedId(id))
+                ExitIdScope();
 
             _painter = parentPainter;
+
+            if (!contentCompleted)
+                ReleaseDeferredPainter(contentPainter);
         }
 
         float resolvedHeight = MathF.Max(0, innerH + border * 2 + pad.Vertical);
@@ -575,15 +569,7 @@ public sealed partial class Ui
     }
 
     /// <summary>Draws a fixed-size panel.</summary>
-    public Response Panel(float width, float height, Action<Ui> content, bool clip = true)
-        => Panel(null, width, height, content, clip);
-
-    /// <inheritdoc cref="Panel(float, float, Action{Ui}, bool)" />
-    public Response Panel<TState>(float width, float height, TState state, Action<Ui, TState> content, bool clip = true)
-        => Panel(null, width, height, state, content, clip);
-
-    /// <summary>Draws a fixed-size panel with an optional id.</summary>
-    public Response Panel(string? id, float width, float height, Action<Ui> content, bool clip = true)
+    public Response Panel(float width, float height, Action<Ui> content, bool clip = true, UiId? id = null)
     {
         float resolvedWidth = MathF.Max(0, width);
         float resolvedHeight = MathF.Max(0, height);
@@ -605,8 +591,8 @@ public sealed partial class Ui
             PushHitClip(innerX, innerY, innerW, innerH);
         }
 
-        if (!string.IsNullOrEmpty(id))
-            PushId(id);
+        if (HasSpecifiedId(id))
+            EnterIdScope(id.GetValueOrDefault());
 
         _layouts.Add(new LayoutScope
         {
@@ -620,25 +606,30 @@ public sealed partial class Ui
             Empty = true
         });
 
-        content(this);
-
-        _layouts.RemoveAt(_layouts.Count - 1);
-
-        if (!string.IsNullOrEmpty(id))
-            PopId();
-
-        if (clip)
+        try
         {
-            PopHitClip();
-            _painter.PopClip();
+            content(this);
+        }
+        finally
+        {
+            _layouts.RemoveAt(_layouts.Count - 1);
+
+            if (HasSpecifiedId(id))
+                ExitIdScope();
+
+            if (clip)
+            {
+                PopHitClip();
+                _painter.PopClip();
+            }
         }
 
         Advance(resolvedWidth, resolvedHeight);
         return new Response(x, y, resolvedWidth, resolvedHeight, hover, false, false);
     }
 
-    /// <inheritdoc cref="Panel(string?, float, float, Action{Ui}, bool)" />
-    public Response Panel<TState>(string? id, float width, float height, TState state, Action<Ui, TState> content, bool clip = true)
+    /// <inheritdoc cref="Panel(float, float, Action{Ui}, bool, UiId?)" />
+    public Response Panel<TState>(float width, float height, TState state, Action<Ui, TState> content, bool clip = true, UiId? id = null)
     {
         float resolvedWidth = MathF.Max(0, width);
         float resolvedHeight = MathF.Max(0, height);
@@ -660,8 +651,8 @@ public sealed partial class Ui
             PushHitClip(innerX, innerY, innerW, innerH);
         }
 
-        if (!string.IsNullOrEmpty(id))
-            PushId(id);
+        if (HasSpecifiedId(id))
+            EnterIdScope(id.GetValueOrDefault());
 
         _layouts.Add(new LayoutScope
         {
@@ -675,17 +666,22 @@ public sealed partial class Ui
             Empty = true
         });
 
-        content(this, state);
-
-        _layouts.RemoveAt(_layouts.Count - 1);
-
-        if (!string.IsNullOrEmpty(id))
-            PopId();
-
-        if (clip)
+        try
         {
-            PopHitClip();
-            _painter.PopClip();
+            content(this, state);
+        }
+        finally
+        {
+            _layouts.RemoveAt(_layouts.Count - 1);
+
+            if (HasSpecifiedId(id))
+                ExitIdScope();
+
+            if (clip)
+            {
+                PopHitClip();
+                _painter.PopClip();
+            }
         }
 
         Advance(resolvedWidth, resolvedHeight);
@@ -704,12 +700,17 @@ public sealed partial class Ui
             PushHitClip(x, y, width, height);
         }
 
-        draw(new UiCanvas(this, x, y, width, height));
-
-        if (clip)
+        try
         {
-            PopHitClip();
-            _painter.PopClip();
+            draw(new UiCanvas(this, x, y, width, height));
+        }
+        finally
+        {
+            if (clip)
+            {
+                PopHitClip();
+                _painter.PopClip();
+            }
         }
 
         Advance(width, height);
@@ -728,12 +729,17 @@ public sealed partial class Ui
             PushHitClip(x, y, width, height);
         }
 
-        draw(new UiCanvas(this, x, y, width, height), state);
-
-        if (clip)
+        try
         {
-            PopHitClip();
-            _painter.PopClip();
+            draw(new UiCanvas(this, x, y, width, height), state);
+        }
+        finally
+        {
+            if (clip)
+            {
+                PopHitClip();
+                _painter.PopClip();
+            }
         }
 
         Advance(width, height);
@@ -741,7 +747,7 @@ public sealed partial class Ui
     }
 
     /// <summary>Draws a clickable button.</summary>
-    public Response Button(string label, float? width = null, float? size = null, bool enabled = true)
+    public Response Button(string label, float? width = null, float? size = null, bool enabled = true, UiId? id = null)
     {
         enabled = ResolveEnabled(enabled);
         float s = size ?? DefaultFontSize;
@@ -751,23 +757,24 @@ public sealed partial class Ui
         float w = width.HasValue ? MathF.Max(width.Value, intrinsicW) : intrinsicW;
         float h = layout.Height + pad.Vertical;
 
-        int id = MakeId(label);
+        UiId resolvedId = ResolveWidgetId(id, label);
+        int widgetId = MakeWidgetId(UiWidgetKind.Button, resolvedId);
         var (x, y) = Place(w, h);
 
-        bool focused = RegisterFocusable(id, enabled);
+        bool focused = RegisterFocusable(widgetId, enabled);
         bool hover = enabled && PointIn(x, y, w, h);
-        if (hover) _hotId = id;
+        if (hover) _hotId = widgetId;
         if (hover) RequestCursor(UiCursor.PointingHand);
 
-        if (enabled && _hotId == id && IsMousePressed(UiMouseButton.Left))
+        if (enabled && _hotId == widgetId && IsMousePressed(UiMouseButton.Left))
         {
-            _activeId = id;
-            SetFocus(id);
+            _activeId = widgetId;
+            SetFocus(widgetId);
             focused = true;
         }
 
-        bool pressed = enabled && _activeId == id && IsMouseDown(UiMouseButton.Left);
-        bool clicked = enabled && IsMouseReleased(UiMouseButton.Left) && _activeId == id && _hotId == id;
+        bool pressed = enabled && _activeId == widgetId && IsMouseDown(UiMouseButton.Left);
+        bool clicked = enabled && IsMouseReleased(UiMouseButton.Left) && _activeId == widgetId && _hotId == widgetId;
         if (enabled && focused && (_input.IsPressed(UiKey.Enter) || _input.IsPressed(UiKey.Space)))
             clicked = true;
 
@@ -781,7 +788,7 @@ public sealed partial class Ui
     }
 
     /// <summary>Draws a checkbox bound to a boolean value.</summary>
-    public Response Checkbox(string label, ref bool value, float? width = null, float? size = null, bool enabled = true)
+    public Response Checkbox(string label, ref bool value, float? width = null, float? size = null, bool enabled = true, UiId? id = null)
     {
         enabled = ResolveEnabled(enabled);
         float s = size ?? DefaultFontSize;
@@ -792,23 +799,24 @@ public sealed partial class Ui
         float w = width.HasValue ? MathF.Max(width.Value, intrinsicW) : intrinsicW;
         float h = MathF.Max(indicatorSize, layout.Height);
 
-        int id = MakeId(label);
+        UiId resolvedId = ResolveWidgetId(id, label);
+        int widgetId = MakeWidgetId(UiWidgetKind.Checkbox, resolvedId);
         var (x, y) = Place(w, h);
 
-        bool focused = RegisterFocusable(id, enabled);
+        bool focused = RegisterFocusable(widgetId, enabled);
         bool hover = enabled && PointIn(x, y, w, h);
-        if (hover) _hotId = id;
+        if (hover) _hotId = widgetId;
         if (hover) RequestCursor(UiCursor.PointingHand);
 
-        if (enabled && _hotId == id && IsMousePressed(UiMouseButton.Left))
+        if (enabled && _hotId == widgetId && IsMousePressed(UiMouseButton.Left))
         {
-            _activeId = id;
-            SetFocus(id);
+            _activeId = widgetId;
+            SetFocus(widgetId);
             focused = true;
         }
 
-        bool pressed = enabled && _activeId == id && IsMouseDown(UiMouseButton.Left);
-        bool clicked = enabled && IsMouseReleased(UiMouseButton.Left) && _activeId == id && _hotId == id;
+        bool pressed = enabled && _activeId == widgetId && IsMouseDown(UiMouseButton.Left);
+        bool clicked = enabled && IsMouseReleased(UiMouseButton.Left) && _activeId == widgetId && _hotId == widgetId;
         if (enabled && focused && (_input.IsPressed(UiKey.Enter) || _input.IsPressed(UiKey.Space)))
             clicked = true;
 
@@ -861,7 +869,7 @@ public sealed partial class Ui
     }
 
     /// <summary>Draws an on/off switch bound to a boolean value.</summary>
-    public Response Switch(string label, ref bool value, float? width = null, float? size = null, bool enabled = true)
+    public Response Switch(string label, ref bool value, float? width = null, float? size = null, bool enabled = true, UiId? id = null)
     {
         enabled = ResolveEnabled(enabled);
         float s = size ?? DefaultFontSize;
@@ -873,23 +881,24 @@ public sealed partial class Ui
         float w = width.HasValue ? MathF.Max(width.Value, intrinsicW) : intrinsicW;
         float h = MathF.Max(trackHeight, layout.Height);
 
-        int id = MakeId(label);
+        UiId resolvedId = ResolveWidgetId(id, label);
+        int widgetId = MakeWidgetId(UiWidgetKind.Switch, resolvedId);
         var (x, y) = Place(w, h);
 
-        bool focused = RegisterFocusable(id, enabled);
+        bool focused = RegisterFocusable(widgetId, enabled);
         bool hover = enabled && PointIn(x, y, w, h);
-        if (hover) _hotId = id;
+        if (hover) _hotId = widgetId;
         if (hover) RequestCursor(UiCursor.PointingHand);
 
-        if (enabled && _hotId == id && IsMousePressed(UiMouseButton.Left))
+        if (enabled && _hotId == widgetId && IsMousePressed(UiMouseButton.Left))
         {
-            _activeId = id;
-            SetFocus(id);
+            _activeId = widgetId;
+            SetFocus(widgetId);
             focused = true;
         }
 
-        bool pressed = enabled && _activeId == id && IsMouseDown(UiMouseButton.Left);
-        bool clicked = enabled && IsMouseReleased(UiMouseButton.Left) && _activeId == id && _hotId == id;
+        bool pressed = enabled && _activeId == widgetId && IsMouseDown(UiMouseButton.Left);
+        bool clicked = enabled && IsMouseReleased(UiMouseButton.Left) && _activeId == widgetId && _hotId == widgetId;
         if (enabled && focused && (_input.IsPressed(UiKey.Enter) || _input.IsPressed(UiKey.Space)))
             clicked = true;
 
@@ -939,7 +948,7 @@ public sealed partial class Ui
     }
 
     /// <summary>Draws a radio button.</summary>
-    public Response RadioButton(string label, bool selected, float? width = null, float? size = null, bool enabled = true)
+    public Response RadioButton(string label, bool selected, float? width = null, float? size = null, bool enabled = true, UiId? id = null)
     {
         enabled = ResolveEnabled(enabled);
         float s = size ?? DefaultFontSize;
@@ -950,23 +959,24 @@ public sealed partial class Ui
         float w = width.HasValue ? MathF.Max(width.Value, intrinsicW) : intrinsicW;
         float h = MathF.Max(indicatorSize, layout.Height);
 
-        int id = MakeId(label);
+        UiId resolvedId = ResolveWidgetId(id, label);
+        int widgetId = MakeWidgetId(UiWidgetKind.RadioButton, resolvedId);
         var (x, y) = Place(w, h);
 
-        bool focused = RegisterFocusable(id, enabled);
+        bool focused = RegisterFocusable(widgetId, enabled);
         bool hover = enabled && PointIn(x, y, w, h);
-        if (hover) _hotId = id;
+        if (hover) _hotId = widgetId;
         if (hover) RequestCursor(UiCursor.PointingHand);
 
-        if (enabled && _hotId == id && IsMousePressed(UiMouseButton.Left))
+        if (enabled && _hotId == widgetId && IsMousePressed(UiMouseButton.Left))
         {
-            _activeId = id;
-            SetFocus(id);
+            _activeId = widgetId;
+            SetFocus(widgetId);
             focused = true;
         }
 
-        bool pressed = enabled && _activeId == id && IsMouseDown(UiMouseButton.Left);
-        bool clicked = enabled && IsMouseReleased(UiMouseButton.Left) && _activeId == id && _hotId == id;
+        bool pressed = enabled && _activeId == widgetId && IsMouseDown(UiMouseButton.Left);
+        bool clicked = enabled && IsMouseReleased(UiMouseButton.Left) && _activeId == widgetId && _hotId == widgetId;
         if (enabled && focused && (_input.IsPressed(UiKey.Enter) || _input.IsPressed(UiKey.Space)))
             clicked = true;
 
@@ -1011,10 +1021,10 @@ public sealed partial class Ui
     }
 
     /// <summary>Draws a radio button that assigns a value when selected.</summary>
-    public Response RadioValue<T>(string label, ref T current, T value, float? width = null, float? size = null, bool enabled = true)
+    public Response RadioValue<T>(string label, ref T current, T value, float? width = null, float? size = null, bool enabled = true, UiId? id = null)
     {
         bool selected = EqualityComparer<T>.Default.Equals(current, value);
-        Response response = RadioButton(label, selected, width, size, enabled);
+        Response response = RadioButton(label, selected, width, size, enabled, id);
         if (response.Changed && !selected)
             current = value;
 
@@ -1260,7 +1270,8 @@ public sealed partial class Ui
         float? size = null,
         bool enabled = true,
         float? frameBorderWidth = null,
-        EdgeInsets? padding = null)
+        EdgeInsets? padding = null,
+        UiId? id = null)
     {
         enabled = ResolveEnabled(enabled);
         float s = size ?? DefaultFontSize;
@@ -1272,23 +1283,24 @@ public sealed partial class Ui
         float w = width.HasValue ? MathF.Max(width.Value, intrinsicW) : intrinsicW;
         float h = layout.Height + pad.Vertical;
 
-        int id = MakeId(label);
+        UiId resolvedId = ResolveWidgetId(id, label);
+        int widgetId = MakeWidgetId(UiWidgetKind.Selectable, resolvedId);
         var (x, y) = Place(w, h);
 
-        bool focused = RegisterFocusable(id, enabled);
+        bool focused = RegisterFocusable(widgetId, enabled);
         bool hover = enabled && PointIn(x, y, w, h);
-        if (hover) _hotId = id;
+        if (hover) _hotId = widgetId;
         if (hover) RequestCursor(UiCursor.PointingHand);
 
-        if (enabled && _hotId == id && IsMousePressed(UiMouseButton.Left))
+        if (enabled && _hotId == widgetId && IsMousePressed(UiMouseButton.Left))
         {
-            _activeId = id;
-            SetFocus(id);
+            _activeId = widgetId;
+            SetFocus(widgetId);
             focused = true;
         }
 
-        bool pressed = enabled && _activeId == id && IsMouseDown(UiMouseButton.Left);
-        bool clicked = enabled && IsMouseReleased(UiMouseButton.Left) && _activeId == id && _hotId == id;
+        bool pressed = enabled && _activeId == widgetId && IsMouseDown(UiMouseButton.Left);
+        bool clicked = enabled && IsMouseReleased(UiMouseButton.Left) && _activeId == widgetId && _hotId == widgetId;
         if (enabled && focused && (_input.IsPressed(UiKey.Enter) || _input.IsPressed(UiKey.Space)))
             clicked = true;
 
@@ -1321,7 +1333,8 @@ public sealed partial class Ui
         float? size = null,
         bool enabled = true,
         bool closeOnActivate = false,
-        string? shortcut = null)
+        string? shortcut = null,
+        UiId? id = null)
     {
         enabled = ResolveEnabled(enabled);
         bool hasShortcut = !string.IsNullOrEmpty(shortcut);
@@ -1352,23 +1365,24 @@ public sealed partial class Ui
         float intrinsicW2 = labelLayout.Width + pad2.Horizontal + markerSize2 + markerGap2 + shortcutGap2 + (shortcutLayout?.Width ?? 0f);
         float resolvedWidth2 = width.HasValue ? MathF.Max(width.Value, intrinsicW2) : MathF.Max(AvailableWidth, intrinsicW2);
         float resolvedHeight2 = labelLayout.Height + pad2.Vertical;
-        int id2 = MakeId(label);
+        UiId resolvedId2 = ResolveWidgetId(id, label);
+        int widgetId2 = MakeWidgetId(UiWidgetKind.MenuItem, resolvedId2);
         var (x2, y2) = Place(resolvedWidth2, resolvedHeight2);
 
-        bool focused2 = RegisterFocusable(id2, enabled);
+        bool focused2 = RegisterFocusable(widgetId2, enabled);
         bool hover2 = enabled && PointIn(x2, y2, resolvedWidth2, resolvedHeight2);
-        if (hover2) _hotId = id2;
+        if (hover2) _hotId = widgetId2;
         if (hover2) RequestCursor(UiCursor.PointingHand);
 
-        if (enabled && _hotId == id2 && IsMousePressed(UiMouseButton.Left))
+        if (enabled && _hotId == widgetId2 && IsMousePressed(UiMouseButton.Left))
         {
-            _activeId = id2;
-            SetFocus(id2);
+            _activeId = widgetId2;
+            SetFocus(widgetId2);
             focused2 = true;
         }
 
-        bool pressed2 = enabled && _activeId == id2 && IsMouseDown(UiMouseButton.Left);
-        bool clicked2 = enabled && IsMouseReleased(UiMouseButton.Left) && _activeId == id2 && _hotId == id2;
+        bool pressed2 = enabled && _activeId == widgetId2 && IsMouseDown(UiMouseButton.Left);
+        bool clicked2 = enabled && IsMouseReleased(UiMouseButton.Left) && _activeId == widgetId2 && _hotId == widgetId2;
         if (enabled && focused2 && (_input.IsPressed(UiKey.Enter) || _input.IsPressed(UiKey.Space)))
             clicked2 = true;
 
@@ -1402,16 +1416,15 @@ public sealed partial class Ui
 
     /// <summary>Draws a menu item row that renders custom content when activated.</summary>
     public Response MenuItem(
-        string id,
         Action<Ui> content,
         bool selected = false,
         float? width = null,
         float? size = null,
         bool enabled = true,
         bool closeOnActivate = false,
-        string? shortcut = null)
+        string? shortcut = null,
+        UiId? id = null)
         => MenuItem(
-            id,
             new UiActionState(content),
             static (ui, state) => state.Content(ui),
             selected,
@@ -1419,11 +1432,11 @@ public sealed partial class Ui
             size,
             enabled,
             closeOnActivate,
-            shortcut);
+            shortcut,
+            id);
 
-    /// <inheritdoc cref="MenuItem(string, Action{Ui}, bool, float?, float?, bool, bool, string?)" />
+    /// <inheritdoc cref="MenuItem(Action{Ui}, bool, float?, float?, bool, bool, string?, UiId?)" />
     public Response MenuItem<TState>(
-        string id,
         TState state,
         Action<Ui, TState> content,
         bool selected = false,
@@ -1431,14 +1444,18 @@ public sealed partial class Ui
         float? size = null,
         bool enabled = true,
         bool closeOnActivate = false,
-        string? shortcut = null)
+        string? shortcut = null,
+        UiId? id = null)
     {
         ArgumentNullException.ThrowIfNull(content);
+        if (!HasSpecifiedId(id))
+            throw new ArgumentException("Custom menu items require an id.", nameof(id));
 
         enabled = ResolveEnabled(enabled);
+        UiId resolvedId = id.GetValueOrDefault();
         float s = size ?? DefaultFontSize;
         var pad = Theme.MenuItemPadding;
-        int widgetId = MakeId(id);
+        int widgetId = MakeWidgetId(UiWidgetKind.MenuItem, resolvedId);
         bool hasShortcut = !string.IsNullOrEmpty(shortcut);
         TextLayoutResult? shortcutLayout = hasShortcut ? LayoutText(shortcut!, s) : null;
         float shortcutGap = hasShortcut ? MathF.Max(12f, Theme.Gap * 1.5f) : 0f;
@@ -1486,7 +1503,7 @@ public sealed partial class Ui
             DrawTextLayout(shortcutLayout!.Value, shortcutX, contentY, Theme.TextSecondary);
         }
 
-        PushId(id);
+        EnterIdScope(resolvedId);
         _layouts.Add(new LayoutScope
         {
             OriginX = contentX,
@@ -1503,7 +1520,7 @@ public sealed partial class Ui
         finally
         {
             _layouts.RemoveAt(_layouts.Count - 1);
-            PopId();
+            ExitIdScope();
         }
 
         Advance(resolvedWidth, resolvedHeight);
@@ -1521,22 +1538,23 @@ public sealed partial class Ui
 
     /// <summary>Draws a combo box over a list of string options.</summary>
     public Response ComboBox(
-        string id,
+        string label,
         IReadOnlyList<string> options,
         ref int selectedIndex,
         float width,
         float? size = null,
         float maxPopupHeight = 220f,
-        bool enabled = true)
+        bool enabled = true,
+        UiId? id = null)
     {
         enabled = ResolveEnabled(enabled);
         float s = size ?? DefaultFontSize;
         var pad = Theme.ComboBoxPadding;
-        string popupId = id + "/popup";
-        int popupWidgetId = MakeId(popupId);
+        UiId resolvedId = ResolveWidgetId(id, label);
         bool selectionChanged = false;
         bool appliedPendingSelection = false;
-        int widgetId = MakeId(id);
+        int widgetId = MakeWidgetId(UiWidgetKind.ComboBox, resolvedId);
+        int popupWidgetId = MakeChildId(widgetId, "popup");
         var comboState = GetState<ComboBoxState>(widgetId);
 
         if (comboState.HasPendingSelection)
@@ -1545,7 +1563,7 @@ public sealed partial class Ui
             comboState.PendingSelectedIndex = -1;
             comboState.HasPendingSelection = false;
             appliedPendingSelection = true;
-            ClosePopup(popupId);
+            ClosePopupById(popupWidgetId);
             SetFocus(widgetId);
         }
 
@@ -1568,7 +1586,7 @@ public sealed partial class Ui
         var popupState = GetState<PopupState>(popupWidgetId);
         var (x, y) = Place(width, h);
 
-        bool popupOpen = IsPopupOpen(popupId);
+        bool popupOpen = IsPopupOpen(popupWidgetId);
         bool registeredFocus = RegisterFocusable(widgetId, enabled);
         bool focused = registeredFocus || (enabled && _focusedId == widgetId);
         bool ensureHighlightedVisible = false;
@@ -1601,13 +1619,13 @@ public sealed partial class Ui
         {
             if (popupOpen)
             {
-                ClosePopup(popupId);
+                ClosePopupById(popupWidgetId);
                 popupOpen = false;
                 comboState.HighlightedIndex = selected;
             }
             else
             {
-                OpenPopup(popupId);
+                OpenPopupById(popupWidgetId);
                 popupOpen = true;
                 openedThisFrame = true;
                 comboState.HighlightedIndex = selected;
@@ -1634,7 +1652,7 @@ public sealed partial class Ui
 
             if (_input.IsPressed(UiKey.Escape))
             {
-                ClosePopup(popupId);
+                ClosePopupById(popupWidgetId);
                 popupOpen = false;
                 comboState.HighlightedIndex = selected;
             }
@@ -1646,7 +1664,7 @@ public sealed partial class Ui
                     selectionChanged = true;
                 }
 
-                ClosePopup(popupId);
+                ClosePopupById(popupWidgetId);
                 popupOpen = false;
                 comboState.HighlightedIndex = selected;
             }
@@ -1685,22 +1703,25 @@ public sealed partial class Ui
 
         if (popupOpen)
         {
-            Popup(popupId, x, y + h, width, maxPopupHeight, popup =>
+            Popup(popupWidgetId, x, y + h, width, maxPopupHeight, popup =>
             {
                 popup.ItemSpacing(0);
                 for (int i = 0; i < options.Count; i++)
                 {
-                    if (popup.Selectable(
-                            options[i],
-                            i == comboState.HighlightedIndex,
-                            width: popup.AvailableWidth,
-                            frameBorderWidth: 0f,
-                            padding: popup.Theme.MenuItemPadding).Clicked)
+                    using (popup.Id(i))
                     {
-                        comboState.HighlightedIndex = i;
-                        comboState.PendingSelectedIndex = i;
-                        comboState.HasPendingSelection = true;
-                        ClosePopup(popupId);
+                        if (popup.Selectable(
+                                options[i],
+                                i == comboState.HighlightedIndex,
+                                width: popup.AvailableWidth,
+                                frameBorderWidth: 0f,
+                                padding: popup.Theme.MenuItemPadding).Clicked)
+                        {
+                            comboState.HighlightedIndex = i;
+                            comboState.PendingSelectedIndex = i;
+                            comboState.HasPendingSelection = true;
+                            ClosePopupById(popupWidgetId);
+                        }
                     }
                 }
             });
@@ -1723,7 +1744,7 @@ public sealed partial class Ui
 
     /// <summary>Draws a floating-point slider.</summary>
     public Response Slider(
-        string id,
+        string label,
         ref float value,
         float min,
         float max,
@@ -1731,7 +1752,20 @@ public sealed partial class Ui
         float? step = null,
         bool enabled = true,
         string? format = null,
-        string? label = null)
+        UiId? id = null)
+        => SliderCore(UiWidgetKind.Slider, label, ref value, min, max, width, step, enabled, format, id);
+
+    private Response SliderCore(
+        UiWidgetKind widgetKind,
+        string label,
+        ref float value,
+        float min,
+        float max,
+        float width,
+        float? step,
+        bool enabled,
+        string? format,
+        UiId? id)
     {
         enabled = ResolveEnabled(enabled);
         if (max < min)
@@ -1739,8 +1773,9 @@ public sealed partial class Ui
 
         value = SnapSliderValue(value, min, max, step);
 
-        int widgetId = MakeId(id);
-        string display = BuildSliderDisplay(label, FormatSliderValue(value, format));
+        UiId resolvedId = ResolveWidgetId(id, label);
+        int widgetId = MakeWidgetId(widgetKind, resolvedId);
+        string display = BuildValueDisplay(label, FormatSliderValue(value, format));
         float textMaxWidth = MathF.Max(0, width - FrameBorderWidth * 2 - 8f);
         var layout = LayoutText(display, DefaultFontSize, maxWidth: textMaxWidth, overflow: TextOverflowMode.Ellipsis);
         float h = MathF.Max(Theme.SliderHeight, layout.Height + FrameBorderWidth * 2 + 6f);
@@ -1822,7 +1857,7 @@ public sealed partial class Ui
 
         if (changed)
         {
-            display = BuildSliderDisplay(label, FormatSliderValue(value, format));
+            display = BuildValueDisplay(label, FormatSliderValue(value, format));
             layout = LayoutText(display, DefaultFontSize, maxWidth: textMaxWidth, overflow: TextOverflowMode.Ellipsis);
         }
 
@@ -1847,7 +1882,7 @@ public sealed partial class Ui
 
     /// <summary>Draws an integer slider.</summary>
     public Response SliderInt(
-        string id,
+        string label,
         ref int value,
         int min,
         int max,
@@ -1855,17 +1890,17 @@ public sealed partial class Ui
         int step = 1,
         bool enabled = true,
         string? format = null,
-        string? label = null)
+        UiId? id = null)
     {
         float current = value;
-        Response response = Slider(id, ref current, min, max, width, step, enabled, format ?? "{0:0}", label);
+        Response response = SliderCore(UiWidgetKind.SliderInt, label, ref current, min, max, width, step, enabled, format ?? "{0:0}", id);
         value = (int)MathF.Round(current);
         return response;
     }
 
     /// <summary>Draws a draggable floating-point value editor.</summary>
     public Response DragFloat(
-        string id,
+        string label,
         ref float value,
         float speed = 1f,
         float? min = null,
@@ -1873,7 +1908,22 @@ public sealed partial class Ui
         string? format = null,
         float? width = null,
         float? size = null,
-        bool enabled = true)
+        bool enabled = true,
+        UiId? id = null)
+        => DragFloatCore(UiWidgetKind.DragFloat, label, ref value, speed, min, max, format, width, size, enabled, id);
+
+    private Response DragFloatCore(
+        UiWidgetKind widgetKind,
+        string label,
+        ref float value,
+        float speed,
+        float? min,
+        float? max,
+        string? format,
+        float? width,
+        float? size,
+        bool enabled,
+        UiId? id)
     {
         enabled = ResolveEnabled(enabled);
         float minV = min ?? float.NegativeInfinity;
@@ -1883,13 +1933,17 @@ public sealed partial class Ui
 
         float s = size ?? DefaultFontSize;
         var pad = Theme.ButtonPadding;
-        int widgetId = MakeId(id);
+        UiId resolvedId = ResolveWidgetId(id, label);
+        int widgetId = MakeWidgetId(widgetKind, resolvedId);
         string fmt = format ?? "{0:0.00}";
 
-        string display = string.Format(System.Globalization.CultureInfo.InvariantCulture, fmt, value);
+        string valueText = string.Format(System.Globalization.CultureInfo.InvariantCulture, fmt, value);
+        string display = BuildValueDisplay(label, valueText);
         var layout = LayoutText(display, s);
         float intrinsicW = layout.Width + pad.Horizontal;
         float w = width ?? MathF.Max(96f, intrinsicW);
+        float textMaxWidth = MathF.Max(0, w - pad.Horizontal);
+        layout = LayoutText(display, s, maxWidth: textMaxWidth, overflow: TextOverflowMode.Ellipsis);
         float h = layout.Height + pad.Vertical;
 
         var (x, y) = Place(w, h);
@@ -1943,8 +1997,9 @@ public sealed partial class Ui
 
         if (changed)
         {
-            display = string.Format(System.Globalization.CultureInfo.InvariantCulture, fmt, value);
-            layout = LayoutText(display, s);
+            valueText = string.Format(System.Globalization.CultureInfo.InvariantCulture, fmt, value);
+            display = BuildValueDisplay(label, valueText);
+            layout = LayoutText(display, s, maxWidth: textMaxWidth, overflow: TextOverflowMode.Ellipsis);
         }
 
         float textX = x + MathF.Max(pad.Left, (w - layout.Width) * 0.5f);
@@ -1966,7 +2021,7 @@ public sealed partial class Ui
 
     /// <summary>Draws a draggable integer value editor.</summary>
     public Response DragInt(
-        string id,
+        string label,
         ref int value,
         float speed = 1f,
         int? min = null,
@@ -1974,9 +2029,11 @@ public sealed partial class Ui
         string? format = null,
         float? width = null,
         float? size = null,
-        bool enabled = true)
+        bool enabled = true,
+        UiId? id = null)
     {
-        int widgetId = MakeId(id);
+        UiId resolvedId = ResolveWidgetId(id, label);
+        int widgetId = MakeWidgetId(UiWidgetKind.DragInt, resolvedId);
         var dragState = GetState<DragIntState>(widgetId);
 
         bool draggingActive = _activeId == widgetId && IsMouseDown(UiMouseButton.Left);
@@ -1984,8 +2041,9 @@ public sealed partial class Ui
             dragState.FloatValue = value;
 
         int startValue = value;
-        Response response = DragFloat(
-            id,
+        Response response = DragFloatCore(
+            UiWidgetKind.DragInt,
+            label,
             ref dragState.FloatValue,
             speed,
             min.HasValue ? min.Value : null,
@@ -1993,7 +2051,8 @@ public sealed partial class Ui
             format ?? "{0:0}",
             width,
             size,
-            enabled);
+            enabled,
+            id);
 
         int rounded = (int)MathF.Round(dragState.FloatValue);
         if (min.HasValue) rounded = Math.Max(min.Value, rounded);
@@ -2010,7 +2069,7 @@ public sealed partial class Ui
     }
 
     /// <summary>Draws a header that toggles an open/collapsed state.</summary>
-    public Response CollapsingHeader(string label, ref bool open, float? width = null, float? size = null, bool enabled = true)
+    public Response CollapsingHeader(string label, ref bool open, float? width = null, float? size = null, bool enabled = true, UiId? id = null)
     {
         enabled = ResolveEnabled(enabled);
         float s = size ?? DefaultFontSize;
@@ -2022,23 +2081,24 @@ public sealed partial class Ui
         float w = width.HasValue ? MathF.Max(width.Value, intrinsicW) : intrinsicW;
         float h = MathF.Max(labelLayout.Height, arrowSize) + pad.Vertical;
 
-        int id = MakeId(label);
+        UiId resolvedId = ResolveWidgetId(id, label);
+        int widgetId = MakeWidgetId(UiWidgetKind.CollapsingHeader, resolvedId);
         var (x, y) = Place(w, h);
 
-        bool focused = RegisterFocusable(id, enabled);
+        bool focused = RegisterFocusable(widgetId, enabled);
         bool hover = enabled && PointIn(x, y, w, h);
-        if (hover) _hotId = id;
+        if (hover) _hotId = widgetId;
         if (hover) RequestCursor(UiCursor.PointingHand);
 
-        if (enabled && _hotId == id && IsMousePressed(UiMouseButton.Left))
+        if (enabled && _hotId == widgetId && IsMousePressed(UiMouseButton.Left))
         {
-            _activeId = id;
-            SetFocus(id);
+            _activeId = widgetId;
+            SetFocus(widgetId);
             focused = true;
         }
 
-        bool pressed = enabled && _activeId == id && IsMouseDown(UiMouseButton.Left);
-        bool clicked = enabled && IsMouseReleased(UiMouseButton.Left) && _activeId == id && _hotId == id;
+        bool pressed = enabled && _activeId == widgetId && IsMouseDown(UiMouseButton.Left);
+        bool clicked = enabled && IsMouseReleased(UiMouseButton.Left) && _activeId == widgetId && _hotId == widgetId;
         if (enabled && focused && (_input.IsPressed(UiKey.Enter) || _input.IsPressed(UiKey.Space)))
             clicked = true;
 

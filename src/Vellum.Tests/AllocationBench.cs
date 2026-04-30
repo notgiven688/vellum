@@ -14,11 +14,22 @@ internal static class AllocationBench
         Measure("50x label (constant text)", font, static ui => { for (int i = 0; i < 50; i++) ui.Label("Hello, world"); });
         Measure("50x label (interpolated)", font, static ui => { for (int i = 0; i < 50; i++) ui.Label($"Item {i}: value {i * 7}"); });
         Measure("50x label (wrapped)", font, static ui => { for (int i = 0; i < 50; i++) ui.Label("The quick brown fox jumps over the lazy dog and a few more words besides", maxWidth: 200, wrap: TextWrapMode.WordWrap); });
-        Measure("50x button", font, static ui => { for (int i = 0; i < 50; i++) ui.Button("Click me"); });
+        Measure("50x button", font, static ui =>
+        {
+            for (int i = 0; i < 50; i++)
+            {
+                using (ui.Id(i))
+                    ui.Button("Click me");
+            }
+        });
         Measure("50x checkbox", font, static ui =>
         {
             bool b = false;
-            for (int i = 0; i < 50; i++) ui.Checkbox("Toggle me", ref b);
+            for (int i = 0; i < 50; i++)
+            {
+                using (ui.Id(i))
+                    ui.Checkbox("Toggle me", ref b);
+            }
         });
         Measure("text field", font, static ui =>
         {
@@ -30,14 +41,14 @@ internal static class AllocationBench
             string s = "line 1\nline 2\nline 3\nline 4\nline 5\nline 6\nline 7\nline 8\nline 9\nline 10";
             ui.TextArea("notes", ref s, 200, 200);
         });
-        Measure("horizontal+width nested", font, static ui =>
+        Measure("row+fixed width nested", font, static ui =>
         {
             for (int i = 0; i < 20; i++)
             {
-                using (ui.Horizontal())
+                using (ui.Row())
                 {
-                    using (ui.Width(100)) ui.Label("Left");
-                    using (ui.Width(100)) ui.Label("Right");
+                    using (ui.FixedWidth(100)) ui.Label("Left");
+                    using (ui.FixedWidth(100)) ui.Label("Right");
                 }
             }
         });

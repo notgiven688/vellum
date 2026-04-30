@@ -58,6 +58,7 @@ public sealed partial class Ui
         });
 
         float innerH;
+        bool contentCompleted = false;
         try
         {
             content(this, state);
@@ -66,11 +67,15 @@ public sealed partial class Ui
             innerH = inner.Dir == LayoutDir.Horizontal
                 ? inner.MaxExtent
                 : inner.CursorY - inner.OriginY;
+            contentCompleted = true;
         }
         finally
         {
             _layouts.RemoveAt(_layouts.Count - 1);
             _painter = parentPainter;
+
+            if (!contentCompleted)
+                ReleaseDeferredPainter(contentPainter);
         }
 
         float resolvedHeight = MathF.Max(0, innerH + border * 2 + pad.Vertical);
@@ -94,7 +99,8 @@ public sealed partial class Ui
         float maxPopupHeight = 280f,
         bool enabled = true,
         bool openOnHover = false,
-        bool openToSide = false)
+        bool openToSide = false,
+        UiId? id = null)
         => Menu(
             label,
             new UiActionState(content),
@@ -105,9 +111,10 @@ public sealed partial class Ui
             maxPopupHeight,
             enabled,
             openOnHover,
-            openToSide);
+            openToSide,
+            id);
 
-    /// <inheritdoc cref="Menu(string, Action{Ui}, float?, float?, float?, float, bool, bool, bool)" />
+    /// <inheritdoc cref="Menu(string, Action{Ui}, float?, float?, float?, float, bool, bool, bool, UiId?)" />
     public Response Menu<TState>(
         string label,
         TState state,
@@ -118,7 +125,8 @@ public sealed partial class Ui
         float maxPopupHeight = 280f,
         bool enabled = true,
         bool openOnHover = false,
-        bool openToSide = false)
+        bool openToSide = false,
+        UiId? id = null)
     {
         ArgumentNullException.ThrowIfNull(content);
 
@@ -169,9 +177,9 @@ public sealed partial class Ui
             displayLabelLayout = LayoutText(label, resolvedSize, maxWidth: labelMaxW, overflow: TextOverflowMode.Ellipsis);
         }
 
-        int widgetId = MakeId(label);
-        string popupId = label + "/menu";
-        int popupWidgetId = MakeId(popupId);
+        UiId resolvedId = ResolveWidgetId(id, label);
+        int widgetId = MakeWidgetId(UiWidgetKind.Menu, resolvedId);
+        int popupWidgetId = MakeChildId(widgetId, "menu");
         _menuPopupIds.Add(popupWidgetId);
         bool popupOpen = IsPopupOpen(popupWidgetId);
         bool menuRootActive = topLevel && IsRootMenuPopupActive();
@@ -203,7 +211,7 @@ public sealed partial class Ui
         bool allowHoverOpen = !topLevel || menuRootActive || openOnHover;
         if (enabled && !popupOpen && hover && allowHoverOpen)
         {
-            OpenPopup(popupId);
+            OpenPopupById(popupWidgetId);
             popupOpen = true;
             openedThisFrame = true;
             popupTransitionHovered = false;
@@ -214,13 +222,13 @@ public sealed partial class Ui
         {
             if (popupOpen)
             {
-                ClosePopup(popupId);
+                ClosePopupById(popupWidgetId);
                 popupOpen = false;
                 closedThisFrame = true;
             }
             else
             {
-                OpenPopup(popupId);
+                OpenPopupById(popupWidgetId);
                 popupOpen = true;
                 openedThisFrame = true;
             }
@@ -228,7 +236,7 @@ public sealed partial class Ui
 
         if (enabled && focused && popupOpen && _input.IsPressed(UiKey.Escape))
         {
-            ClosePopup(popupId);
+            ClosePopupById(popupWidgetId);
             popupOpen = false;
             closedThisFrame = true;
         }
@@ -242,7 +250,7 @@ public sealed partial class Ui
             !popupTransitionHovered &&
             !popupPathHovered)
         {
-            ClosePopup(popupId);
+            ClosePopupById(popupWidgetId);
             popupOpen = false;
             closedThisFrame = true;
         }
@@ -293,7 +301,7 @@ public sealed partial class Ui
                 float popupAnchorX = ResolveMenuPopupAnchorX(!sidePopup, x, resolvedWidth, resolvedPopupWidth);
                 float popupAnchorY = sidePopup ? y : y + resolvedHeight;
 
-                Popup(popupId, popupAnchorX, popupAnchorY, resolvedPopupWidth, maxPopupHeight, popup =>
+                Popup(popupWidgetId, popupAnchorX, popupAnchorY, resolvedPopupWidth, maxPopupHeight, popup =>
                 {
                     popup.ItemSpacing(0);
                     content(popup, state);
@@ -386,6 +394,9 @@ public sealed partial class Ui
         bool previousMenuMeasureIntrinsicWidth = _menuMeasureIntrinsicWidth;
         _menuMeasureOnly = true;
         _menuMeasureIntrinsicWidth = useIntrinsicWidths;
+#if DEBUG
+        _idTrackingDisabledDepth++;
+#endif
         _popupContext.Add(popupId);
         _idStack.Push(popupId);
         _layouts.Add(new LayoutScope
@@ -418,6 +429,9 @@ public sealed partial class Ui
             _layouts.RemoveAt(_layouts.Count - 1);
             _idStack.Pop();
             _popupContext.RemoveAt(_popupContext.Count - 1);
+#if DEBUG
+            _idTrackingDisabledDepth--;
+#endif
             _menuMeasureIntrinsicWidth = previousMenuMeasureIntrinsicWidth;
             _menuMeasureOnly = previousMenuMeasureOnly;
             _painter = parentPainter;
