@@ -31,7 +31,7 @@ public sealed partial class Ui
     {
         ArgumentNullException.ThrowIfNull(content);
 
-        int widgetId = MakeId(id);
+        int widgetId = MakeWidgetId(UiWidgetKind.TabBar, id);
         RegisterWidgetId(widgetId, $"TabBar \"{id}\"");
         var tabState = GetState<TabBarState>(widgetId);
         float availableWidth = AvailableWidth;
@@ -106,10 +106,12 @@ public sealed partial class Ui
         if (index > 0 && Theme.TabSpacing > 0)
             Spacing(Theme.TabSpacing);
 
-        int tabId = MakeId(id ?? label);
+        string resolvedId = id ?? label;
+        int focusId = MakeId(resolvedId);
+        int tabId = MakeWidgetId(UiWidgetKind.Tab, resolvedId);
         var (x, y) = Place(w, h);
 
-        bool focused = RegisterFocusable(tabId, true);
+        bool focused = RegisterFocusable(tabId, true, focusId);
         bool hover = PointIn(x, y, w, h);
         if (hover) _hotId = tabId;
         if (hover) RequestCursor(UiCursor.PointingHand);
@@ -117,7 +119,7 @@ public sealed partial class Ui
         if (hover && IsMousePressed(UiMouseButton.Left))
         {
             _activeId = tabId;
-            SetFocus(tabId);
+            SetFocus(tabId, focusId);
             focused = true;
         }
 

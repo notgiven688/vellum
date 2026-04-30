@@ -44,7 +44,7 @@ public sealed partial class Ui
         ArgumentNullException.ThrowIfNull(state);
         ArgumentNullException.ThrowIfNull(content);
 
-        int windowId = MakeId(id ?? title);
+        int windowId = MakeWidgetId(UiWidgetKind.Window, id ?? title);
         RegisterWidgetId(windowId, $"Window \"{title}\"");
         EnsureWindowOrder(windowId);
 

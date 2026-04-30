@@ -178,13 +178,14 @@ public sealed partial class Ui
         }
 
         string resolvedId = id ?? label;
-        int widgetId = MakeId(resolvedId);
-        int popupWidgetId = MakeChildId(widgetId, "menu");
+        int focusId = MakeId(resolvedId);
+        int widgetId = MakeWidgetId(UiWidgetKind.Menu, resolvedId);
+        int popupWidgetId = MakeChildId(focusId, "menu");
         _menuPopupIds.Add(popupWidgetId);
         bool popupOpen = IsPopupOpen(popupWidgetId);
         bool menuRootActive = topLevel && IsRootMenuPopupActive();
 
-        bool focused = RegisterFocusable(widgetId, enabled);
+        bool focused = RegisterFocusable(widgetId, enabled, focusId);
         bool hover = enabled && (menuRootActive
             ? PointInMenuAnchor(x, y, resolvedWidth, resolvedHeight)
             : PointIn(x, y, resolvedWidth, resolvedHeight));
@@ -194,7 +195,7 @@ public sealed partial class Ui
         if (enabled && _hotId == widgetId && IsMousePressed(UiMouseButton.Left))
         {
             _activeId = widgetId;
-            SetFocus(widgetId);
+            SetFocus(widgetId, focusId);
             focused = true;
         }
 

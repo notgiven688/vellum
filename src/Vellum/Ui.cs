@@ -151,6 +151,34 @@ public sealed partial class Ui : IDisposable
 {
     private enum LayoutDir { Vertical, Horizontal }
 
+    private enum UiWidgetKind
+    {
+        Button = 1,
+        Checkbox,
+        Switch,
+        RadioButton,
+        Selectable,
+        Menu,
+        MenuItem,
+        ComboBox,
+        Slider,
+        SliderInt,
+        DragFloat,
+        DragInt,
+        CollapsingHeader,
+        TextField,
+        TextArea,
+        Splitter,
+        TabBar,
+        Tab,
+        TreeNode,
+        TreeLeaf,
+        ScrollArea,
+        ScrollAreaBoth,
+        Window,
+        Popup
+    }
+
     private struct LayoutScope
     {
         public float OriginX, OriginY;
@@ -287,10 +315,14 @@ public sealed partial class Ui : IDisposable
     private bool _tabNavigationRequested;
     private bool _tabNavigationBackward;
     private int _firstFocusableId;
+    private int _firstFocusableAliasId;
     private int _lastFocusableId;
+    private int _lastFocusableAliasId;
     private int _pendingFocusId;
+    private int _pendingFocusAliasId;
     private int _requestedFocusId;
     private bool _sawFocusedWidget;
+    private int _focusedAliasId;
     private readonly List<int> _popupContext = new();
     private bool _popupDismissedThisPress;
     private int _windowContextId;
@@ -483,8 +515,11 @@ public sealed partial class Ui : IDisposable
         _tabNavigationRequested = _input.IsPressed(UiKey.Tab);
         _tabNavigationBackward = _input.Shift;
         _firstFocusableId = 0;
+        _firstFocusableAliasId = 0;
         _lastFocusableId = 0;
+        _lastFocusableAliasId = 0;
         _pendingFocusId = 0;
+        _pendingFocusAliasId = 0;
         _sawFocusedWidget = false;
         _hitClips.Clear();
         _seenWidgetIds.Clear();
@@ -533,7 +568,10 @@ public sealed partial class Ui : IDisposable
         ApplyPendingFocusNavigation();
 
         if (IsMousePressed(UiMouseButton.Left) && _hotId != _focusedId)
+        {
             _focusedId = 0;
+            _focusedAliasId = 0;
+        }
 
         FinalizePopupFrame();
         FinalizeWindowFrame();
@@ -589,6 +627,15 @@ public sealed partial class Ui : IDisposable
         _hotId = 0;
         _activeId = 0;
         _focusedId = 0;
+        _firstFocusableId = 0;
+        _firstFocusableAliasId = 0;
+        _lastFocusableId = 0;
+        _lastFocusableAliasId = 0;
+        _pendingFocusId = 0;
+        _pendingFocusAliasId = 0;
+        _requestedFocusId = 0;
+        _sawFocusedWidget = false;
+        _focusedAliasId = 0;
         _disposed = true;
         GC.SuppressFinalize(this);
     }
@@ -896,6 +943,12 @@ public sealed partial class Ui : IDisposable
         return HashMix(CurrentIdSeed, HashString(label));
     }
 
+    private int MakeWidgetId(UiWidgetKind kind, ReadOnlySpan<char> label)
+        => HashMix(HashMix(CurrentIdSeed, HashInt((int)kind)), HashString(label));
+
+    private int MakePopupId(ReadOnlySpan<char> id)
+        => MakeWidgetId(UiWidgetKind.Popup, id);
+
     private int MakeId(int value) => HashMix(CurrentIdSeed, HashInt(value));
 
     private int MakeId(long value) => HashMix(CurrentIdSeed, HashLong(value));
@@ -1125,7 +1178,9 @@ public sealed partial class Ui : IDisposable
     public void RequestFocus(string id)
     {
         _focusedId = 0;
+        _focusedAliasId = 0;
         _pendingFocusId = 0;
+        _pendingFocusAliasId = 0;
         _sawFocusedWidget = false;
         _requestedFocusId = MakeId(id);
     }
@@ -1134,14 +1189,16 @@ public sealed partial class Ui : IDisposable
     public void ClearFocus()
     {
         _focusedId = 0;
+        _focusedAliasId = 0;
         _pendingFocusId = 0;
+        _pendingFocusAliasId = 0;
         _requestedFocusId = 0;
         _sawFocusedWidget = false;
     }
 
     /// <summary>Returns whether the widget with the given id has keyboard focus.</summary>
     public bool HasFocus(string id)
-        => _requestedFocusId == 0 && _focusedId == MakeId(id);
+        => _requestedFocusId == 0 && (_focusedAliasId == MakeId(id) || _focusedId == MakeId(id));
 
     // -------------------------------------------------------------------------
     // Persistent widget state and focus
@@ -1163,50 +1220,72 @@ public sealed partial class Ui : IDisposable
         return created;
     }
 
-    private bool RegisterFocusable(int id, bool enabled)
+    private bool RegisterFocusable(int id, bool enabled, int focusAliasId = 0)
     {
+        if (focusAliasId == 0)
+            focusAliasId = id;
+
         RegisterWidgetId(id);
         MarkWidgetSeen(id);
 
         if (!enabled)
         {
-            if (_focusedId == id) _focusedId = 0;
+            if (_focusedId == id) ClearFocus(id);
             return false;
         }
 
         if (!CanFocusCurrentContext())
             return false;
 
-        if (_requestedFocusId == id)
+        if (_requestedFocusId == id || _requestedFocusId == focusAliasId)
         {
-            _focusedId = id;
+            SetFocus(id, focusAliasId);
             _requestedFocusId = 0;
             _pendingFocusId = 0;
+            _pendingFocusAliasId = 0;
             _tabNavigationRequested = false;
         }
 
-        if (_firstFocusableId == 0) _firstFocusableId = id;
+        if (_firstFocusableId == 0)
+        {
+            _firstFocusableId = id;
+            _firstFocusableAliasId = focusAliasId;
+        }
         int previousFocusableId = _lastFocusableId;
+        int previousFocusableAliasId = _lastFocusableAliasId;
         _lastFocusableId = id;
+        _lastFocusableAliasId = focusAliasId;
 
         if (_tabNavigationRequested && _pendingFocusId == 0)
         {
             if (_focusedId == 0)
             {
-                if (!_tabNavigationBackward) _pendingFocusId = id;
+                if (!_tabNavigationBackward)
+                {
+                    _pendingFocusId = id;
+                    _pendingFocusAliasId = focusAliasId;
+                }
             }
             else if (_tabNavigationBackward)
             {
                 if (id == _focusedId)
+                {
                     _pendingFocusId = previousFocusableId != 0 ? previousFocusableId : -1;
+                    _pendingFocusAliasId = previousFocusableId != 0 ? previousFocusableAliasId : 0;
+                }
             }
             else if (_sawFocusedWidget)
             {
                 _pendingFocusId = id;
+                _pendingFocusAliasId = focusAliasId;
             }
         }
 
-        if (_focusedId == id) _sawFocusedWidget = true;
+        if (_focusedId == id)
+        {
+            _focusedAliasId = focusAliasId;
+            _sawFocusedWidget = true;
+        }
         return _focusedId == id;
     }
 
@@ -1216,36 +1295,48 @@ public sealed partial class Ui : IDisposable
 
         if (_firstFocusableId == 0)
         {
-            _focusedId = 0;
+            ClearFocus();
             return;
         }
 
         if (_focusedId == 0)
         {
-            _focusedId = _tabNavigationBackward ? _lastFocusableId : _firstFocusableId;
+            SetFocus(
+                _tabNavigationBackward ? _lastFocusableId : _firstFocusableId,
+                _tabNavigationBackward ? _lastFocusableAliasId : _firstFocusableAliasId);
             return;
         }
 
         if (_pendingFocusId == -1)
         {
-            _focusedId = _lastFocusableId;
+            SetFocus(_lastFocusableId, _lastFocusableAliasId);
             return;
         }
 
         if (_pendingFocusId != 0)
         {
-            _focusedId = _pendingFocusId;
+            SetFocus(_pendingFocusId, _pendingFocusAliasId);
             return;
         }
 
-        _focusedId = _tabNavigationBackward ? _lastFocusableId : _firstFocusableId;
+        SetFocus(
+            _tabNavigationBackward ? _lastFocusableId : _firstFocusableId,
+            _tabNavigationBackward ? _lastFocusableAliasId : _firstFocusableAliasId);
     }
 
-    private void SetFocus(int id) => _focusedId = id;
+    private void SetFocus(int id, int focusAliasId = 0)
+    {
+        _focusedId = id;
+        _focusedAliasId = focusAliasId != 0 ? focusAliasId : id;
+    }
 
     private void ClearFocus(int id)
     {
-        if (_focusedId == id) _focusedId = 0;
+        if (_focusedId != id)
+            return;
+
+        _focusedId = 0;
+        _focusedAliasId = 0;
     }
 
     private void UpdateMouseButtons(bool legacyPrimaryDown)
@@ -1325,7 +1416,10 @@ public sealed partial class Ui : IDisposable
     private void ClearInteractionForMissingWidgets()
     {
         if (_focusedId != 0 && !_seenWidgetIds.Contains(_focusedId))
+        {
             _focusedId = 0;
+            _focusedAliasId = 0;
+        }
         if (_activeId != 0 && !_seenWidgetIds.Contains(_activeId))
             _activeId = 0;
     }
@@ -1350,7 +1444,11 @@ public sealed partial class Ui : IDisposable
         foreach (int staleId in staleIds)
         {
             _widgetStates.Remove(staleId);
-            if (_focusedId == staleId) _focusedId = 0;
+            if (_focusedId == staleId)
+            {
+                _focusedId = 0;
+                _focusedAliasId = 0;
+            }
             if (_activeId == staleId) _activeId = 0;
 
             int popupIndex = _openPopupIds.IndexOf(staleId);

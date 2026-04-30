@@ -45,7 +45,9 @@ public sealed partial class Ui
         enabled = ResolveEnabled(enabled);
         float s = size ?? DefaultFontSize;
         var pad = Theme.TreeNodePadding;
-        int widgetId = MakeId(id ?? label);
+        string resolvedId = id ?? label;
+        int focusId = MakeId(resolvedId);
+        int widgetId = MakeWidgetId(UiWidgetKind.TreeNode, resolvedId);
 
         var nodeState = GetState<TreeNodeState>(widgetId);
         if (!nodeState.Initialized)
@@ -63,7 +65,7 @@ public sealed partial class Ui
 
         var (x, y) = Place(w, h);
 
-        bool focused = RegisterFocusable(widgetId, enabled);
+        bool focused = RegisterFocusable(widgetId, enabled, focusId);
         bool hover = enabled && PointIn(x, y, w, h);
         if (hover) _hotId = widgetId;
         if (hover) RequestCursor(UiCursor.PointingHand);
@@ -71,7 +73,7 @@ public sealed partial class Ui
         if (enabled && _hotId == widgetId && IsMousePressed(UiMouseButton.Left))
         {
             _activeId = widgetId;
-            SetFocus(widgetId);
+            SetFocus(widgetId, focusId);
             focused = true;
         }
 
@@ -136,7 +138,9 @@ public sealed partial class Ui
         enabled = ResolveEnabled(enabled);
         float s = size ?? DefaultFontSize;
         var pad = Theme.TreeNodePadding;
-        int widgetId = MakeId(id ?? label);
+        string resolvedId = id ?? label;
+        int focusId = MakeId(resolvedId);
+        int widgetId = MakeWidgetId(UiWidgetKind.TreeLeaf, resolvedId);
 
         var labelLayout = LayoutText(label, s);
         float arrowSize = MathF.Max(8f, s * 0.55f);
@@ -147,7 +151,7 @@ public sealed partial class Ui
 
         var (x, y) = Place(w, h);
 
-        bool focused = RegisterFocusable(widgetId, enabled);
+        bool focused = RegisterFocusable(widgetId, enabled, focusId);
         bool hover = enabled && PointIn(x, y, w, h);
         if (hover) _hotId = widgetId;
         if (hover) RequestCursor(UiCursor.PointingHand);
@@ -155,7 +159,7 @@ public sealed partial class Ui
         if (enabled && _hotId == widgetId && IsMousePressed(UiMouseButton.Left))
         {
             _activeId = widgetId;
-            SetFocus(widgetId);
+            SetFocus(widgetId, focusId);
             focused = true;
         }
 

@@ -1132,6 +1132,47 @@ public sealed class VellumTests
             Check("explicit widget ids disambiguate same-label widgets", !primary.Activated && secondary.Activated);
         }
 
+        {
+            var renderer = new TestRenderer();
+            var ui = new Ui(renderer)
+            {
+                Font = font,
+                DefaultFontSize = 18f,
+                Lcd = false
+            };
+
+            string text = "Ada";
+            Response button = default, field = default;
+            ui.Frame(800, 600, Vector2.Zero, false, frame =>
+            {
+                button = frame.Button("Name");
+                field = frame.TextField("Name", ref text, 180);
+            });
+
+            Check("widget kind disambiguates same-label widgets", button.W > 0f && field.W > 0f);
+        }
+
+        {
+            var renderer = new TestRenderer();
+            var ui = new Ui(renderer)
+            {
+                Font = font,
+                DefaultFontSize = 18f,
+                Lcd = false
+            };
+
+            ui.OpenPopup("Settings");
+            Response button = default;
+            bool popupRendered = false;
+            ui.Frame(800, 600, Vector2.Zero, false, frame =>
+            {
+                button = frame.Button("Settings");
+                popupRendered = frame.Popup("Settings", button, 160, 120, popup => popup.Label("Popup content"));
+            });
+
+            Check("popup ids do not collide with same-label widgets", button.W > 0f && popupRendered);
+        }
+
 #if DEBUG
         {
             var renderer = new TestRenderer();
@@ -1502,6 +1543,35 @@ public sealed class VellumTests
             Frame(new Vector2(px + 12, py + 56), false);
             Frame(Vector2.Zero, false);
             Check("combo box selects an item and closes", popupBoundsKnown && selected == 0 && !ui.IsChildPopupOpen("theme", "popup") && combo.Changed);
+        }
+
+        {
+            var renderer = new TestRenderer();
+            var ui = new Ui(renderer)
+            {
+                Font = font,
+                DefaultFontSize = 18f,
+                Lcd = false
+            };
+
+            string[] options = ["Same", "Other", "Same"];
+            int selected = 1;
+            Response combo = default;
+
+            void Frame(Vector2 mouse, bool mouseDown)
+            {
+                ui.Frame(360, 220, mouse, mouseDown, frame =>
+                {
+                    combo = frame.ComboBox("duplicates", options, ref selected, 180);
+                });
+            }
+
+            Frame(new Vector2(20, 24), true);
+            Frame(new Vector2(20, 24), false);
+            bool popupBoundsKnown = ui.TryGetChildPopupBounds("duplicates", "popup", out _, out _, out _, out _);
+
+            Check("combo box duplicate labels keep distinct row ids",
+                popupBoundsKnown && selected == 1 && ui.IsChildPopupOpen("duplicates", "popup") && combo.Focused);
         }
 
         {

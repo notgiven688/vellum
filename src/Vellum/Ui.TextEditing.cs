@@ -141,7 +141,9 @@ public sealed partial class Ui
         enabled = ResolveEnabled(enabled);
         float s = size ?? DefaultFontSize;
         var pad = Theme.TextFieldPadding;
-        int widgetId = MakeId(id ?? label);
+        string resolvedId = id ?? label;
+        int focusId = MakeId(resolvedId);
+        int widgetId = MakeWidgetId(UiWidgetKind.TextField, resolvedId);
         float border = FrameBorderWidth;
 
         string normalizedText = SanitizeTextInput(text);
@@ -158,7 +160,7 @@ public sealed partial class Ui
         float h = metrics.Height + pad.Vertical + border * 2;
         var (x, y) = Place(width, h);
 
-        bool focused = RegisterFocusable(widgetId, enabled);
+        bool focused = RegisterFocusable(widgetId, enabled, focusId);
         if ((!focused || readOnly) && state.Editing)
             EndEditSession(state);
 
@@ -171,7 +173,7 @@ public sealed partial class Ui
 
         if (mousePressed)
         {
-            SetFocus(widgetId);
+            SetFocus(widgetId, focusId);
             _activeId = widgetId;
             focused = true;
             if (!wasFocused && !readOnly)
@@ -185,7 +187,7 @@ public sealed partial class Ui
         }
         else if (enabled && _activeId == widgetId && IsMouseDown(UiMouseButton.Left))
         {
-            SetFocus(widgetId);
+            SetFocus(widgetId, focusId);
             focused = true;
             state.CaretIndex = metrics.HitTest(_mouse.X - (x + border + pad.Left) + state.ScrollX);
         }
@@ -310,7 +312,9 @@ public sealed partial class Ui
         enabled = ResolveEnabled(enabled);
         float s = size ?? DefaultFontSize;
         var pad = Theme.TextFieldPadding;
-        int widgetId = MakeId(id ?? label);
+        string resolvedId = id ?? label;
+        int focusId = MakeId(resolvedId);
+        int widgetId = MakeWidgetId(UiWidgetKind.TextArea, resolvedId);
         float border = FrameBorderWidth;
 
         string normalizedText = SanitizeTextInput(text, allowNewlines: true);
@@ -328,7 +332,7 @@ public sealed partial class Ui
         float viewW = MathF.Max(0, width - border * 2 - pad.Horizontal);
         var (x, y) = Place(width, h);
 
-        bool focused = RegisterFocusable(widgetId, enabled);
+        bool focused = RegisterFocusable(widgetId, enabled, focusId);
         if ((!focused || readOnly) && state.Editing)
             EndEditSession(state);
 
@@ -349,7 +353,7 @@ public sealed partial class Ui
 
         if (mousePressed)
         {
-            SetFocus(widgetId);
+            SetFocus(widgetId, focusId);
             _activeId = widgetId;
             focused = true;
             if (!wasFocused && !readOnly)
@@ -366,7 +370,7 @@ public sealed partial class Ui
         }
         else if (enabled && _activeId == widgetId && IsMouseDown(UiMouseButton.Left))
         {
-            SetFocus(widgetId);
+            SetFocus(widgetId, focusId);
             focused = true;
             state.CaretIndex = metrics.HitTest(
                 _mouse.X - textX + state.ScrollX,

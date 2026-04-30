@@ -43,7 +43,7 @@ public sealed partial class Ui
         enabled = ResolveEnabled(enabled);
         const float ScrollbarGap = 4f;
 
-        int widgetId = MakeId(id);
+        int widgetId = MakeWidgetId(UiWidgetKind.ScrollArea, id);
         RegisterWidgetId(widgetId, $"ScrollArea \"{id}\"");
         var state = GetState<ScrollAreaState>(widgetId);
         var (x, y) = Place(width, height);
@@ -224,7 +224,7 @@ public sealed partial class Ui
         enabled = ResolveEnabled(enabled);
         const float ScrollbarGap = 4f;
 
-        int widgetId = MakeId(id);
+        int widgetId = MakeWidgetId(UiWidgetKind.ScrollArea, id);
         RegisterWidgetId(widgetId, $"ScrollArea \"{id}\"");
         var state = GetState<ScrollAreaState>(widgetId);
         var (x, y) = Place(width, height);
@@ -411,7 +411,7 @@ public sealed partial class Ui
     {
         enabled = ResolveEnabled(enabled);
 
-        int widgetId = MakeId(id);
+        int widgetId = MakeWidgetId(UiWidgetKind.ScrollAreaBoth, id);
         RegisterWidgetId(widgetId, $"ScrollAreaBoth \"{id}\"");
         var state = GetState<ScrollAreaState>(widgetId);
         var (x, y) = Place(width, height);

@@ -28,10 +28,10 @@ public sealed partial class Ui
     }
 
     /// <summary>Marks a popup as open. The popup is rendered when declared with the same id.</summary>
-    public void OpenPopup(string id) => OpenPopupById(MakeId(id));
+    public void OpenPopup(string id) => OpenPopupById(MakePopupId(id));
 
     /// <summary>Closes the popup with the given id.</summary>
-    public void ClosePopup(string id) => ClosePopupById(MakeId(id));
+    public void ClosePopup(string id) => ClosePopupById(MakePopupId(id));
 
     /// <summary>Closes the popup currently being rendered and its descendants.</summary>
     public void CloseCurrentPopup()
@@ -45,12 +45,12 @@ public sealed partial class Ui
     public void CloseAllPopups() => _openPopupIds.Clear();
 
     /// <summary>Returns whether the popup with the given id is open.</summary>
-    public bool IsPopupOpen(string id) => IsPopupOpen(MakeId(id));
+    public bool IsPopupOpen(string id) => IsPopupOpen(MakePopupId(id));
 
     /// <summary>Gets the last known bounds of an open popup.</summary>
     public bool TryGetPopupBounds(string id, out float x, out float y, out float width, out float height)
     {
-        if (TryGetKnownPopupRect(MakeId(id), out var rect))
+        if (TryGetKnownPopupRect(MakePopupId(id), out var rect))
         {
             x = rect.X;
             y = rect.Y;
@@ -96,7 +96,7 @@ public sealed partial class Ui
         float maxHeight,
         Action<Ui> content,
         bool enabled = true)
-        => QueuePopupRequest(MakeId(id), anchorX, anchorY, width, maxHeight, content, enabled, isModal: false, $"Popup \"{id}\"");
+        => QueuePopupRequest(MakePopupId(id), anchorX, anchorY, width, maxHeight, content, enabled, isModal: false, $"Popup \"{id}\"");
 
     /// <summary>Declares a modal popup centered in the viewport.</summary>
     public bool ModalPopup(string id, float width, float maxHeight, Action<Ui> content, bool enabled = true)
@@ -106,7 +106,7 @@ public sealed partial class Ui
     public bool ModalPopup<TState>(string id, float width, float maxHeight, TState state, Action<Ui, TState> content, bool enabled = true)
     {
         ArgumentNullException.ThrowIfNull(content);
-        return QueuePopupRequest(MakeId(id), 0f, 0f, width, maxHeight, popup => content(popup, state), enabled, isModal: true, $"ModalPopup \"{id}\"");
+        return QueuePopupRequest(MakePopupId(id), 0f, 0f, width, maxHeight, popup => content(popup, state), enabled, isModal: true, $"ModalPopup \"{id}\"");
     }
 
     /// <summary>Declares a popup anchored below a widget response.</summary>
