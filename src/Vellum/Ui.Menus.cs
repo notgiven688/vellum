@@ -100,7 +100,7 @@ public sealed partial class Ui
         bool enabled = true,
         bool openOnHover = false,
         bool openToSide = false,
-        string? id = null)
+        UiId? id = null)
         => Menu(
             label,
             new UiActionState(content),
@@ -114,7 +114,7 @@ public sealed partial class Ui
             openToSide,
             id);
 
-    /// <inheritdoc cref="Menu(string, Action{Ui}, float?, float?, float?, float, bool, bool, bool, string?)" />
+    /// <inheritdoc cref="Menu(string, Action{Ui}, float?, float?, float?, float, bool, bool, bool, UiId?)" />
     public Response Menu<TState>(
         string label,
         TState state,
@@ -126,7 +126,7 @@ public sealed partial class Ui
         bool enabled = true,
         bool openOnHover = false,
         bool openToSide = false,
-        string? id = null)
+        UiId? id = null)
     {
         ArgumentNullException.ThrowIfNull(content);
 
@@ -177,15 +177,14 @@ public sealed partial class Ui
             displayLabelLayout = LayoutText(label, resolvedSize, maxWidth: labelMaxW, overflow: TextOverflowMode.Ellipsis);
         }
 
-        string resolvedId = id ?? label;
-        int focusId = MakeId(resolvedId);
+        UiId resolvedId = ResolveWidgetId(id, label);
         int widgetId = MakeWidgetId(UiWidgetKind.Menu, resolvedId);
-        int popupWidgetId = MakeChildId(focusId, "menu");
+        int popupWidgetId = MakeChildId(widgetId, "menu");
         _menuPopupIds.Add(popupWidgetId);
         bool popupOpen = IsPopupOpen(popupWidgetId);
         bool menuRootActive = topLevel && IsRootMenuPopupActive();
 
-        bool focused = RegisterFocusable(widgetId, enabled, focusId);
+        bool focused = RegisterFocusable(widgetId, enabled);
         bool hover = enabled && (menuRootActive
             ? PointInMenuAnchor(x, y, resolvedWidth, resolvedHeight)
             : PointIn(x, y, resolvedWidth, resolvedHeight));
@@ -195,7 +194,7 @@ public sealed partial class Ui
         if (enabled && _hotId == widgetId && IsMousePressed(UiMouseButton.Left))
         {
             _activeId = widgetId;
-            SetFocus(widgetId, focusId);
+            SetFocus(widgetId);
             focused = true;
         }
 
@@ -395,6 +394,9 @@ public sealed partial class Ui
         bool previousMenuMeasureIntrinsicWidth = _menuMeasureIntrinsicWidth;
         _menuMeasureOnly = true;
         _menuMeasureIntrinsicWidth = useIntrinsicWidths;
+#if DEBUG
+        _idTrackingDisabledDepth++;
+#endif
         _popupContext.Add(popupId);
         _idStack.Push(popupId);
         _layouts.Add(new LayoutScope
@@ -427,6 +429,9 @@ public sealed partial class Ui
             _layouts.RemoveAt(_layouts.Count - 1);
             _idStack.Pop();
             _popupContext.RemoveAt(_popupContext.Count - 1);
+#if DEBUG
+            _idTrackingDisabledDepth--;
+#endif
             _menuMeasureIntrinsicWidth = previousMenuMeasureIntrinsicWidth;
             _menuMeasureOnly = previousMenuMeasureOnly;
             _painter = parentPainter;

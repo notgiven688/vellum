@@ -66,12 +66,12 @@ public sealed partial class Ui
         return false;
     }
 
-    internal bool IsChildPopupOpen(string parentId, string childId)
-        => IsPopupOpen(MakeChildId(MakeId(parentId), childId));
+    internal bool IsChildPopupOpen(UiWidgetKind parentKind, string parentId, string childId)
+        => IsPopupOpen(MakeChildId(MakeWidgetId(parentKind, parentId.AsSpan()), childId));
 
-    internal bool TryGetChildPopupBounds(string parentId, string childId, out float x, out float y, out float width, out float height)
+    internal bool TryGetChildPopupBounds(UiWidgetKind parentKind, string parentId, string childId, out float x, out float y, out float width, out float height)
     {
-        if (TryGetKnownPopupRect(MakeChildId(MakeId(parentId), childId), out var rect))
+        if (TryGetKnownPopupRect(MakeChildId(MakeWidgetId(parentKind, parentId.AsSpan()), childId), out var rect))
         {
             x = rect.X;
             y = rect.Y;

@@ -31,13 +31,13 @@ public sealed partial class Ui
     {
         ArgumentNullException.ThrowIfNull(content);
 
-        int widgetId = MakeWidgetId(UiWidgetKind.TabBar, id);
+        int widgetId = MakeWidgetId(UiWidgetKind.TabBar, id.AsSpan());
         RegisterWidgetId(widgetId, $"TabBar \"{id}\"");
         var tabState = GetState<TabBarState>(widgetId);
         float availableWidth = AvailableWidth;
 
         var ctx = new TabBarContext { State = tabState };
-        EnterIdScope(id);
+        EnterIdScope(id.AsSpan());
         _tabBarContexts.Push(ctx);
 
         var (rowX, rowY) = Place(0, 0);
@@ -84,11 +84,11 @@ public sealed partial class Ui
     }
 
     /// <summary>Declares a tab inside the current tab bar.</summary>
-    public Response Tab(string label, Action<Ui> content, string? id = null)
+    public Response Tab(string label, Action<Ui> content, UiId? id = null)
         => Tab(label, new UiActionState(content), static (ui, state) => state.Content(ui), id);
 
-    /// <inheritdoc cref="Tab(string, Action{Ui}, string?)" />
-    public Response Tab<TState>(string label, TState state, Action<Ui, TState> content, string? id = null)
+    /// <inheritdoc cref="Tab(string, Action{Ui}, UiId?)" />
+    public Response Tab<TState>(string label, TState state, Action<Ui, TState> content, UiId? id = null)
     {
         ArgumentNullException.ThrowIfNull(content);
         if (_tabBarContexts.Count == 0)
@@ -106,12 +106,11 @@ public sealed partial class Ui
         if (index > 0 && Theme.TabSpacing > 0)
             Spacing(Theme.TabSpacing);
 
-        string resolvedId = id ?? label;
-        int focusId = MakeId(resolvedId);
+        UiId resolvedId = ResolveWidgetId(id, label);
         int tabId = MakeWidgetId(UiWidgetKind.Tab, resolvedId);
         var (x, y) = Place(w, h);
 
-        bool focused = RegisterFocusable(tabId, true, focusId);
+        bool focused = RegisterFocusable(tabId, true);
         bool hover = PointIn(x, y, w, h);
         if (hover) _hotId = tabId;
         if (hover) RequestCursor(UiCursor.PointingHand);
@@ -119,7 +118,7 @@ public sealed partial class Ui
         if (hover && IsMousePressed(UiMouseButton.Left))
         {
             _activeId = tabId;
-            SetFocus(tabId, focusId);
+            SetFocus(tabId);
             focused = true;
         }
 

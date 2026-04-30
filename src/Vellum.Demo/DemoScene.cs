@@ -225,7 +225,7 @@ internal static class DemoScene
             using (panel.Row())
             {
                 if (panel.Button("Focus name", width: rowWidth).Clicked)
-                    panel.RequestFocus("name");
+                    panel.RequestFocus(UiWidgetKind.TextField, "name");
 
                 state.QuickMenuButton = panel.Button("Quick menu", width: rowWidth);
             }
@@ -235,7 +235,7 @@ internal static class DemoScene
             if (panel.Button("Click me", width: panel.AvailableWidth).Clicked) state.ClickCount++;
             if (panel.Button("Reset", width: panel.AvailableWidth).Clicked) state.ClickCount = 0;
             if (panel.Button("Focus name", width: panel.AvailableWidth).Clicked)
-                panel.RequestFocus("name");
+                panel.RequestFocus(UiWidgetKind.TextField, "name");
             state.QuickMenuButton = panel.Button("Quick menu", width: panel.AvailableWidth);
         }
 

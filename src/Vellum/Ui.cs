@@ -144,40 +144,68 @@ public sealed class WindowState
 }
 
 /// <summary>
+/// Identifies a Vellum widget kind. Used by <see cref="Ui.RequestFocus(UiWidgetKind, UiId)"/>
+/// to disambiguate widgets that share a label across kinds.
+/// </summary>
+public enum UiWidgetKind
+{
+    /// <summary>A clickable button.</summary>
+    Button = 1,
+    /// <summary>A checkbox bound to a boolean.</summary>
+    Checkbox,
+    /// <summary>An on/off switch bound to a boolean.</summary>
+    Switch,
+    /// <summary>A radio button.</summary>
+    RadioButton,
+    /// <summary>A selectable row.</summary>
+    Selectable,
+    /// <summary>A menu opened from a menu bar or as a submenu.</summary>
+    Menu,
+    /// <summary>A menu item row.</summary>
+    MenuItem,
+    /// <summary>A combo box.</summary>
+    ComboBox,
+    /// <summary>A floating-point slider.</summary>
+    Slider,
+    /// <summary>An integer slider.</summary>
+    SliderInt,
+    /// <summary>A floating-point drag field.</summary>
+    DragFloat,
+    /// <summary>An integer drag field.</summary>
+    DragInt,
+    /// <summary>A collapsing header.</summary>
+    CollapsingHeader,
+    /// <summary>A single-line text field.</summary>
+    TextField,
+    /// <summary>A multi-line text area.</summary>
+    TextArea,
+    /// <summary>A draggable splitter.</summary>
+    Splitter,
+    /// <summary>A tab bar.</summary>
+    TabBar,
+    /// <summary>A tab inside a tab bar.</summary>
+    Tab,
+    /// <summary>An expandable tree node.</summary>
+    TreeNode,
+    /// <summary>A leaf row in a tree.</summary>
+    TreeLeaf,
+    /// <summary>A vertical scroll area.</summary>
+    ScrollArea,
+    /// <summary>A scroll area that scrolls in both directions.</summary>
+    ScrollAreaBoth,
+    /// <summary>A floating window.</summary>
+    Window,
+    /// <summary>A popup container.</summary>
+    Popup
+}
+
+/// <summary>
 /// Immediate-mode GUI context. Layout scopes are opened with lambdas
 /// (Row / Column), widgets are methods that return a Response.
 /// </summary>
 public sealed partial class Ui : IDisposable
 {
     private enum LayoutDir { Vertical, Horizontal }
-
-    private enum UiWidgetKind
-    {
-        Button = 1,
-        Checkbox,
-        Switch,
-        RadioButton,
-        Selectable,
-        Menu,
-        MenuItem,
-        ComboBox,
-        Slider,
-        SliderInt,
-        DragFloat,
-        DragInt,
-        CollapsingHeader,
-        TextField,
-        TextArea,
-        Splitter,
-        TabBar,
-        Tab,
-        TreeNode,
-        TreeLeaf,
-        ScrollArea,
-        ScrollAreaBoth,
-        Window,
-        Popup
-    }
 
     private struct LayoutScope
     {
@@ -308,21 +336,17 @@ public sealed partial class Ui : IDisposable
     private readonly Stack<int> _idStack = new();
 #if DEBUG
     private readonly HashSet<int> _debugRegisteredWidgetIds = new();
-    private int _debugDuplicateIdCheckSuppressionDepth;
+    private int _idTrackingDisabledDepth;
 #endif
 
     // Per-frame focus navigation
     private bool _tabNavigationRequested;
     private bool _tabNavigationBackward;
     private int _firstFocusableId;
-    private int _firstFocusableAliasId;
     private int _lastFocusableId;
-    private int _lastFocusableAliasId;
     private int _pendingFocusId;
-    private int _pendingFocusAliasId;
     private int _requestedFocusId;
     private bool _sawFocusedWidget;
-    private int _focusedAliasId;
     private readonly List<int> _popupContext = new();
     private bool _popupDismissedThisPress;
     private int _windowContextId;
@@ -506,20 +530,18 @@ public sealed partial class Ui : IDisposable
         UpdateMouseButtons(mouseDown);
 
         _idStack.Clear();
+        _disabledDepth = 0;
 #if DEBUG
         _debugRegisteredWidgetIds.Clear();
-        _debugDuplicateIdCheckSuppressionDepth = 0;
+        _idTrackingDisabledDepth = 0;
 #endif
         _hotId = 0;
         _requestedCursor = UiCursor.Arrow;
         _tabNavigationRequested = _input.IsPressed(UiKey.Tab);
         _tabNavigationBackward = _input.Shift;
         _firstFocusableId = 0;
-        _firstFocusableAliasId = 0;
         _lastFocusableId = 0;
-        _lastFocusableAliasId = 0;
         _pendingFocusId = 0;
-        _pendingFocusAliasId = 0;
         _sawFocusedWidget = false;
         _hitClips.Clear();
         _seenWidgetIds.Clear();
@@ -559,6 +581,7 @@ public sealed partial class Ui : IDisposable
     public void EndFrame()
     {
         ThrowIfDisposed();
+        DebugVerifyScopesClosed();
 
         RenderQueuedWindows();
         _hitClips.Clear();
@@ -568,10 +591,7 @@ public sealed partial class Ui : IDisposable
         ApplyPendingFocusNavigation();
 
         if (IsMousePressed(UiMouseButton.Left) && _hotId != _focusedId)
-        {
             _focusedId = 0;
-            _focusedAliasId = 0;
-        }
 
         FinalizePopupFrame();
         FinalizeWindowFrame();
@@ -609,7 +629,7 @@ public sealed partial class Ui : IDisposable
         _idStack.Clear();
 #if DEBUG
         _debugRegisteredWidgetIds.Clear();
-        _debugDuplicateIdCheckSuppressionDepth = 0;
+        _idTrackingDisabledDepth = 0;
 #endif
         _popupContext.Clear();
         _windowContextId = 0;
@@ -628,14 +648,10 @@ public sealed partial class Ui : IDisposable
         _activeId = 0;
         _focusedId = 0;
         _firstFocusableId = 0;
-        _firstFocusableAliasId = 0;
         _lastFocusableId = 0;
-        _lastFocusableAliasId = 0;
         _pendingFocusId = 0;
-        _pendingFocusAliasId = 0;
         _requestedFocusId = 0;
         _sawFocusedWidget = false;
-        _focusedAliasId = 0;
         _disposed = true;
         GC.SuppressFinalize(this);
     }
@@ -938,88 +954,38 @@ public sealed partial class Ui : IDisposable
 
     private int CurrentIdSeed => _idStack.Count > 0 ? _idStack.Peek() : unchecked((int)0x9e3779b1);
 
-    private int MakeId(ReadOnlySpan<char> label)
-    {
-        return HashMix(CurrentIdSeed, HashString(label));
-    }
+    private int MakeId(ReadOnlySpan<char> label) => HashMix(CurrentIdSeed, UiId.HashString(label));
+
+    private int MakeId(UiId id) => HashMix(CurrentIdSeed, id.Hash);
+
+    private static bool HasSpecifiedId(UiId? id) => id.HasValue && id.Value.IsSpecified;
+
+    private static UiId ResolveWidgetId(UiId? id, string fallback)
+        => HasSpecifiedId(id) ? id!.Value : UiId.FromString(fallback);
 
     private int MakeWidgetId(UiWidgetKind kind, ReadOnlySpan<char> label)
-        => HashMix(HashMix(CurrentIdSeed, HashInt((int)kind)), HashString(label));
+        => HashMix(HashMix(CurrentIdSeed, UiId.HashInt((int)kind)), UiId.HashString(label));
 
-    private int MakePopupId(ReadOnlySpan<char> id)
-        => MakeWidgetId(UiWidgetKind.Popup, id);
+    private int MakeWidgetId(UiWidgetKind kind, UiId id)
+        => HashMix(HashMix(CurrentIdSeed, UiId.HashInt((int)kind)), id.Hash);
 
-    private int MakeId(int value) => HashMix(CurrentIdSeed, HashInt(value));
+    private int MakePopupId(ReadOnlySpan<char> id) => MakeWidgetId(UiWidgetKind.Popup, id);
 
-    private int MakeId(long value) => HashMix(CurrentIdSeed, HashLong(value));
+    private int MakeId(int value) => HashMix(CurrentIdSeed, UiId.HashInt(value));
 
-    private int MakeId(ulong value) => HashMix(CurrentIdSeed, HashLong(unchecked((long)value)));
+    private int MakeId(long value) => HashMix(CurrentIdSeed, UiId.HashLong(value));
 
-    private int MakeId(Guid value) => HashMix(CurrentIdSeed, HashGuid(value));
+    private int MakeId(ulong value) => HashMix(CurrentIdSeed, UiId.HashLong(unchecked((long)value)));
 
-    private static int MakeChildId(int parentId, ReadOnlySpan<char> child) => HashMix(parentId, HashString(child));
+    private int MakeId(Guid value) => HashMix(CurrentIdSeed, UiId.HashGuid(value));
+
+    private static int MakeChildId(int parentId, ReadOnlySpan<char> child) => HashMix(parentId, UiId.HashString(child));
 
     private static int HashMix(int a, int b) => (int)((uint)a * 2654435761u ^ (uint)b);
 
-    private static int HashString(ReadOnlySpan<char> text)
-    {
-        unchecked
-        {
-            uint hash = 2166136261;
-            foreach (char ch in text)
-            {
-                hash ^= ch;
-                hash *= 16777619;
-            }
-
-            return (int)hash;
-        }
-    }
-
-    private static int HashInt(int value)
-    {
-        unchecked
-        {
-            uint hash = 2166136261;
-            hash ^= (uint)value;
-            hash *= 16777619;
-            return (int)hash;
-        }
-    }
-
-    private static int HashLong(long value)
-    {
-        unchecked
-        {
-            uint hash = 2166136261;
-            ulong bits = (ulong)value;
-            hash ^= (uint)bits;
-            hash *= 16777619;
-            hash ^= (uint)(bits >> 32);
-            hash *= 16777619;
-            return (int)hash;
-        }
-    }
-
-    private static int HashGuid(Guid value)
-    {
-        Span<byte> bytes = stackalloc byte[16];
-        value.TryWriteBytes(bytes);
-
-        unchecked
-        {
-            uint hash = 2166136261;
-            foreach (byte b in bytes)
-            {
-                hash ^= b;
-                hash *= 16777619;
-            }
-
-            return (int)hash;
-        }
-    }
-
     private void EnterIdScope(ReadOnlySpan<char> name) => _idStack.Push(MakeId(name));
+
+    private void EnterIdScope(UiId id) => _idStack.Push(MakeId(id));
 
     private void EnterIdScope(int value) => _idStack.Push(MakeId(value));
 
@@ -1174,31 +1140,29 @@ public sealed partial class Ui : IDisposable
         }
     }
 
-    /// <summary>Requests keyboard focus for the widget with the given id.</summary>
-    public void RequestFocus(string id)
+    /// <summary>Requests keyboard focus for the widget identified by <paramref name="kind"/> and <paramref name="id"/>.</summary>
+    /// <remarks>
+    /// <paramref name="id"/> is the widget's resolved identifier — its label by default, or the
+    /// value passed via the widget's <c>id:</c> parameter when one was supplied. The argument
+    /// converts implicitly from <see cref="string"/>, <see cref="int"/>, <see cref="long"/>,
+    /// <see cref="ulong"/>, and <see cref="System.Guid"/>.
+    /// </remarks>
+    public void RequestFocus(UiWidgetKind kind, UiId id)
     {
         _focusedId = 0;
-        _focusedAliasId = 0;
         _pendingFocusId = 0;
-        _pendingFocusAliasId = 0;
         _sawFocusedWidget = false;
-        _requestedFocusId = MakeId(id);
+        _requestedFocusId = id.IsSpecified ? MakeWidgetId(kind, id) : 0;
     }
 
     /// <summary>Clears keyboard focus.</summary>
     public void ClearFocus()
     {
         _focusedId = 0;
-        _focusedAliasId = 0;
         _pendingFocusId = 0;
-        _pendingFocusAliasId = 0;
         _requestedFocusId = 0;
         _sawFocusedWidget = false;
     }
-
-    /// <summary>Returns whether the widget with the given id has keyboard focus.</summary>
-    public bool HasFocus(string id)
-        => _requestedFocusId == 0 && (_focusedAliasId == MakeId(id) || _focusedId == MakeId(id));
 
     // -------------------------------------------------------------------------
     // Persistent widget state and focus
@@ -1220,11 +1184,8 @@ public sealed partial class Ui : IDisposable
         return created;
     }
 
-    private bool RegisterFocusable(int id, bool enabled, int focusAliasId = 0)
+    private bool RegisterFocusable(int id, bool enabled)
     {
-        if (focusAliasId == 0)
-            focusAliasId = id;
-
         RegisterWidgetId(id);
         MarkWidgetSeen(id);
 
@@ -1237,55 +1198,39 @@ public sealed partial class Ui : IDisposable
         if (!CanFocusCurrentContext())
             return false;
 
-        if (_requestedFocusId == id || _requestedFocusId == focusAliasId)
+        if (_requestedFocusId == id)
         {
-            SetFocus(id, focusAliasId);
+            SetFocus(id);
             _requestedFocusId = 0;
             _pendingFocusId = 0;
-            _pendingFocusAliasId = 0;
             _tabNavigationRequested = false;
         }
 
         if (_firstFocusableId == 0)
-        {
             _firstFocusableId = id;
-            _firstFocusableAliasId = focusAliasId;
-        }
         int previousFocusableId = _lastFocusableId;
-        int previousFocusableAliasId = _lastFocusableAliasId;
         _lastFocusableId = id;
-        _lastFocusableAliasId = focusAliasId;
 
         if (_tabNavigationRequested && _pendingFocusId == 0)
         {
             if (_focusedId == 0)
             {
                 if (!_tabNavigationBackward)
-                {
                     _pendingFocusId = id;
-                    _pendingFocusAliasId = focusAliasId;
-                }
             }
             else if (_tabNavigationBackward)
             {
                 if (id == _focusedId)
-                {
                     _pendingFocusId = previousFocusableId != 0 ? previousFocusableId : -1;
-                    _pendingFocusAliasId = previousFocusableId != 0 ? previousFocusableAliasId : 0;
-                }
             }
             else if (_sawFocusedWidget)
             {
                 _pendingFocusId = id;
-                _pendingFocusAliasId = focusAliasId;
             }
         }
 
         if (_focusedId == id)
-        {
-            _focusedAliasId = focusAliasId;
             _sawFocusedWidget = true;
-        }
         return _focusedId == id;
     }
 
@@ -1301,42 +1246,31 @@ public sealed partial class Ui : IDisposable
 
         if (_focusedId == 0)
         {
-            SetFocus(
-                _tabNavigationBackward ? _lastFocusableId : _firstFocusableId,
-                _tabNavigationBackward ? _lastFocusableAliasId : _firstFocusableAliasId);
+            SetFocus(_tabNavigationBackward ? _lastFocusableId : _firstFocusableId);
             return;
         }
 
         if (_pendingFocusId == -1)
         {
-            SetFocus(_lastFocusableId, _lastFocusableAliasId);
+            SetFocus(_lastFocusableId);
             return;
         }
 
         if (_pendingFocusId != 0)
         {
-            SetFocus(_pendingFocusId, _pendingFocusAliasId);
+            SetFocus(_pendingFocusId);
             return;
         }
 
-        SetFocus(
-            _tabNavigationBackward ? _lastFocusableId : _firstFocusableId,
-            _tabNavigationBackward ? _lastFocusableAliasId : _firstFocusableAliasId);
+        SetFocus(_tabNavigationBackward ? _lastFocusableId : _firstFocusableId);
     }
 
-    private void SetFocus(int id, int focusAliasId = 0)
-    {
-        _focusedId = id;
-        _focusedAliasId = focusAliasId != 0 ? focusAliasId : id;
-    }
+    private void SetFocus(int id) => _focusedId = id;
 
     private void ClearFocus(int id)
     {
-        if (_focusedId != id)
-            return;
-
-        _focusedId = 0;
-        _focusedAliasId = 0;
+        if (_focusedId == id)
+            _focusedId = 0;
     }
 
     private void UpdateMouseButtons(bool legacyPrimaryDown)
@@ -1397,10 +1331,29 @@ public sealed partial class Ui : IDisposable
     }
 
     [Conditional("DEBUG")]
+    private void DebugVerifyScopesClosed()
+    {
+#if DEBUG
+        if (_layouts.Count > 1)
+            throw new InvalidOperationException(
+                $"Vellum scope leak: {_layouts.Count - 1} unclosed Row/Column/FixedWidth/MaxWidth handle(s). " +
+                "Wrap layout handles in 'using (...)'.");
+        if (_idStack.Count > 0)
+            throw new InvalidOperationException(
+                $"Vellum scope leak: {_idStack.Count} unclosed Id(...) handle(s). " +
+                "Wrap Id handles in 'using (...)'.");
+        if (_disabledDepth > 0)
+            throw new InvalidOperationException(
+                $"Vellum scope leak: {_disabledDepth} unclosed Disabled(...) handle(s). " +
+                "Wrap Disabled handles in 'using (...)'.");
+#endif
+    }
+
+    [Conditional("DEBUG")]
     private void RegisterWidgetId(int id, string? message = null)
     {
 #if DEBUG
-        if (id == 0 || _debugDuplicateIdCheckSuppressionDepth > 0 || _menuMeasureOnly)
+        if (id == 0 || _idTrackingDisabledDepth > 0)
             return;
 
         if (_debugRegisteredWidgetIds.Add(id))
@@ -1416,10 +1369,7 @@ public sealed partial class Ui : IDisposable
     private void ClearInteractionForMissingWidgets()
     {
         if (_focusedId != 0 && !_seenWidgetIds.Contains(_focusedId))
-        {
             _focusedId = 0;
-            _focusedAliasId = 0;
-        }
         if (_activeId != 0 && !_seenWidgetIds.Contains(_activeId))
             _activeId = 0;
     }
@@ -1444,11 +1394,7 @@ public sealed partial class Ui : IDisposable
         foreach (int staleId in staleIds)
         {
             _widgetStates.Remove(staleId);
-            if (_focusedId == staleId)
-            {
-                _focusedId = 0;
-                _focusedAliasId = 0;
-            }
+            if (_focusedId == staleId) _focusedId = 0;
             if (_activeId == staleId) _activeId = 0;
 
             int popupIndex = _openPopupIds.IndexOf(staleId);

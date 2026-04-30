@@ -18,7 +18,7 @@ public sealed partial class Ui
         bool enabled = true,
         bool defaultOpen = false,
         bool selected = false,
-        string? id = null)
+        UiId? id = null)
         => TreeNode(
             label,
             new UiActionState(children),
@@ -29,7 +29,7 @@ public sealed partial class Ui
             selected,
             id);
 
-    /// <inheritdoc cref="TreeNode(string, Action{Ui}, float?, bool, bool, bool, string?)" />
+    /// <inheritdoc cref="TreeNode(string, Action{Ui}, float?, bool, bool, bool, UiId?)" />
     public Response TreeNode<TState>(
         string label,
         TState state,
@@ -38,15 +38,14 @@ public sealed partial class Ui
         bool enabled = true,
         bool defaultOpen = false,
         bool selected = false,
-        string? id = null)
+        UiId? id = null)
     {
         ArgumentNullException.ThrowIfNull(children);
 
         enabled = ResolveEnabled(enabled);
         float s = size ?? DefaultFontSize;
         var pad = Theme.TreeNodePadding;
-        string resolvedId = id ?? label;
-        int focusId = MakeId(resolvedId);
+        UiId resolvedId = ResolveWidgetId(id, label);
         int widgetId = MakeWidgetId(UiWidgetKind.TreeNode, resolvedId);
 
         var nodeState = GetState<TreeNodeState>(widgetId);
@@ -65,7 +64,7 @@ public sealed partial class Ui
 
         var (x, y) = Place(w, h);
 
-        bool focused = RegisterFocusable(widgetId, enabled, focusId);
+        bool focused = RegisterFocusable(widgetId, enabled);
         bool hover = enabled && PointIn(x, y, w, h);
         if (hover) _hotId = widgetId;
         if (hover) RequestCursor(UiCursor.PointingHand);
@@ -73,7 +72,7 @@ public sealed partial class Ui
         if (enabled && _hotId == widgetId && IsMousePressed(UiMouseButton.Left))
         {
             _activeId = widgetId;
-            SetFocus(widgetId, focusId);
+            SetFocus(widgetId);
             focused = true;
         }
 
@@ -133,13 +132,12 @@ public sealed partial class Ui
         bool selected = false,
         float? size = null,
         bool enabled = true,
-        string? id = null)
+        UiId? id = null)
     {
         enabled = ResolveEnabled(enabled);
         float s = size ?? DefaultFontSize;
         var pad = Theme.TreeNodePadding;
-        string resolvedId = id ?? label;
-        int focusId = MakeId(resolvedId);
+        UiId resolvedId = ResolveWidgetId(id, label);
         int widgetId = MakeWidgetId(UiWidgetKind.TreeLeaf, resolvedId);
 
         var labelLayout = LayoutText(label, s);
@@ -151,7 +149,7 @@ public sealed partial class Ui
 
         var (x, y) = Place(w, h);
 
-        bool focused = RegisterFocusable(widgetId, enabled, focusId);
+        bool focused = RegisterFocusable(widgetId, enabled);
         bool hover = enabled && PointIn(x, y, w, h);
         if (hover) _hotId = widgetId;
         if (hover) RequestCursor(UiCursor.PointingHand);
@@ -159,7 +157,7 @@ public sealed partial class Ui
         if (enabled && _hotId == widgetId && IsMousePressed(UiMouseButton.Left))
         {
             _activeId = widgetId;
-            SetFocus(widgetId, focusId);
+            SetFocus(widgetId);
             focused = true;
         }
 

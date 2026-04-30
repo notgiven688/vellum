@@ -39,12 +39,12 @@ public sealed partial class Ui
 
     /// <summary>Declares a floating window.</summary>
     public Response Window(string title, WindowState state, float width, Action<Ui> content,
-        bool resizable = false, bool closable = true, bool header = true, string? id = null)
+        bool resizable = false, bool closable = true, bool header = true, UiId? id = null)
     {
         ArgumentNullException.ThrowIfNull(state);
         ArgumentNullException.ThrowIfNull(content);
 
-        int windowId = MakeWidgetId(UiWidgetKind.Window, id ?? title);
+        int windowId = MakeWidgetId(UiWidgetKind.Window, ResolveWidgetId(id, title));
         RegisterWidgetId(windowId, $"Window \"{title}\"");
         EnsureWindowOrder(windowId);
 
@@ -294,7 +294,7 @@ public sealed partial class Ui
         float bodyRegionH = scrollableBody
             ? MathF.Max(0, (fixedHeight ? fixedOuterHeight : maxOuterHeight) - border * 2 - titleBarHeight)
             : 0f;
-        int scrollId = HashMix(request.WindowId, HashString("scroll"));
+        int scrollId = HashMix(request.WindowId, UiId.HashString("scroll"));
         float scrollbarReserve = bodyScrollable ? Theme.ScrollbarWidth + ScrollbarGap : 0f;
         float contentW = MathF.Max(0, resolvedWidth - border * 2 - bodyPad.Horizontal - scrollbarReserve);
         bool scrollTrackHovered = false;
@@ -437,14 +437,14 @@ public sealed partial class Ui
 
                 _hotId = hotIdBeforeContent;
 #if DEBUG
-                _debugDuplicateIdCheckSuppressionDepth++;
+                _idTrackingDisabledDepth++;
                 try
                 {
                     contentPainter = RenderContentPass(contentW, out contentHeight, out hotIdAfterContent);
                 }
                 finally
                 {
-                    _debugDuplicateIdCheckSuppressionDepth--;
+                    _idTrackingDisabledDepth--;
                 }
 #else
                 contentPainter = RenderContentPass(contentW, out contentHeight, out hotIdAfterContent);
@@ -500,8 +500,8 @@ public sealed partial class Ui
             buttonY,
             titleButtonSize,
             titleButtonSize);
-        int collapseButtonId = HashMix(request.WindowId, HashString("collapse"));
-        int closeButtonId = HashMix(request.WindowId, HashString("close"));
+        int collapseButtonId = HashMix(request.WindowId, UiId.HashString("collapse"));
+        int closeButtonId = HashMix(request.WindowId, UiId.HashString("close"));
         bool titleButtonsInteractive = hasHeader &&
             _openPopupIds.Count == 0 &&
             !_popupDismissedThisPress &&
@@ -570,7 +570,7 @@ public sealed partial class Ui
             float gripX = x + resolvedWidth - border - ResizeGripSize;
             float gripY = y + resolvedHeight - border - ResizeGripSize;
             gripRect = new ClipRect(gripX, gripY, ResizeGripSize, ResizeGripSize);
-            gripId = HashMix(request.WindowId, HashString("resize"));
+            gripId = HashMix(request.WindowId, UiId.HashString("resize"));
             MarkWidgetSeen(gripId);
 
             bool gripInteractive =

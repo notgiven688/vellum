@@ -344,7 +344,9 @@ public sealed class VellumTests
         "Vellum.UiFonts",
         "Vellum.UiInputState",
         "Vellum.UiKey",
+        "Vellum.UiId",
         "Vellum.UiMouseButton",
+        "Vellum.UiWidgetKind",
         "Vellum.WindowState",
         "Vellum.Rendering.ClipRect",
         "Vellum.Rendering.Color",
@@ -982,18 +984,18 @@ public sealed class VellumTests
 
             ui.Frame(800, 600, Vector2.Zero, false, frame =>
             {
-                frame.RequestFocus("second");
+                frame.RequestFocus(UiWidgetKind.TextField, "second");
                 first = frame.TextField("first", ref firstText, 140);
                 second = frame.TextField("second", ref secondText, 140);
             });
 
-            Check("request focus moves focus to a later widget in the same frame", !first.Focused && second.Focused && ui.HasFocus("second"));
+            Check("request focus moves focus to a later widget in the same frame", !first.Focused && second.Focused);
 
             ui.ClearFocus();
             Response late = default;
             ui.Frame(800, 600, Vector2.Zero, false, frame =>
             {
-                frame.RequestFocus("late");
+                frame.RequestFocus(UiWidgetKind.TextField, "late");
                 frame.Label("Waiting");
             });
             ui.Frame(800, 600, Vector2.Zero, false, frame =>
@@ -1001,7 +1003,7 @@ public sealed class VellumTests
                 late = frame.TextField("late", ref secondText, 140);
             });
 
-            Check("request focus persists until the widget appears", late.Focused && ui.HasFocus("late"));
+            Check("request focus persists until the widget appears", late.Focused);
         }
 
         {
@@ -1049,7 +1051,7 @@ public sealed class VellumTests
             Response button = default;
             ui.Frame(800, 600, Vector2.Zero, false, Input(keys: new[] { UiKey.Space }), frame =>
             {
-                frame.RequestFocus("Go");
+                frame.RequestFocus(UiWidgetKind.Button, "Go");
                 button = frame.Button("Go");
             });
 
@@ -1070,7 +1072,7 @@ public sealed class VellumTests
             {
                 using (frame.Id(1))
                 {
-                    frame.RequestFocus("Delete");
+                    frame.RequestFocus(UiWidgetKind.Button, "Delete");
                     first = frame.Button("Delete");
                 }
 
@@ -1124,13 +1126,74 @@ public sealed class VellumTests
             Response primary = default, secondary = default;
             ui.Frame(800, 600, Vector2.Zero, false, Input(keys: new[] { UiKey.Space }), frame =>
             {
-                frame.RequestFocus("save-secondary");
+                frame.RequestFocus(UiWidgetKind.Button, "save-secondary");
                 primary = frame.Button("Save", id: "save-primary");
                 secondary = frame.Button("Save", id: "save-secondary");
             });
 
             Check("explicit widget ids disambiguate same-label widgets", !primary.Activated && secondary.Activated);
         }
+
+        {
+            var renderer = new TestRenderer();
+            var ui = new Ui(renderer)
+            {
+                Font = font,
+                DefaultFontSize = 18f,
+                Lcd = false
+            };
+
+            string? inheritedId = null;
+            Response first = default, second = default;
+            ui.Frame(800, 600, Vector2.Zero, false, Input(keys: new[] { UiKey.Space }), frame =>
+            {
+                frame.RequestFocus(UiWidgetKind.Button, "Alpha");
+                first = frame.Button("Alpha", id: inheritedId);
+                second = frame.Button("Beta", id: inheritedId);
+            });
+
+            Check("null string widget ids fall back to label identity", first.Activated && !second.Activated);
+        }
+
+#if DEBUG
+        {
+            var renderer = new TestRenderer();
+            var ui = new Ui(renderer) { Font = font, DefaultFontSize = 18f, Lcd = false };
+
+            bool layoutLeak = false;
+            try
+            {
+                ui.Frame(800, 600, Vector2.Zero, false, frame => { frame.Row(); });
+            }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("scope leak"))
+            {
+                layoutLeak = true;
+            }
+            Check("missing using on Row() is detected as a scope leak", layoutLeak);
+
+            bool idLeak = false;
+            try
+            {
+                ui.Frame(800, 600, Vector2.Zero, false, frame => { frame.Id("orphan"); });
+            }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("scope leak"))
+            {
+                idLeak = true;
+            }
+            Check("missing using on Id() is detected as a scope leak", idLeak);
+
+            bool disabledLeak = false;
+            try
+            {
+                ui.Frame(800, 600, Vector2.Zero, false, frame => { frame.Disabled(); });
+            }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("scope leak"))
+            {
+                disabledLeak = true;
+            }
+            Check("missing using on Disabled() is detected as a scope leak", disabledLeak);
+        }
+#endif
 
         {
             var renderer = new TestRenderer();
@@ -1509,7 +1572,7 @@ public sealed class VellumTests
             }
 
             Frame(new Vector2(20, 24));
-            bool hasBounds = ui.TryGetChildPopupBounds("Select Demo Scene", "menu", out _, out _, out float popupW, out _);
+            bool hasBounds = ui.TryGetChildPopupBounds(UiWidgetKind.Menu, "Select Demo Scene", "menu", out _, out _, out float popupW, out _);
             Check("side-opening menu auto-sizes to long content", hasBounds && longItem.W > 180f && popupW > 180f);
         }
 
@@ -1536,13 +1599,13 @@ public sealed class VellumTests
 
             Frame(new Vector2(20, 24), true);
             Frame(new Vector2(20, 24), false);
-            Check("combo box opens on click", combo.Focused && ui.IsChildPopupOpen("theme", "popup"));
+            Check("combo box opens on click", combo.Focused && ui.IsChildPopupOpen(UiWidgetKind.ComboBox, "theme", "popup"));
 
-            bool popupBoundsKnown = ui.TryGetChildPopupBounds("theme", "popup", out float px, out float py, out _, out _);
+            bool popupBoundsKnown = ui.TryGetChildPopupBounds(UiWidgetKind.ComboBox, "theme", "popup", out float px, out float py, out _, out _);
             Frame(new Vector2(px + 12, py + 56), true);
             Frame(new Vector2(px + 12, py + 56), false);
             Frame(Vector2.Zero, false);
-            Check("combo box selects an item and closes", popupBoundsKnown && selected == 0 && !ui.IsChildPopupOpen("theme", "popup") && combo.Changed);
+            Check("combo box selects an item and closes", popupBoundsKnown && selected == 0 && !ui.IsChildPopupOpen(UiWidgetKind.ComboBox, "theme", "popup") && combo.Changed);
         }
 
         {
@@ -1568,10 +1631,10 @@ public sealed class VellumTests
 
             Frame(new Vector2(20, 24), true);
             Frame(new Vector2(20, 24), false);
-            bool popupBoundsKnown = ui.TryGetChildPopupBounds("duplicates", "popup", out _, out _, out _, out _);
+            bool popupBoundsKnown = ui.TryGetChildPopupBounds(UiWidgetKind.ComboBox, "duplicates", "popup", out _, out _, out _, out _);
 
             Check("combo box duplicate labels keep distinct row ids",
-                popupBoundsKnown && selected == 1 && ui.IsChildPopupOpen("duplicates", "popup") && combo.Focused);
+                popupBoundsKnown && selected == 1 && ui.IsChildPopupOpen(UiWidgetKind.ComboBox, "duplicates", "popup") && combo.Focused);
         }
 
         {
@@ -1597,13 +1660,13 @@ public sealed class VellumTests
 
             Frame(Input(keys: new[] { UiKey.Tab }));
             Frame(Input(keys: new[] { UiKey.Enter }));
-            Check("combo box opens from keyboard focus", ui.IsChildPopupOpen("theme/keyboard", "popup") && combo.Focused);
+            Check("combo box opens from keyboard focus", ui.IsChildPopupOpen(UiWidgetKind.ComboBox, "theme/keyboard", "popup") && combo.Focused);
 
             Frame(Input(keys: new[] { UiKey.Down }));
-            Check("combo box keeps the committed value while only moving the highlight", selected == 1 && ui.IsChildPopupOpen("theme/keyboard", "popup") && !combo.Changed);
+            Check("combo box keeps the committed value while only moving the highlight", selected == 1 && ui.IsChildPopupOpen(UiWidgetKind.ComboBox, "theme/keyboard", "popup") && !combo.Changed);
 
             Frame(Input(keys: new[] { UiKey.Enter }));
-            Check("combo box commits the highlighted item on enter", selected == 2 && !ui.IsChildPopupOpen("theme/keyboard", "popup") && combo.Changed && combo.Focused);
+            Check("combo box commits the highlighted item on enter", selected == 2 && !ui.IsChildPopupOpen(UiWidgetKind.ComboBox, "theme/keyboard", "popup") && combo.Changed && combo.Focused);
         }
 
         {
@@ -1631,12 +1694,12 @@ public sealed class VellumTests
             Frame(Input(keys: new[] { UiKey.Enter }));
             Frame(Input(keys: new[] { UiKey.End }));
             Frame(Input(keys: new[] { UiKey.Escape }));
-            Check("combo box escape closes without applying the highlighted item", selected == 1 && !ui.IsChildPopupOpen("theme/cancel", "popup") && !combo.Changed && combo.Focused);
+            Check("combo box escape closes without applying the highlighted item", selected == 1 && !ui.IsChildPopupOpen(UiWidgetKind.ComboBox, "theme/cancel", "popup") && !combo.Changed && combo.Focused);
 
             Frame(Input(keys: new[] { UiKey.Enter }));
             Frame(Input(keys: new[] { UiKey.Home }));
             Frame(Input(keys: new[] { UiKey.Enter }));
-            Check("combo box home jumps to the first item before commit", selected == 0 && !ui.IsChildPopupOpen("theme/cancel", "popup") && combo.Changed);
+            Check("combo box home jumps to the first item before commit", selected == 0 && !ui.IsChildPopupOpen(UiWidgetKind.ComboBox, "theme/cancel", "popup") && combo.Changed);
         }
 
         {
