@@ -12,6 +12,7 @@ public sealed partial class Ui
 
         public UiActionState(Action<Ui> content)
         {
+            ArgumentNullException.ThrowIfNull(content);
             Content = content;
         }
     }
@@ -301,11 +302,7 @@ public sealed partial class Ui
                 float popupAnchorX = ResolveMenuPopupAnchorX(!sidePopup, x, resolvedWidth, resolvedPopupWidth);
                 float popupAnchorY = sidePopup ? y : y + resolvedHeight;
 
-                Popup(popupWidgetId, popupAnchorX, popupAnchorY, resolvedPopupWidth, maxPopupHeight, popup =>
-                {
-                    popup.ItemSpacing(0);
-                    content(popup, state);
-                }, enabled);
+                Popup(popupWidgetId, popupAnchorX, popupAnchorY, resolvedPopupWidth, maxPopupHeight, state, content, enabled, zeroItemSpacing: true);
             }
         }
 

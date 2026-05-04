@@ -10,12 +10,12 @@ public sealed partial class Ui
     }
 
     /// <summary>Opens and declares a context menu for a target response on right-click.</summary>
-    public bool ContextMenu(string id, Response target, Action<Ui> content, float width = 220f, float maxHeight = 280f)
+    public bool ContextMenu(UiId id, Response target, Action<Ui> content, float width = 220f, float maxHeight = 280f)
         => ContextMenu(id, target, new UiActionState(content), static (ui, state) => state.Content(ui), width, maxHeight);
 
-    /// <inheritdoc cref="ContextMenu(string, Response, Action{Ui}, float, float)" />
+    /// <inheritdoc cref="ContextMenu(UiId, Response, Action{Ui}, float, float)" />
     public bool ContextMenu<TState>(
-        string id,
+        UiId id,
         Response target,
         TState state,
         Action<Ui, TState> content,
@@ -35,10 +35,6 @@ public sealed partial class Ui
 
         SeedMenuPopupContentHeightIfNeeded(popupWidgetId, width, state, content);
 
-        return Popup(id, ctxState.Anchor.X, ctxState.Anchor.Y, width, maxHeight, popup =>
-        {
-            popup.ItemSpacing(0);
-            content(popup, state);
-        });
+        return Popup(popupWidgetId, ctxState.Anchor.X, ctxState.Anchor.Y, width, maxHeight, state, content, zeroItemSpacing: true);
     }
 }

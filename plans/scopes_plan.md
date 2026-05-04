@@ -75,17 +75,19 @@ foreach (var item in items)
     });
 }
 
-ui.Window("Inspector", state, 320f, selected, static (w, sel) =>
+ui.Panel(selected, static (panel, sel) =>
 {
-    w.Label(sel.Name);
+    panel.Label(sel.Name);
 });
 ```
 
 - `static` on the lambda forbids captures, so the delegate is cached once per call site and never reallocated.
 - `TState` flows the per-iteration data in by parameter instead of by capture. Use a tuple when more than one value is needed: `(item, index, isSelected)`.
 - Best fit for content inside loops, scrolled lists, virtualised trees, or any other path that runs many times per frame.
+- A `TState` overload is only worth publishing when the construct can pass that state through without hiding a closure allocation. Consistency overloads that internally do `ui => content(ui, state)` are misleading and should not be added.
+- Delayed constructs that expose `TState` must store the content delegate and state separately in the queued request. Vellum uses an internal type-erased deferred-content carrier for this in popup/menu/tab paths. That removes the hidden closure/delegate wrapper; value-type state may still box when it is stored in a delayed request.
 
-Used by today: every scope that has an `Action<Ui>` overload also has a paired `Action<Ui, TState>` overload — `Frame`, `Id`, `Disabled`, `Window`, `Panel`, `MenuBar`, `Menu`, `ContextMenu`, `ModalPopup`, `TabBar`, `Tab`, `TreeNode`, `ScrollArea`, `ScrollAreaBoth`.
+Used by today: immediate scopes and delayed scopes with an explicit state carrier expose paired `Action<Ui, TState>` overloads — `Frame`, `Id`, `Disabled`, `Panel`, `MenuBar`, `Menu`, `ContextMenu`, `ModalPopup`, `TabBar`, `Tab`, `TreeNode`, `ScrollArea`, `ScrollAreaBoth`. `Window` intentionally does not expose a `TState` overload today because window content is queued and rendered later.
 
 ## What's Available Where
 
@@ -95,7 +97,7 @@ Used by today: every scope that has an `Action<Ui>` overload also has a paired `
 | `Row` / `Column` / `FixedWidth` / `MaxWidth` | yes            | yes          | —                    |
 | `Disabled`                                   | yes            | yes          | yes                  |
 | `Frame`                                      | —              | yes          | yes                  |
-| `Window`                                     | —              | yes          | yes                  |
+| `Window`                                     | —              | yes          | —                    |
 | `Panel`                                      | —              | yes          | yes                  |
 | `MenuBar` / `Menu` / `ContextMenu`           | —              | yes          | yes                  |
 | `ModalPopup`                                 | —              | yes          | yes                  |
@@ -105,7 +107,8 @@ Used by today: every scope that has an `Action<Ui>` overload also has a paired `
 
 Two patterns to notice:
 
-- Layout primitives (`Row`, `Column`, `FixedWidth`, `MaxWidth`) are the only constructs that expose a handle but no `TState` lambda. They run inside hot per-row code, so the handle is the recommended shape; the `Action<Ui>` overload exists for short top-level layouts. A `TState` overload is unnecessary because users either reach for the handle (zero alloc) or write a one-off lambda.
+- Layout primitives (`Row`, `Column`, `FixedWidth`, `MaxWidth`) expose a handle but no `TState` lambda. They run inside hot per-row code, so the handle is the recommended shape; the `Action<Ui>` overload exists for short top-level layouts. A `TState` overload is unnecessary because users either reach for the handle (zero alloc) or write a one-off lambda.
+- `Window` exposes only `Action<Ui>` even though it is a scoped container. Its content is queued for later rendering, so a simple `Window<TState>` wrapper would capture `state` and defeat the allocation model. Add a `TState` overload only if the queued window request can carry state separately from the delegate, the way popup/menu/tab requests do.
 - Container widgets that also need to reason about returned `Response`, animation state, or popup wiring (`Window`, `Panel`, `Popup`, `TabBar`, `TreeNode`, `ScrollArea`) only expose the lambda forms. The lambda boundary is also where Vellum performs measurement passes, scroll virtualisation, and clipping; these would be awkward to bracket with a handle.
 
 ## Choosing Between the Forms
@@ -117,7 +120,7 @@ Two patterns to notice:
 | Need to assign to outer locals from inside the scope   | `using` handle (lambdas can't)      |
 | Need `ref` / `Span<T>` locals across the scope         | `using` handle                      |
 | Need to `return` / `break` / `continue` out            | `using` handle                      |
-| Construct only exposes lambda forms                    | `static` `TState` lambda when in a loop, plain lambda otherwise |
+| Construct only exposes lambda forms                    | `static` `TState` lambda when available and in a loop, plain lambda otherwise |
 
 The `using` handle should be presented as a first-class option, not as an advanced escape hatch — it is the only form that composes cleanly with `ref`, `Span<T>`, and ordinary control flow.
 
@@ -182,9 +185,10 @@ When introducing a new scoped construct, the default checklist is:
 1. Pick the verb-free name (`Foo`, not `BeginFoo`).
 2. Implement an internal `EnterFoo` / `ExitFoo` pair that mutates `Ui` state.
 3. If the scope is layout-like or runs inside hot loops, expose a `FooScopeHandle` (`ref struct`) and a public `FooScopeHandle Foo(...)` method. Otherwise skip the handle.
-4. Always expose `void Foo(..., Action<Ui> content)` and `void Foo<TState>(..., TState state, Action<Ui, TState> content)` overloads. The lambda forms route through the same `Enter` / `Exit` pair, wrapped in a `using` (or `try / finally`).
-5. Add XML docs that show the `static` shape on the `TState` overload — that is the form users should learn first.
-6. Do not add `BeginFoo` / `EndFoo` unless the scope genuinely needs to straddle host code, the way `Frame` does.
+4. Expose `void Foo(..., Action<Ui> content)` for normal callback usage.
+5. Add `void Foo<TState>(..., TState state, Action<Ui, TState> content)` only when the construct executes content immediately, or when delayed execution can store and replay the state without hidden closure allocation. Do not add a `TState` overload just by wrapping it in a capturing `Action<Ui>`.
+6. If a `TState` overload exists, add XML docs that show the `static` shape — that is the form users should learn first.
+7. Do not add `BeginFoo` / `EndFoo` unless the scope genuinely needs to straddle host code, the way `Frame` does.
 
 `Frame` itself does not follow step 2 — there is no internal `EnterFrame` / `ExitFrame` pair. `BeginFrame` and `EndFrame` are the exposed entry points that host loops use directly, and they do their work inline rather than routing through a private `Enter` / `Exit` pair. Treat that as the deliberate exception, not the model for new scopes.
 

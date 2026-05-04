@@ -24,14 +24,15 @@ public sealed partial class Ui
         public float MaxHeight;
         public bool IsModal;
         public bool Enabled;
-        public Action<Ui>? Content;
+        public bool ZeroItemSpacing;
+        public DeferredUiContent Content;
     }
 
     /// <summary>Marks a popup as open. The popup is rendered when declared with the same id.</summary>
-    public void OpenPopup(string id) => OpenPopupById(MakePopupId(id));
+    public void OpenPopup(UiId id) => OpenPopupById(MakePopupId(id));
 
     /// <summary>Closes the popup with the given id.</summary>
-    public void ClosePopup(string id) => ClosePopupById(MakePopupId(id));
+    public void ClosePopup(UiId id) => ClosePopupById(MakePopupId(id));
 
     /// <summary>Closes the popup currently being rendered and its descendants.</summary>
     public void CloseCurrentPopup()
@@ -45,10 +46,10 @@ public sealed partial class Ui
     public void CloseAllPopups() => _openPopupIds.Clear();
 
     /// <summary>Returns whether the popup with the given id is open.</summary>
-    public bool IsPopupOpen(string id) => IsPopupOpen(MakePopupId(id));
+    public bool IsPopupOpen(UiId id) => IsPopupOpen(MakePopupId(id));
 
     /// <summary>Gets the last known bounds of an open popup.</summary>
-    public bool TryGetPopupBounds(string id, out float x, out float y, out float width, out float height)
+    public bool TryGetPopupBounds(UiId id, out float x, out float y, out float width, out float height)
     {
         if (TryGetKnownPopupRect(MakePopupId(id), out var rect))
         {
@@ -89,29 +90,26 @@ public sealed partial class Ui
 
     /// <summary>Declares a popup anchored at an explicit position.</summary>
     public bool Popup(
-        string id,
+        UiId id,
         float anchorX,
         float anchorY,
         float width,
         float maxHeight,
         Action<Ui> content,
         bool enabled = true)
-        => QueuePopupRequest(MakePopupId(id), anchorX, anchorY, width, maxHeight, content, enabled, isModal: false, $"Popup \"{id}\"");
+        => QueuePopupRequest(MakePopupId(id), anchorX, anchorY, width, maxHeight, content, enabled, isModal: false, "Popup");
 
     /// <summary>Declares a modal popup centered in the viewport.</summary>
-    public bool ModalPopup(string id, float width, float maxHeight, Action<Ui> content, bool enabled = true)
-        => ModalPopup(id, width, maxHeight, new UiActionState(content), static (ui, state) => state.Content(ui), enabled);
+    public bool ModalPopup(UiId id, float width, float maxHeight, Action<Ui> content, bool enabled = true)
+        => QueuePopupRequest(MakePopupId(id), 0f, 0f, width, maxHeight, content, enabled, isModal: true, "ModalPopup");
 
-    /// <inheritdoc cref="ModalPopup(string, float, float, Action{Ui}, bool)" />
-    public bool ModalPopup<TState>(string id, float width, float maxHeight, TState state, Action<Ui, TState> content, bool enabled = true)
-    {
-        ArgumentNullException.ThrowIfNull(content);
-        return QueuePopupRequest(MakePopupId(id), 0f, 0f, width, maxHeight, popup => content(popup, state), enabled, isModal: true, $"ModalPopup \"{id}\"");
-    }
+    /// <inheritdoc cref="ModalPopup(UiId, float, float, Action{Ui}, bool)" />
+    public bool ModalPopup<TState>(UiId id, float width, float maxHeight, TState state, Action<Ui, TState> content, bool enabled = true)
+        => QueuePopupRequest(MakePopupId(id), 0f, 0f, width, maxHeight, state, content, enabled, isModal: true, "ModalPopup");
 
     /// <summary>Declares a popup anchored below a widget response.</summary>
     public bool Popup(
-        string id,
+        UiId id,
         Response anchor,
         float width,
         float maxHeight,
@@ -141,7 +139,72 @@ public sealed partial class Ui
         string diagnosticName)
     {
         ArgumentNullException.ThrowIfNull(content);
+        if (!TryPreparePopupRequest(popupId, enabled, isModal, diagnosticName, out int depth))
+            return false;
 
+        StorePopupRequest(
+            depth,
+            popupId,
+            anchorX,
+            anchorY,
+            width,
+            maxHeight,
+            isModal,
+            zeroItemSpacing: false,
+            DeferredUiContent.Create(content));
+        return true;
+    }
+
+    private bool Popup<TState>(
+        int popupId,
+        float anchorX,
+        float anchorY,
+        float width,
+        float maxHeight,
+        TState state,
+        Action<Ui, TState> content,
+        bool enabled = true,
+        bool zeroItemSpacing = false)
+        => QueuePopupRequest(popupId, anchorX, anchorY, width, maxHeight, state, content, enabled, isModal: false, "Popup", zeroItemSpacing);
+
+    private bool QueuePopupRequest<TState>(
+        int popupId,
+        float anchorX,
+        float anchorY,
+        float width,
+        float maxHeight,
+        TState state,
+        Action<Ui, TState> content,
+        bool enabled,
+        bool isModal,
+        string diagnosticName,
+        bool zeroItemSpacing = false)
+    {
+        ArgumentNullException.ThrowIfNull(content);
+        if (!TryPreparePopupRequest(popupId, enabled, isModal, diagnosticName, out int depth))
+            return false;
+
+        StorePopupRequest(
+            depth,
+            popupId,
+            anchorX,
+            anchorY,
+            width,
+            maxHeight,
+            isModal,
+            zeroItemSpacing,
+            DeferredUiContent.Create(state, content));
+        return true;
+    }
+
+    private bool TryPreparePopupRequest(
+        int popupId,
+        bool enabled,
+        bool isModal,
+        string diagnosticName,
+        out int depth)
+    {
+        depth = 0;
         if (!IsPopupOpen(popupId)) return false;
 
         if (!enabled)
@@ -150,7 +213,7 @@ public sealed partial class Ui
             return false;
         }
 
-        int depth = _popupContext.Count;
+        depth = _popupContext.Count;
         if (!CanQueuePopupRequest(popupId, depth))
             return false;
 
@@ -159,6 +222,20 @@ public sealed partial class Ui
         if (isModal)
             _modalPopupIdsCurrent.Add(popupId);
 
+        return true;
+    }
+
+    private void StorePopupRequest(
+        int depth,
+        int popupId,
+        float anchorX,
+        float anchorY,
+        float width,
+        float maxHeight,
+        bool isModal,
+        bool zeroItemSpacing,
+        DeferredUiContent content)
+    {
         _popupRequestsByDepth[depth] = new PopupRequest
         {
             PopupId = popupId,
@@ -168,9 +245,9 @@ public sealed partial class Ui
             MaxHeight = maxHeight,
             IsModal = isModal,
             Enabled = true,
+            ZeroItemSpacing = zeroItemSpacing,
             Content = content
         };
-        return true;
     }
 
     private void PreparePopupFrame()
@@ -323,7 +400,7 @@ public sealed partial class Ui
 
     private void RenderPopupRequest(PopupRequest request, int depth)
     {
-        if (request.Content == null || depth >= _openPopupIds.Count || _openPopupIds[depth] != request.PopupId)
+        if (!request.Content.HasContent || depth >= _openPopupIds.Count || _openPopupIds[depth] != request.PopupId)
             return;
 
         var state = GetState<PopupState>(request.PopupId);
@@ -442,7 +519,10 @@ public sealed partial class Ui
         LayoutScope inner;
         try
         {
-            request.Content(this);
+            if (request.ZeroItemSpacing)
+                ItemSpacing(0);
+
+            request.Content.Invoke(this);
             inner = _layouts[^1];
         }
         finally

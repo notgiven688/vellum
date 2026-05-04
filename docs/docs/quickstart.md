@@ -121,6 +121,20 @@ ui.Button("Save", id: "save-primary");
 ui.Button("Save", id: "save-secondary");
 ```
 
+Containers that do not have visible labels take an explicit typed ID as their first argument:
+
+```csharp
+ui.ScrollArea(item.Id, width: 260f, height: 180f, area =>
+{
+    area.Label(item.Name);
+});
+
+ui.TabBar("workspace-tabs", tabs =>
+{
+    tabs.Tab("Overview", tab => tab.Label("Summary"));
+});
+```
+
 Debug builds throw when two widgets resolve to the same ID in one frame, so duplicate labels are caught early.
 
 ## Windows

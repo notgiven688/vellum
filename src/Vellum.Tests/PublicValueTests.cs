@@ -64,6 +64,91 @@ public sealed class PublicValueTests
     }
 
     [Fact]
+    public void UiId_ExplicitIdContainers_Accept_Typed_Ids()
+    {
+        var renderer = new UiTestRenderer();
+        var ui = UiTestSupport.CreateUi(renderer);
+
+        bool popupRendered = false;
+        ui.OpenPopup(17);
+
+        ui.Frame(320, 240, Vector2.Zero, false, frame =>
+        {
+            frame.ScrollArea(1, 80, 42, area => area.Label("Vertical"));
+            frame.ScrollAreaBoth(2L, 80, 42, area => area.Label("Both"));
+            frame.TabBar(3UL, tabs => tabs.Tab("One", tab => tab.Label("Selected")));
+            frame.ContextMenu(4, default, menu => menu.Label("Context"));
+            popupRendered = frame.Popup(17, 10, 10, 120, 80, popup => popup.Label("Popup"));
+        });
+
+        Assert.True(popupRendered);
+        Assert.True(ui.IsPopupOpen(17));
+        Assert.True(ui.TryGetPopupBounds(17, out _, out _, out _, out _));
+
+        ui.ClosePopup(17);
+
+        Assert.False(ui.IsPopupOpen(17));
+        Assert.Throws<ArgumentException>(() => ui.OpenPopup(default(UiId)));
+    }
+
+    [Fact]
+    public void Ui_StateOverloads_Accept_Static_Content_For_Delayed_Containers()
+    {
+        var renderer = new UiTestRenderer();
+        var ui = UiTestSupport.CreateUi(renderer);
+        int[] modalCount = [0];
+        int[] contextCount = [0];
+        int[] menuCount = [0];
+        int[] tabCount = [0];
+
+        ui.OpenPopup(10);
+        ui.Frame(320, 240, Vector2.Zero, false, frame =>
+        {
+            frame.ModalPopup(10, 120, 80, modalCount, static (popup, count) =>
+            {
+                count[0]++;
+                popup.Label("Modal");
+            });
+        });
+
+        ui.OpenPopup(20);
+        ui.Frame(320, 240, Vector2.Zero, false, frame =>
+        {
+            frame.ContextMenu(20, default, contextCount, static (popup, count) =>
+            {
+                count[0]++;
+                popup.Label("Context");
+            });
+        });
+
+        ui.Frame(320, 240, Vector2.Zero, false, frame =>
+        {
+            frame.MenuBar(menuCount, static (bar, count) =>
+            {
+                bar.Menu("File", count, static (popup, count) =>
+                {
+                    count[0]++;
+                    popup.Label("Open");
+                });
+            });
+
+            frame.TabBar(30, tabCount, static (tabs, count) =>
+            {
+                tabs.Tab("One", count, static (tab, count) =>
+                {
+                    count[0]++;
+                    tab.Label("Tab");
+                });
+            });
+        });
+
+        Assert.Equal(1, modalCount[0]);
+        Assert.True(contextCount[0] >= 1);
+        Assert.Equal(0, menuCount[0]);
+        Assert.Equal(1, tabCount[0]);
+    }
+
+    [Fact]
     public void ThemePresets_Return_Independent_Instances()
     {
         Theme darkA = ThemePresets.Dark();

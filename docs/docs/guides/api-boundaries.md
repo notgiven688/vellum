@@ -7,6 +7,8 @@ Vellum keeps three public API areas. New public types should fit one of these ar
 The user API is the surface application code uses to build interfaces:
 
 - `Ui`
+- `UiId`
+- `UiWidgetKind`
 - `Response`
 - `WindowState`
 - `UiCanvas`
