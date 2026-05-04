@@ -87,7 +87,7 @@ ui.Window("Inspector", inspectorWindow, 320f, selected, static (w, sel) =>
 - A `TState` overload is only worth publishing when the construct can pass that state through without hiding a closure allocation. Consistency overloads that internally do `ui => content(ui, state)` are misleading and should not be added.
 - Delayed constructs that expose `TState` must store the content delegate and state separately in the queued request. Vellum uses an internal type-erased deferred-content carrier for this in window/popup/menu/tab paths. That removes the hidden closure/delegate wrapper; value-type state may still box when it is stored in a delayed request.
 
-Used by today: immediate scopes and delayed scopes with an explicit state carrier expose paired `Action<Ui, TState>` overloads — `Frame`, `Id`, `Disabled`, `Window`, `Panel`, `MenuBar`, `Menu`, `ContextMenu`, `ModalPopup`, `TabBar`, `Tab`, `TreeNode`, `ScrollArea`, `ScrollAreaBoth`.
+Used by today: immediate scopes and delayed scopes with an explicit state carrier expose paired `Action<Ui, TState>` overloads — `Frame`, `Id`, `Disabled`, `Window`, `Panel`, `MenuBar`, `Menu`, `ContextMenu`, `Popup`, `ModalPopup`, `TabBar`, `Tab`, `TreeNode`, `ScrollArea`, `ScrollAreaBoth`.
 
 ## What's Available Where
 
@@ -100,6 +100,7 @@ Used by today: immediate scopes and delayed scopes with an explicit state carrie
 | `Window`                                     | —              | yes          | yes                  |
 | `Panel`                                      | —              | yes          | yes                  |
 | `MenuBar` / `Menu` / `ContextMenu`           | —              | yes          | yes                  |
+| `Popup`                                      | —              | yes          | yes                  |
 | `ModalPopup`                                 | —              | yes          | yes                  |
 | `TabBar` / `Tab`                             | —              | yes          | yes                  |
 | `TreeNode`                                   | —              | yes          | yes                  |
@@ -108,7 +109,7 @@ Used by today: immediate scopes and delayed scopes with an explicit state carrie
 Two patterns to notice:
 
 - Layout primitives (`Row`, `Column`, `FixedWidth`, `MaxWidth`) expose a handle but no `TState` lambda. They run inside hot per-row code, so the handle is the recommended shape; the `Action<Ui>` overload exists for short top-level layouts. A `TState` overload is unnecessary because users either reach for the handle (zero alloc) or write a one-off lambda.
-- Queued scopes (`Window`, `Menu`, `ContextMenu`, `ModalPopup`, selected `Tab` content) expose `TState` only because their queued request carries the content delegate and state separately. Do not add a delayed `TState` overload by wrapping it in a capturing `Action<Ui>`.
+- Queued scopes (`Window`, `Menu`, `ContextMenu`, `Popup`, `ModalPopup`, selected `Tab` content) expose `TState` only because their queued request carries the content delegate and state separately. Do not add a delayed `TState` overload by wrapping it in a capturing `Action<Ui>`.
 - Container widgets that also need to reason about returned `Response`, animation state, or popup wiring (`Window`, `Panel`, `Popup`, `TabBar`, `TreeNode`, `ScrollArea`) only expose the lambda forms. The lambda boundary is also where Vellum performs measurement passes, scroll virtualisation, and clipping; these would be awkward to bracket with a handle.
 
 ## Choosing Between the Forms

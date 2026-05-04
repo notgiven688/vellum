@@ -99,6 +99,18 @@ public sealed partial class Ui
         bool enabled = true)
         => QueuePopupRequest(MakePopupId(id), anchorX, anchorY, width, maxHeight, content, enabled, isModal: false, "Popup");
 
+    /// <inheritdoc cref="Popup(UiId, float, float, float, float, Action{Ui}, bool)" />
+    public bool Popup<TState>(
+        UiId id,
+        float anchorX,
+        float anchorY,
+        float width,
+        float maxHeight,
+        TState state,
+        Action<Ui, TState> content,
+        bool enabled = true)
+        => QueuePopupRequest(MakePopupId(id), anchorX, anchorY, width, maxHeight, state, content, enabled, isModal: false, "Popup");
+
     /// <summary>Declares a modal popup centered in the viewport.</summary>
     public bool ModalPopup(UiId id, float width, float maxHeight, Action<Ui> content, bool enabled = true)
         => QueuePopupRequest(MakePopupId(id), 0f, 0f, width, maxHeight, content, enabled, isModal: true, "ModalPopup");
@@ -116,6 +128,17 @@ public sealed partial class Ui
         Action<Ui> content,
         bool enabled = true)
         => Popup(id, anchor.X, anchor.Y + anchor.H, width, maxHeight, content, enabled);
+
+    /// <inheritdoc cref="Popup(UiId, Response, float, float, Action{Ui}, bool)" />
+    public bool Popup<TState>(
+        UiId id,
+        Response anchor,
+        float width,
+        float maxHeight,
+        TState state,
+        Action<Ui, TState> content,
+        bool enabled = true)
+        => Popup(id, anchor.X, anchor.Y + anchor.H, width, maxHeight, state, content, enabled);
 
     private bool Popup(
         int popupId,
