@@ -36,35 +36,40 @@ var ui = new Ui(renderer)
     Theme = ThemePresets.Dark()
 };
 
-int clicks = 0;
+var state = new AppState();
 
 while (app.Running)
 {
     Vector2 mousePos = app.MousePosition;
     UiInputState input = app.UiInput;
 
-    ui.Frame(app.Width, app.Height, mousePos, input, root =>
+    ui.Frame(app.Width, app.Height, mousePos, input, state, static (root, state) =>
     {
         root.FillViewport(root.Theme.SurfaceBg);
 
-        root.MaxWidth(420f, content =>
+        using (root.MaxWidth(420f, UiAlign.Center))
         {
-            content.Panel(content.AvailableWidth, panel =>
+            root.Panel(root.AvailableWidth, state, static (panel, state) =>
             {
                 panel.Heading("Hello");
                 panel.Label("Vellum is immediate-mode.");
                 panel.Spacing(8f);
 
                 if (panel.Button("Increment").Clicked)
-                    clicks++;
+                    state.Clicks++;
 
-                panel.Label($"Clicks: {clicks}");
+                panel.Label($"Clicks: {state.Clicks}");
             });
-        }, align: UiAlign.Center);
+        }
     });
 
     bool wantsMouse = ui.WantsCaptureMouse;
     bool wantsKeyboard = ui.WantsCaptureKeyboard;
+}
+
+sealed class AppState
+{
+    public int Clicks;
 }
 ```
 
@@ -113,7 +118,7 @@ dotnet build src/vellum.slnx
 Run the default OpenTK demo:
 
 ```bash
-dotnet run --project Vellum.Demo
+dotnet run --project src/Vellum.Demo/Vellum.Demo.csproj
 ```
 
 ## Acknowledgements

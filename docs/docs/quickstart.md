@@ -137,6 +137,17 @@ ui.TabBar("workspace-tabs", tabs =>
 
 Debug builds throw when two widgets resolve to the same ID in one frame, so duplicate labels are caught early.
 
+When a callback would otherwise capture application state, prefer the state overload with a `static` lambda:
+
+```csharp
+ui.Window("Inspector", inspector, 360f, selectedEntity, static (body, entity) =>
+{
+    body.Label(entity.Name);
+});
+```
+
+See [API Style](guides/api-style.md) for the full identity and scope model.
+
 ## Windows
 
 Windows keep runtime position, size, collapse, and close state in a `WindowState` value owned by your application.
@@ -156,7 +167,7 @@ ui.Frame(width, height, mouse, input, root =>
 });
 ```
 
-Use the state overload when window content should avoid capturing app state:
+The same window can use the state overload when its content should avoid capturing app state:
 
 ```csharp
 root.Window("Inspector", inspector, 360f, selectedEntity, static (body, entity) =>

@@ -6,6 +6,7 @@ Start with the [Quickstart](quickstart.md) for small, working examples of the ma
 
 Use the other guides when you need a specific topic:
 
+- [API Style](guides/api-style.md) explains widget identity, explicit IDs, `using` scopes, and `static` state callbacks.
 - [Text and Fonts](guides/text-and-fonts.md) explains the built-in text renderer, custom fonts, wrapping, clipping, and known text limitations.
 - [Backend Implementation](guides/backends.md) explains how to implement `IRenderer`.
 - The API section contains generated reference documentation from the public XML comments.
