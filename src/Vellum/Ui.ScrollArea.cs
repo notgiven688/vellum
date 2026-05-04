@@ -38,13 +38,14 @@ public sealed partial class Ui
     }
 
     /// <summary>Draws a vertical scroll area.</summary>
-    public Response ScrollArea(string id, float width, float height, Action<Ui> content, bool enabled = true)
+    public Response ScrollArea(UiId id, float width, float height, Action<Ui> content, bool enabled = true)
     {
         enabled = ResolveEnabled(enabled);
         const float ScrollbarGap = 4f;
 
-        int widgetId = MakeWidgetId(UiWidgetKind.ScrollArea, id.AsSpan());
-        RegisterWidgetId(widgetId, $"ScrollArea \"{id}\"");
+        id = RequireSpecifiedId(id, nameof(id));
+        int widgetId = MakeWidgetId(UiWidgetKind.ScrollArea, id);
+        RegisterWidgetId(widgetId, "ScrollArea");
         var state = GetState<ScrollAreaState>(widgetId);
         var (x, y) = Place(width, height);
         float border = FrameBorderWidth;
@@ -218,14 +219,19 @@ public sealed partial class Ui
             disabled: !enabled);
     }
 
-    /// <inheritdoc cref="ScrollArea(string, float, float, Action{Ui}, bool)" />
-    public Response ScrollArea<TState>(string id, float width, float height, TState contentState, Action<Ui, TState> content, bool enabled = true)
+    /// <summary>Draws a vertical scroll area with explicit state passed to the content callback.</summary>
+    /// <remarks>
+    /// Use this overload with a <c>static</c> lambda to avoid capturing
+    /// application state while rendering scroll area content.
+    /// </remarks>
+    public Response ScrollArea<TState>(UiId id, float width, float height, TState contentState, Action<Ui, TState> content, bool enabled = true)
     {
         enabled = ResolveEnabled(enabled);
         const float ScrollbarGap = 4f;
 
-        int widgetId = MakeWidgetId(UiWidgetKind.ScrollArea, id.AsSpan());
-        RegisterWidgetId(widgetId, $"ScrollArea \"{id}\"");
+        id = RequireSpecifiedId(id, nameof(id));
+        int widgetId = MakeWidgetId(UiWidgetKind.ScrollArea, id);
+        RegisterWidgetId(widgetId, "ScrollArea");
         var state = GetState<ScrollAreaState>(widgetId);
         var (x, y) = Place(width, height);
         float border = FrameBorderWidth;
@@ -400,19 +406,24 @@ public sealed partial class Ui
     }
 
     /// <summary>Draws a scroll area with horizontal and vertical scrolling.</summary>
-    public Response ScrollAreaBoth(string id, float width, float height, Action<Ui> content, bool enabled = true)
+    public Response ScrollAreaBoth(UiId id, float width, float height, Action<Ui> content, bool enabled = true)
         => ScrollAreaBothCore(id, width, height, content, static (ui, callback) => callback(ui), enabled);
 
-    /// <inheritdoc cref="ScrollAreaBoth(string, float, float, Action{Ui}, bool)" />
-    public Response ScrollAreaBoth<TState>(string id, float width, float height, TState contentState, Action<Ui, TState> content, bool enabled = true)
+    /// <summary>Draws a both-axis scroll area with explicit state passed to the content callback.</summary>
+    /// <remarks>
+    /// Use this overload with a <c>static</c> lambda to avoid capturing
+    /// application state while rendering scroll area content.
+    /// </remarks>
+    public Response ScrollAreaBoth<TState>(UiId id, float width, float height, TState contentState, Action<Ui, TState> content, bool enabled = true)
         => ScrollAreaBothCore(id, width, height, contentState, content, enabled);
 
-    private Response ScrollAreaBothCore<TState>(string id, float width, float height, TState contentState, Action<Ui, TState> content, bool enabled)
+    private Response ScrollAreaBothCore<TState>(UiId id, float width, float height, TState contentState, Action<Ui, TState> content, bool enabled)
     {
         enabled = ResolveEnabled(enabled);
 
-        int widgetId = MakeWidgetId(UiWidgetKind.ScrollAreaBoth, id.AsSpan());
-        RegisterWidgetId(widgetId, $"ScrollAreaBoth \"{id}\"");
+        id = RequireSpecifiedId(id, nameof(id));
+        int widgetId = MakeWidgetId(UiWidgetKind.ScrollAreaBoth, id);
+        RegisterWidgetId(widgetId, "ScrollAreaBoth");
         var state = GetState<ScrollAreaState>(widgetId);
         var (x, y) = Place(width, height);
         float border = FrameBorderWidth;

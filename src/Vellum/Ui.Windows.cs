@@ -32,7 +32,7 @@ public sealed partial class Ui
         public bool Resizable;
         public bool Closable;
         public bool Header;
-        public Action<Ui>? Content;
+        public DeferredUiContent Content;
     }
 
     private enum WindowTitleIcon { Collapse, Expand, Close }
@@ -41,15 +41,84 @@ public sealed partial class Ui
     public Response Window(string title, WindowState state, float width, Action<Ui> content,
         bool resizable = false, bool closable = true, bool header = true, UiId? id = null)
     {
-        ArgumentNullException.ThrowIfNull(state);
         ArgumentNullException.ThrowIfNull(content);
 
-        int windowId = MakeWidgetId(UiWidgetKind.Window, ResolveWidgetId(id, title));
+        if (!TryPrepareWindowRequest(title, state, width, resizable, id, out int windowId, out float effectiveWidth, out var response))
+            return response;
+
+        StoreWindowRequest(
+            windowId,
+            title,
+            state,
+            effectiveWidth,
+            resizable,
+            closable,
+            header,
+            DeferredUiContent.Create(content));
+        return response;
+    }
+
+    /// <summary>Declares a floating window with explicit state passed to the content callback.</summary>
+    /// <remarks>
+    /// Use this overload with a <c>static</c> lambda to avoid capturing
+    /// application state in window content.
+    /// </remarks>
+    /// <example>
+    /// <code>
+    /// ui.Window("Inspector", inspectorWindow, 320f, selected, static (window, selected) =>
+    /// {
+    ///     window.Label(selected.Name);
+    /// });
+    /// </code>
+    /// </example>
+    public Response Window<TState>(
+        string title,
+        WindowState state,
+        float width,
+        TState contentState,
+        Action<Ui, TState> content,
+        bool resizable = false,
+        bool closable = true,
+        bool header = true,
+        UiId? id = null)
+    {
+        ArgumentNullException.ThrowIfNull(content);
+
+        if (!TryPrepareWindowRequest(title, state, width, resizable, id, out int windowId, out float effectiveWidth, out var response))
+            return response;
+
+        StoreWindowRequest(
+            windowId,
+            title,
+            state,
+            effectiveWidth,
+            resizable,
+            closable,
+            header,
+            DeferredUiContent.Create(contentState, content));
+        return response;
+    }
+
+    private bool TryPrepareWindowRequest(
+        string title,
+        WindowState state,
+        float width,
+        bool resizable,
+        UiId? id,
+        out int windowId,
+        out float effectiveWidth,
+        out Response response)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+
+        windowId = MakeWidgetId(UiWidgetKind.Window, ResolveWidgetId(id, title));
         RegisterWidgetId(windowId, $"Window \"{title}\"");
         EnsureWindowOrder(windowId);
 
+        effectiveWidth = 0f;
+        response = default;
         if (!state.Open)
-            return default;
+            return false;
 
         var runtime = GetWindowRuntimeState(windowId);
         if (!runtime.Initialized)
@@ -73,8 +142,28 @@ public sealed partial class Ui
         }
 
         state.Position = runtime.Position;
-        float effectiveWidth = resizable && state.Size.X > 0 ? state.Size.X : width;
+        effectiveWidth = resizable && state.Size.X > 0 ? state.Size.X : width;
         runtime.Width = MathF.Max(0, effectiveWidth);
+        if (TryGetWindowRect(windowId, out var rect))
+        {
+            response = new Response(rect.X, rect.Y, rect.W, rect.H, PointInRect(rect, _mouse), false, false);
+            return true;
+        }
+
+        response = new Response(runtime.Position.X, runtime.Position.Y, runtime.Width, 0, false, false, false);
+        return true;
+    }
+
+    private void StoreWindowRequest(
+        int windowId,
+        string title,
+        WindowState state,
+        float effectiveWidth,
+        bool resizable,
+        bool closable,
+        bool header,
+        DeferredUiContent content)
+    {
         _windowRequests[windowId] = new WindowRequest
         {
             WindowId = windowId,
@@ -86,11 +175,6 @@ public sealed partial class Ui
             Header = header,
             Content = content
         };
-
-        if (TryGetWindowRect(windowId, out var rect))
-            return new Response(rect.X, rect.Y, rect.W, rect.H, PointInRect(rect, _mouse), false, false);
-
-        return new Response(runtime.Position.X, runtime.Position.Y, runtime.Width, 0, false, false, false);
     }
 
     private void PrepareWindowFrame()
@@ -217,7 +301,7 @@ public sealed partial class Ui
 
     private void RenderWindowRequest(WindowRequest request)
     {
-        if (request.Content == null || !request.State.Open)
+        if (!request.Content.HasContent || !request.State.Open)
             return;
 
         var runtime = GetWindowRuntimeState(request.WindowId);
@@ -398,7 +482,7 @@ public sealed partial class Ui
 
             try
             {
-                request.Content(this);
+                request.Content.Invoke(this);
 
                 var inner = _layouts[^1];
                 passContentHeight = inner.Dir == LayoutDir.Horizontal

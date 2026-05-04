@@ -17,27 +17,32 @@ public sealed partial class Ui
         public float ActiveTabLeft;
         public float ActiveTabRight;
         public float HeaderBottom;
-        public Action<Ui>? SelectedContent;
+        public DeferredUiContent SelectedContent;
     }
 
     private readonly Stack<TabBarContext> _tabBarContexts = new();
 
     /// <summary>Starts a tab bar and renders the selected tab content.</summary>
-    public Response TabBar(string id, Action<Ui> content)
+    public Response TabBar(UiId id, Action<Ui> content)
         => TabBar(id, new UiActionState(content), static (ui, state) => state.Content(ui));
 
-    /// <inheritdoc cref="TabBar(string, Action{Ui})" />
-    public Response TabBar<TState>(string id, TState state, Action<Ui, TState> content)
+    /// <summary>Starts a tab bar with explicit state passed to the tab declaration callback.</summary>
+    /// <remarks>
+    /// Use this overload with a <c>static</c> lambda to avoid capturing
+    /// application state while declaring tabs.
+    /// </remarks>
+    public Response TabBar<TState>(UiId id, TState state, Action<Ui, TState> content)
     {
         ArgumentNullException.ThrowIfNull(content);
 
-        int widgetId = MakeWidgetId(UiWidgetKind.TabBar, id.AsSpan());
-        RegisterWidgetId(widgetId, $"TabBar \"{id}\"");
+        id = RequireSpecifiedId(id, nameof(id));
+        int widgetId = MakeWidgetId(UiWidgetKind.TabBar, id);
+        RegisterWidgetId(widgetId, "TabBar");
         var tabState = GetState<TabBarState>(widgetId);
         float availableWidth = AvailableWidth;
 
         var ctx = new TabBarContext { State = tabState };
-        EnterIdScope(id.AsSpan());
+        EnterIdScope(id);
         _tabBarContexts.Push(ctx);
 
         var (rowX, rowY) = Place(0, 0);
@@ -70,8 +75,8 @@ public sealed partial class Ui
             }
         }
 
-        if (ctx.SelectedContent != null)
-            ctx.SelectedContent(this);
+        if (ctx.SelectedContent.HasContent)
+            ctx.SelectedContent.Invoke(this);
 
         return new Response(
             rowX,
@@ -87,7 +92,12 @@ public sealed partial class Ui
     public Response Tab(string label, Action<Ui> content, UiId? id = null)
         => Tab(label, new UiActionState(content), static (ui, state) => state.Content(ui), id);
 
-    /// <inheritdoc cref="Tab(string, Action{Ui}, UiId?)" />
+    /// <summary>Declares a tab with explicit state passed to the selected-tab content callback.</summary>
+    /// <remarks>
+    /// Selected tab content may be rendered after the tab row is declared. Use
+    /// this overload with a <c>static</c> lambda to avoid capturing application
+    /// state in that delayed content.
+    /// </remarks>
     public Response Tab<TState>(string label, TState state, Action<Ui, TState> content, UiId? id = null)
     {
         ArgumentNullException.ThrowIfNull(content);
@@ -159,7 +169,7 @@ public sealed partial class Ui
             ctx.HasActiveTab = true;
             ctx.ActiveTabLeft = x;
             ctx.ActiveTabRight = x + w;
-            ctx.SelectedContent = ui => content(ui, state);
+            ctx.SelectedContent = DeferredUiContent.Create(state, content);
         }
 
         return new Response(x, y, w, h, hover, pressed, clicked, focused: focused, changed: changed);

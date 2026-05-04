@@ -203,6 +203,17 @@ public enum UiWidgetKind
 /// Immediate-mode GUI context. Layout scopes are opened with lambdas
 /// (Row / Column), widgets are methods that return a Response.
 /// </summary>
+/// <remarks>
+/// Application code redraws the UI every frame from application-owned state.
+/// Vellum keeps internal widget state, such as focus, scrolling, active text
+/// edits, selected tabs, and window positions, by stable widget identity.
+/// Visible widgets derive identity from their label and current ID scope.
+/// Repeated rows should use <see cref="Id(int)"/>, <see cref="Id(long)"/>,
+/// <see cref="Id(ulong)"/>, <see cref="Id(Guid)"/>, or a string ID scope.
+/// Widgets with duplicate visible labels can use their <c>id:</c> parameter.
+/// Unlabelled containers such as popups, tab bars, and scroll areas take an
+/// explicit <see cref="UiId"/>.
+/// </remarks>
 public sealed partial class Ui : IDisposable
 {
     private enum LayoutDir { Vertical, Horizontal }
@@ -242,6 +253,55 @@ public sealed partial class Ui : IDisposable
             Border = border;
             Foreground = foreground;
         }
+    }
+
+    private readonly struct DeferredUiContent
+    {
+        private static readonly Action<Ui, object?, object?> InvokeActionContent = InvokeAction;
+
+        private readonly object? _content;
+        private readonly object? _state;
+        private readonly Action<Ui, object?, object?>? _invoke;
+
+        private DeferredUiContent(object? content, object? state, Action<Ui, object?, object?> invoke)
+        {
+            _content = content;
+            _state = state;
+            _invoke = invoke;
+        }
+
+        public bool HasContent => _invoke != null;
+
+        public static DeferredUiContent Create(Action<Ui> content)
+        {
+            ArgumentNullException.ThrowIfNull(content);
+            return new DeferredUiContent(content, null, InvokeActionContent);
+        }
+
+        public static DeferredUiContent Create<TState>(TState state, Action<Ui, TState> content)
+        {
+            ArgumentNullException.ThrowIfNull(content);
+            return new DeferredUiContent(content, state, DeferredUiContentInvoker<TState>.Invoke);
+        }
+
+        public void Invoke(Ui ui)
+        {
+            if (_invoke == null)
+                throw new InvalidOperationException("Deferred UI content was not initialized.");
+
+            _invoke(ui, _content, _state);
+        }
+
+        private static void InvokeAction(Ui ui, object? content, object? state)
+            => ((Action<Ui>)content!)(ui);
+    }
+
+    private static class DeferredUiContentInvoker<TState>
+    {
+        public static readonly Action<Ui, object?, object?> Invoke = InvokeContent;
+
+        private static void InvokeContent(Ui ui, object? content, object? state)
+            => ((Action<Ui, TState>)content!)(ui, (TState)state!);
     }
 
     private readonly struct ClipRect
@@ -960,6 +1020,14 @@ public sealed partial class Ui : IDisposable
 
     private static bool HasSpecifiedId(UiId? id) => id.HasValue && id.Value.IsSpecified;
 
+    private static UiId RequireSpecifiedId(UiId id, string parameterName)
+    {
+        if (!id.IsSpecified)
+            throw new ArgumentException("A non-default UiId is required.", parameterName);
+
+        return id;
+    }
+
     private static UiId ResolveWidgetId(UiId? id, string fallback)
         => HasSpecifiedId(id) ? id!.Value : UiId.FromString(fallback);
 
@@ -970,6 +1038,8 @@ public sealed partial class Ui : IDisposable
         => HashMix(HashMix(CurrentIdSeed, UiId.HashInt((int)kind)), id.Hash);
 
     private int MakePopupId(ReadOnlySpan<char> id) => MakeWidgetId(UiWidgetKind.Popup, id);
+
+    private int MakePopupId(UiId id) => MakeWidgetId(UiWidgetKind.Popup, RequireSpecifiedId(id, nameof(id)));
 
     private int MakeId(int value) => HashMix(CurrentIdSeed, UiId.HashInt(value));
 

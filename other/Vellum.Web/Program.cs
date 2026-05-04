@@ -195,7 +195,14 @@ static void DrawRoot(Ui root, DemoFrameContext context)
             (State: state, WideLayout: wideLayout, CheckerTexture: context.CheckerTexture),
             static (body, bodyContext) => DrawBody(body, bodyContext.State, bodyContext.WideLayout, bodyContext.CheckerTexture));
 
-        root.Window("Inspector", state.InspectorWindow, 280, window => DrawInspector(window, state), resizable: true, id: "inspector");
+        root.Window(
+            "Inspector",
+            state.InspectorWindow,
+            280,
+            state,
+            static (window, state) => DrawInspector(window, state),
+            resizable: true,
+            id: "inspector");
         root.Popup("quickMenu", state.QuickMenuButton, 220, 180, popup => DrawQuickMenu(popup, state));
     }
 
@@ -1081,7 +1088,14 @@ static void RunHeadlessBench()
     Bench("inspector window only",        static (root, context) =>
     {
         context.State.InspectorWindow.Open = true;
-        root.Window("Inspector", context.State.InspectorWindow, 280, w => DrawInspector(w, context.State), resizable: true, id: "inspector");
+        root.Window(
+            "Inspector",
+            context.State.InspectorWindow,
+            280,
+            context.State,
+            static (window, state) => DrawInspector(window, state),
+            resizable: true,
+            id: "inspector");
     });
     Bench("full DrawRoot",                static (root, context) => DrawRoot(root, context));
 

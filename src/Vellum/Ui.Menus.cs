@@ -12,6 +12,7 @@ public sealed partial class Ui
 
         public UiActionState(Action<Ui> content)
         {
+            ArgumentNullException.ThrowIfNull(content);
             Content = content;
         }
     }
@@ -24,11 +25,19 @@ public sealed partial class Ui
     public Response MenuBar(float width, Action<Ui> content)
         => MenuBar(width, new UiActionState(content), static (ui, state) => state.Content(ui));
 
-    /// <inheritdoc cref="MenuBar(Action{Ui})" />
+    /// <summary>Draws a menu bar using the current available width with explicit state passed to the content callback.</summary>
+    /// <remarks>
+    /// Use this overload with a <c>static</c> lambda to avoid capturing
+    /// application state while declaring menu bar content.
+    /// </remarks>
     public Response MenuBar<TState>(TState state, Action<Ui, TState> content)
         => MenuBar(AvailableWidth, state, content);
 
-    /// <inheritdoc cref="MenuBar(float, Action{Ui})" />
+    /// <summary>Draws a menu bar with an explicit width and explicit state passed to the content callback.</summary>
+    /// <remarks>
+    /// Use this overload with a <c>static</c> lambda to avoid capturing
+    /// application state while declaring menu bar content.
+    /// </remarks>
     public Response MenuBar<TState>(float width, TState state, Action<Ui, TState> content)
     {
         ArgumentNullException.ThrowIfNull(content);
@@ -114,7 +123,12 @@ public sealed partial class Ui
             openToSide,
             id);
 
-    /// <inheritdoc cref="Menu(string, Action{Ui}, float?, float?, float?, float, bool, bool, bool, UiId?)" />
+    /// <summary>Draws a menu item whose popup content receives explicit state.</summary>
+    /// <remarks>
+    /// Menu popup content is queued for later rendering. Use this overload with
+    /// a <c>static</c> lambda to avoid capturing application state in that
+    /// delayed content.
+    /// </remarks>
     public Response Menu<TState>(
         string label,
         TState state,
@@ -301,11 +315,7 @@ public sealed partial class Ui
                 float popupAnchorX = ResolveMenuPopupAnchorX(!sidePopup, x, resolvedWidth, resolvedPopupWidth);
                 float popupAnchorY = sidePopup ? y : y + resolvedHeight;
 
-                Popup(popupWidgetId, popupAnchorX, popupAnchorY, resolvedPopupWidth, maxPopupHeight, popup =>
-                {
-                    popup.ItemSpacing(0);
-                    content(popup, state);
-                }, enabled);
+                Popup(popupWidgetId, popupAnchorX, popupAnchorY, resolvedPopupWidth, maxPopupHeight, state, content, enabled, zeroItemSpacing: true);
             }
         }
 

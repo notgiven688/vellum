@@ -29,7 +29,11 @@ public sealed partial class Ui
             selected,
             id);
 
-    /// <inheritdoc cref="TreeNode(string, Action{Ui}, float?, bool, bool, bool, UiId?)" />
+    /// <summary>Draws an expandable tree node whose child content receives explicit state.</summary>
+    /// <remarks>
+    /// Use this overload with a <c>static</c> lambda to avoid capturing
+    /// application state while rendering tree children.
+    /// </remarks>
     public Response TreeNode<TState>(
         string label,
         TState state,

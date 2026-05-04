@@ -121,7 +121,32 @@ ui.Button("Save", id: "save-primary");
 ui.Button("Save", id: "save-secondary");
 ```
 
+Containers that do not have visible labels take an explicit typed ID as their first argument:
+
+```csharp
+ui.ScrollArea(item.Id, width: 260f, height: 180f, area =>
+{
+    area.Label(item.Name);
+});
+
+ui.TabBar("workspace-tabs", tabs =>
+{
+    tabs.Tab("Overview", tab => tab.Label("Summary"));
+});
+```
+
 Debug builds throw when two widgets resolve to the same ID in one frame, so duplicate labels are caught early.
+
+When a callback would otherwise capture application state, prefer the state overload with a `static` lambda:
+
+```csharp
+ui.Window("Inspector", inspector, 360f, selectedEntity, static (body, entity) =>
+{
+    body.Label(entity.Name);
+});
+```
+
+See [API Style](guides/api-style.md) for the full identity and scope model.
 
 ## Windows
 
@@ -139,6 +164,15 @@ ui.Frame(width, height, mouse, input, root =>
         body.TextField("Name", ref entityName);
         body.Checkbox("Visible", ref entityVisible);
     });
+});
+```
+
+The same window can use the state overload when its content should avoid capturing app state:
+
+```csharp
+root.Window("Inspector", inspector, 360f, selectedEntity, static (body, entity) =>
+{
+    body.Label(entity.Name);
 });
 ```
 

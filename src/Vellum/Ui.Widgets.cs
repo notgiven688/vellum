@@ -12,6 +12,20 @@ public sealed partial class Ui
         public bool HasPendingSelection;
     }
 
+    private readonly struct ComboBoxPopupContent
+    {
+        public readonly IReadOnlyList<string> Options;
+        public readonly ComboBoxState State;
+        public readonly int PopupWidgetId;
+
+        public ComboBoxPopupContent(IReadOnlyList<string> options, ComboBoxState state, int popupWidgetId)
+        {
+            Options = options;
+            State = state;
+            PopupWidgetId = popupWidgetId;
+        }
+    }
+
     private float FrameBorderWidth => MathF.Max(0, Theme.BorderWidth);
     private float FrameRadius => MathF.Max(0, Theme.BorderRadius);
 
@@ -432,7 +446,11 @@ public sealed partial class Ui
     public Response Panel(Action<Ui> content, UiId? id = null)
         => Panel(AvailableWidth, content, id);
 
-    /// <inheritdoc cref="Panel(Action{Ui}, UiId?)" />
+    /// <summary>Draws an auto-height panel using the current available width with explicit state passed to the content callback.</summary>
+    /// <remarks>
+    /// Use this overload with a <c>static</c> lambda to avoid capturing
+    /// application state while rendering panel content.
+    /// </remarks>
     public Response Panel<TState>(TState state, Action<Ui, TState> content, UiId? id = null)
         => Panel(AvailableWidth, state, content, id);
 
@@ -502,7 +520,11 @@ public sealed partial class Ui
         return new Response(x, y, resolvedWidth, resolvedHeight, hover, false, false);
     }
 
-    /// <inheritdoc cref="Panel(float, Action{Ui}, UiId?)" />
+    /// <summary>Draws an auto-height panel with explicit width and explicit state passed to the content callback.</summary>
+    /// <remarks>
+    /// Use this overload with a <c>static</c> lambda to avoid capturing
+    /// application state while rendering panel content.
+    /// </remarks>
     public Response Panel<TState>(float width, TState state, Action<Ui, TState> content, UiId? id = null)
     {
         float resolvedWidth = MathF.Max(0, width);
@@ -628,7 +650,11 @@ public sealed partial class Ui
         return new Response(x, y, resolvedWidth, resolvedHeight, hover, false, false);
     }
 
-    /// <inheritdoc cref="Panel(float, float, Action{Ui}, bool, UiId?)" />
+    /// <summary>Draws a fixed-size panel with explicit state passed to the content callback.</summary>
+    /// <remarks>
+    /// Use this overload with a <c>static</c> lambda to avoid capturing
+    /// application state while rendering panel content.
+    /// </remarks>
     public Response Panel<TState>(float width, float height, TState state, Action<Ui, TState> content, bool clip = true, UiId? id = null)
     {
         float resolvedWidth = MathF.Max(0, width);
@@ -1703,28 +1729,15 @@ public sealed partial class Ui
 
         if (popupOpen)
         {
-            Popup(popupWidgetId, x, y + h, width, maxPopupHeight, popup =>
-            {
-                popup.ItemSpacing(0);
-                for (int i = 0; i < options.Count; i++)
-                {
-                    using (popup.Id(i))
-                    {
-                        if (popup.Selectable(
-                                options[i],
-                                i == comboState.HighlightedIndex,
-                                width: popup.AvailableWidth,
-                                frameBorderWidth: 0f,
-                                padding: popup.Theme.MenuItemPadding).Clicked)
-                        {
-                            comboState.HighlightedIndex = i;
-                            comboState.PendingSelectedIndex = i;
-                            comboState.HasPendingSelection = true;
-                            ClosePopupById(popupWidgetId);
-                        }
-                    }
-                }
-            });
+            Popup(
+                popupWidgetId,
+                x,
+                y + h,
+                width,
+                maxPopupHeight,
+                new ComboBoxPopupContent(options, comboState, popupWidgetId),
+                static (popup, content) => popup.RenderComboBoxPopupContent(content),
+                zeroItemSpacing: true);
         }
 
         selectedIndex = selected;
@@ -1740,6 +1753,28 @@ public sealed partial class Ui
             focused: focused,
             changed: clicked || selectionChanged || appliedPendingSelection,
             disabled: !enabled);
+    }
+
+    private void RenderComboBoxPopupContent(ComboBoxPopupContent content)
+    {
+        for (int i = 0; i < content.Options.Count; i++)
+        {
+            using (Id(i))
+            {
+                if (Selectable(
+                        content.Options[i],
+                        i == content.State.HighlightedIndex,
+                        width: AvailableWidth,
+                        frameBorderWidth: 0f,
+                        padding: Theme.MenuItemPadding).Clicked)
+                {
+                    content.State.HighlightedIndex = i;
+                    content.State.PendingSelectedIndex = i;
+                    content.State.HasPendingSelection = true;
+                    ClosePopupById(content.PopupWidgetId);
+                }
+            }
+        }
     }
 
     /// <summary>Draws a floating-point slider.</summary>
