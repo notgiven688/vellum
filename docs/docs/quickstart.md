@@ -156,6 +156,15 @@ ui.Frame(width, height, mouse, input, root =>
 });
 ```
 
+Use the state overload when window content should avoid capturing app state:
+
+```csharp
+root.Window("Inspector", inspector, 360f, selectedEntity, static (body, entity) =>
+{
+    body.Label(entity.Name);
+});
+```
+
 Store `WindowState` alongside the rest of your application state if you want positions and sizes to persist.
 
 ## Text And Fonts

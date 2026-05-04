@@ -96,14 +96,22 @@ public sealed class PublicValueTests
     {
         var renderer = new UiTestRenderer();
         var ui = UiTestSupport.CreateUi(renderer);
+        int[] windowCount = [0];
         int[] modalCount = [0];
         int[] contextCount = [0];
         int[] menuCount = [0];
         int[] tabCount = [0];
+        WindowState windowState = new(new Vector2(12f, 12f));
 
         ui.OpenPopup(10);
         ui.Frame(320, 240, Vector2.Zero, false, frame =>
         {
+            frame.Window("Inspector", windowState, 120, windowCount, static (window, count) =>
+            {
+                count[0]++;
+                window.Label("Window");
+            });
+
             frame.ModalPopup(10, 120, 80, modalCount, static (popup, count) =>
             {
                 count[0]++;
@@ -142,6 +150,7 @@ public sealed class PublicValueTests
             });
         });
 
+        Assert.Equal(1, windowCount[0]);
         Assert.Equal(1, modalCount[0]);
         Assert.True(contextCount[0] >= 1);
         Assert.Equal(0, menuCount[0]);

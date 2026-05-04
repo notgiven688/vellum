@@ -31,7 +31,14 @@ internal static class DemoScene
                 (State: state, WideLayout: wideLayout, CheckerTexture: context.CheckerTexture),
                 static (body, bodyContext) => DrawBody(body, bodyContext.State, bodyContext.WideLayout, bodyContext.CheckerTexture));
 
-            root.Window("Inspector", state.InspectorWindow, 280, window => DrawInspector(window, state), resizable: true, id: "inspector");
+            root.Window(
+                "Inspector",
+                state.InspectorWindow,
+                280,
+                state,
+                static (window, state) => DrawInspector(window, state),
+                resizable: true,
+                id: "inspector");
             root.Popup("quickMenu", state.QuickMenuButton, 220, 180, popup => DrawQuickMenu(popup, state));
         }
     }
