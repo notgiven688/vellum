@@ -219,7 +219,11 @@ public sealed partial class Ui
             disabled: !enabled);
     }
 
-    /// <inheritdoc cref="ScrollArea(UiId, float, float, Action{Ui}, bool)" />
+    /// <summary>Draws a vertical scroll area with explicit state passed to the content callback.</summary>
+    /// <remarks>
+    /// Use this overload with a <c>static</c> lambda to avoid capturing
+    /// application state while rendering scroll area content.
+    /// </remarks>
     public Response ScrollArea<TState>(UiId id, float width, float height, TState contentState, Action<Ui, TState> content, bool enabled = true)
     {
         enabled = ResolveEnabled(enabled);
@@ -405,7 +409,11 @@ public sealed partial class Ui
     public Response ScrollAreaBoth(UiId id, float width, float height, Action<Ui> content, bool enabled = true)
         => ScrollAreaBothCore(id, width, height, content, static (ui, callback) => callback(ui), enabled);
 
-    /// <inheritdoc cref="ScrollAreaBoth(UiId, float, float, Action{Ui}, bool)" />
+    /// <summary>Draws a both-axis scroll area with explicit state passed to the content callback.</summary>
+    /// <remarks>
+    /// Use this overload with a <c>static</c> lambda to avoid capturing
+    /// application state while rendering scroll area content.
+    /// </remarks>
     public Response ScrollAreaBoth<TState>(UiId id, float width, float height, TState contentState, Action<Ui, TState> content, bool enabled = true)
         => ScrollAreaBothCore(id, width, height, contentState, content, enabled);
 

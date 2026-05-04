@@ -446,7 +446,11 @@ public sealed partial class Ui
     public Response Panel(Action<Ui> content, UiId? id = null)
         => Panel(AvailableWidth, content, id);
 
-    /// <inheritdoc cref="Panel(Action{Ui}, UiId?)" />
+    /// <summary>Draws an auto-height panel using the current available width with explicit state passed to the content callback.</summary>
+    /// <remarks>
+    /// Use this overload with a <c>static</c> lambda to avoid capturing
+    /// application state while rendering panel content.
+    /// </remarks>
     public Response Panel<TState>(TState state, Action<Ui, TState> content, UiId? id = null)
         => Panel(AvailableWidth, state, content, id);
 
@@ -516,7 +520,11 @@ public sealed partial class Ui
         return new Response(x, y, resolvedWidth, resolvedHeight, hover, false, false);
     }
 
-    /// <inheritdoc cref="Panel(float, Action{Ui}, UiId?)" />
+    /// <summary>Draws an auto-height panel with explicit width and explicit state passed to the content callback.</summary>
+    /// <remarks>
+    /// Use this overload with a <c>static</c> lambda to avoid capturing
+    /// application state while rendering panel content.
+    /// </remarks>
     public Response Panel<TState>(float width, TState state, Action<Ui, TState> content, UiId? id = null)
     {
         float resolvedWidth = MathF.Max(0, width);
@@ -642,7 +650,11 @@ public sealed partial class Ui
         return new Response(x, y, resolvedWidth, resolvedHeight, hover, false, false);
     }
 
-    /// <inheritdoc cref="Panel(float, float, Action{Ui}, bool, UiId?)" />
+    /// <summary>Draws a fixed-size panel with explicit state passed to the content callback.</summary>
+    /// <remarks>
+    /// Use this overload with a <c>static</c> lambda to avoid capturing
+    /// application state while rendering panel content.
+    /// </remarks>
     public Response Panel<TState>(float width, float height, TState state, Action<Ui, TState> content, bool clip = true, UiId? id = null)
     {
         float resolvedWidth = MathF.Max(0, width);

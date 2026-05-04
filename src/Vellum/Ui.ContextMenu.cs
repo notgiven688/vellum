@@ -13,7 +13,11 @@ public sealed partial class Ui
     public bool ContextMenu(UiId id, Response target, Action<Ui> content, float width = 220f, float maxHeight = 280f)
         => ContextMenu(id, target, new UiActionState(content), static (ui, state) => state.Content(ui), width, maxHeight);
 
-    /// <inheritdoc cref="ContextMenu(UiId, Response, Action{Ui}, float, float)" />
+    /// <summary>Opens and declares a context menu with explicit state passed to the content callback.</summary>
+    /// <remarks>
+    /// Use this overload with a <c>static</c> lambda to avoid capturing
+    /// application state in delayed context menu content.
+    /// </remarks>
     public bool ContextMenu<TState>(
         UiId id,
         Response target,

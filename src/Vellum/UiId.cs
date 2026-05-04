@@ -6,6 +6,12 @@ namespace Vellum;
 /// <see cref="string"/>, <see cref="int"/>, <see cref="long"/>, <see cref="ulong"/>, or
 /// <see cref="System.Guid"/>, or call the <c>From*</c> factories explicitly.
 /// </summary>
+/// <remarks>
+/// Use stable data identity for <see cref="UiId"/> values. If an ID is derived
+/// from editable text, changing that text creates a new widget identity and
+/// Vellum will not carry over UI state such as focus, scroll positions, or
+/// selected tabs.
+/// </remarks>
 public readonly struct UiId : System.IEquatable<UiId>
 {
     internal readonly int Hash;

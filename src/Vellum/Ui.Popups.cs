@@ -99,7 +99,11 @@ public sealed partial class Ui
         bool enabled = true)
         => QueuePopupRequest(MakePopupId(id), anchorX, anchorY, width, maxHeight, content, enabled, isModal: false, "Popup");
 
-    /// <inheritdoc cref="Popup(UiId, float, float, float, float, Action{Ui}, bool)" />
+    /// <summary>Declares a popup anchored at an explicit position with explicit state passed to the content callback.</summary>
+    /// <remarks>
+    /// Use this overload with a <c>static</c> lambda to avoid capturing
+    /// application state in delayed popup content.
+    /// </remarks>
     public bool Popup<TState>(
         UiId id,
         float anchorX,
@@ -115,7 +119,11 @@ public sealed partial class Ui
     public bool ModalPopup(UiId id, float width, float maxHeight, Action<Ui> content, bool enabled = true)
         => QueuePopupRequest(MakePopupId(id), 0f, 0f, width, maxHeight, content, enabled, isModal: true, "ModalPopup");
 
-    /// <inheritdoc cref="ModalPopup(UiId, float, float, Action{Ui}, bool)" />
+    /// <summary>Declares a modal popup with explicit state passed to the content callback.</summary>
+    /// <remarks>
+    /// Use this overload with a <c>static</c> lambda to avoid capturing
+    /// application state in delayed modal content.
+    /// </remarks>
     public bool ModalPopup<TState>(UiId id, float width, float maxHeight, TState state, Action<Ui, TState> content, bool enabled = true)
         => QueuePopupRequest(MakePopupId(id), 0f, 0f, width, maxHeight, state, content, enabled, isModal: true, "ModalPopup");
 
@@ -129,7 +137,11 @@ public sealed partial class Ui
         bool enabled = true)
         => Popup(id, anchor.X, anchor.Y + anchor.H, width, maxHeight, content, enabled);
 
-    /// <inheritdoc cref="Popup(UiId, Response, float, float, Action{Ui}, bool)" />
+    /// <summary>Declares a popup anchored below a widget response with explicit state passed to the content callback.</summary>
+    /// <remarks>
+    /// Use this overload with a <c>static</c> lambda to avoid capturing
+    /// application state in delayed popup content.
+    /// </remarks>
     public bool Popup<TState>(
         UiId id,
         Response anchor,

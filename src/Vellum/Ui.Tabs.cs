@@ -26,7 +26,11 @@ public sealed partial class Ui
     public Response TabBar(UiId id, Action<Ui> content)
         => TabBar(id, new UiActionState(content), static (ui, state) => state.Content(ui));
 
-    /// <inheritdoc cref="TabBar(UiId, Action{Ui})" />
+    /// <summary>Starts a tab bar with explicit state passed to the tab declaration callback.</summary>
+    /// <remarks>
+    /// Use this overload with a <c>static</c> lambda to avoid capturing
+    /// application state while declaring tabs.
+    /// </remarks>
     public Response TabBar<TState>(UiId id, TState state, Action<Ui, TState> content)
     {
         ArgumentNullException.ThrowIfNull(content);
@@ -88,7 +92,12 @@ public sealed partial class Ui
     public Response Tab(string label, Action<Ui> content, UiId? id = null)
         => Tab(label, new UiActionState(content), static (ui, state) => state.Content(ui), id);
 
-    /// <inheritdoc cref="Tab(string, Action{Ui}, UiId?)" />
+    /// <summary>Declares a tab with explicit state passed to the selected-tab content callback.</summary>
+    /// <remarks>
+    /// Selected tab content may be rendered after the tab row is declared. Use
+    /// this overload with a <c>static</c> lambda to avoid capturing application
+    /// state in that delayed content.
+    /// </remarks>
     public Response Tab<TState>(string label, TState state, Action<Ui, TState> content, UiId? id = null)
     {
         ArgumentNullException.ThrowIfNull(content);

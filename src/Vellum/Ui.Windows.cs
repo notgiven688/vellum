@@ -59,6 +59,18 @@ public sealed partial class Ui
     }
 
     /// <summary>Declares a floating window with explicit state passed to the content callback.</summary>
+    /// <remarks>
+    /// Use this overload with a <c>static</c> lambda to avoid capturing
+    /// application state in window content.
+    /// </remarks>
+    /// <example>
+    /// <code>
+    /// ui.Window("Inspector", inspectorWindow, 320f, selected, static (window, selected) =>
+    /// {
+    ///     window.Label(selected.Name);
+    /// });
+    /// </code>
+    /// </example>
     public Response Window<TState>(
         string title,
         WindowState state,

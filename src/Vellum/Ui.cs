@@ -203,6 +203,17 @@ public enum UiWidgetKind
 /// Immediate-mode GUI context. Layout scopes are opened with lambdas
 /// (Row / Column), widgets are methods that return a Response.
 /// </summary>
+/// <remarks>
+/// Application code redraws the UI every frame from application-owned state.
+/// Vellum keeps internal widget state, such as focus, scrolling, active text
+/// edits, selected tabs, and window positions, by stable widget identity.
+/// Visible widgets derive identity from their label and current ID scope.
+/// Repeated rows should use <see cref="Id(int)"/>, <see cref="Id(long)"/>,
+/// <see cref="Id(ulong)"/>, <see cref="Id(Guid)"/>, or a string ID scope.
+/// Widgets with duplicate visible labels can use their <c>id:</c> parameter.
+/// Unlabelled containers such as popups, tab bars, and scroll areas take an
+/// explicit <see cref="UiId"/>.
+/// </remarks>
 public sealed partial class Ui : IDisposable
 {
     private enum LayoutDir { Vertical, Horizontal }
