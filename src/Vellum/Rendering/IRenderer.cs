@@ -30,7 +30,7 @@ public interface IRenderer
     void EndFrame();
 
     /// <summary>
-    /// Uploads tightly packed RGBA8 pixels and returns a non-zero backend texture id.
+    /// Uploads tightly packed non-empty RGBA8 pixels and returns a non-zero backend texture id.
     /// </summary>
     int CreateTexture(byte[] rgba, int width, int height);
 

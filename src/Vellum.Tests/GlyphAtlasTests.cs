@@ -11,14 +11,36 @@ public sealed class GlyphAtlasTests
         var renderer = new UiTestRenderer();
         GlyphAtlas atlas = UiTestSupport.CreateAtlas(renderer, [(int)' '], lcd: false);
 
-        Assert.Equal(1, renderer.CreateTextureCalls);
-        Assert.True(atlas.TextureId > 0);
+        Assert.Equal(0, renderer.CreateTextureCalls);
+        Assert.Equal(-1, atlas.TextureId);
         Assert.Equal(0, atlas.AtlasWidth);
         Assert.Equal(0, atlas.AtlasHeight);
         Assert.True(atlas.TryGetGlyph(' ', out GlyphInfo space));
         Assert.Equal(0f, space.Width);
         Assert.Equal(0f, space.Height);
         Assert.True(space.AdvanceWidth > 0f);
+
+        atlas.Destroy(renderer);
+        Assert.Equal(0, renderer.DestroyTextureCalls);
+    }
+
+    [Fact]
+    public void EnsureGlyphs_From_Advance_Only_Atlas_Creates_First_Texture()
+    {
+        var renderer = new UiTestRenderer();
+        GlyphAtlas atlas = UiTestSupport.CreateAtlas(renderer, [(int)' '], lcd: false);
+
+        atlas.EnsureGlyphs(renderer, [(int)'A']);
+
+        Assert.Equal(1, renderer.CreateTextureCalls);
+        Assert.Equal(0, renderer.DestroyTextureCalls);
+        Assert.True(atlas.TextureId > 0);
+        Assert.True(atlas.AtlasWidth > 0);
+        Assert.True(atlas.AtlasHeight > 0);
+        Assert.True(atlas.TryGetGlyph(' ', out GlyphInfo space));
+        Assert.Equal(0f, space.Width);
+        Assert.True(atlas.TryGetGlyph('A', out GlyphInfo a));
+        Assert.True(a.Width > 0f);
     }
 
     [Fact]

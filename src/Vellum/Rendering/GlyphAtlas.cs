@@ -98,7 +98,13 @@ internal sealed class GlyphAtlas
     private void Rebuild(IRenderer renderer)
     {
         if (TextureId >= 0)
+        {
             renderer.DestroyTexture(TextureId);
+            TextureId = -1;
+        }
+
+        AtlasWidth = 0;
+        AtlasHeight = 0;
 
         _glyphs.Clear();
 
@@ -122,10 +128,7 @@ internal sealed class GlyphAtlas
         }
 
         if (entries.Count == 0)
-        {
-            TextureId = renderer.CreateTexture(Array.Empty<byte>(), 0, 0);
             return;
-        }
 
         // --- Shelf packer ---
         // Sort by height descending for better packing efficiency
