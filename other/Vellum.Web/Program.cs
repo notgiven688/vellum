@@ -430,12 +430,12 @@ static void DrawSettingsPanel(Ui host, DemoState state, int checkerTexture)
             using (panel.FixedWidth(halfWidth))
             {
                 panel.Label("Sensitivity", color: panel.Theme.TextSecondary);
-                panel.DragFloat("Sensitivity", ref state.Sensitivity, speed: 0.01f, min: 0f, max: 10f, width: panel.AvailableWidth, id: "sensitivity");
+                panel.DragFloat(string.Empty, ref state.Sensitivity, speed: 0.01f, min: 0f, max: 10f, width: panel.AvailableWidth, id: "sensitivity");
             }
             using (panel.FixedWidth(panel.AvailableWidth))
             {
                 panel.Label("Max retries", color: panel.Theme.TextSecondary);
-                panel.DragInt("Max retries", ref state.MaxRetries, speed: 0.1f, min: 0, max: 10, width: panel.AvailableWidth, id: "maxRetries");
+                panel.DragInt(string.Empty, ref state.MaxRetries, speed: 0.1f, min: 0, max: 10, width: panel.AvailableWidth, id: "maxRetries");
             }
         }
         panel.Spacing(4);

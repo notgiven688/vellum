@@ -1,10 +1,8 @@
-# Vellum Scope API Plan
+# Vellum Scope API
 
-## Direction
+Vellum avoids public `Begin* / End*` pairs almost everywhere. A scoped construct opens and closes through one of three idioms — a `using`-disposable handle, a single `Action<Ui>` callback, or an `Action<Ui, TState>` callback — and each scoped feature picks the subset of those forms that fits its usage.
 
-Vellum avoids public `Begin* / End*` pairs almost everywhere. A scoped construct in Vellum opens and closes through one of three idioms — a `using`-disposable handle, a single `Action<Ui>` callback, or an `Action<Ui, TState>` callback — and each scoped feature picks the subset of those forms that fits its usage.
-
-The user should never have to remember to call an `End`. The single deliberate exception is `BeginFrame` / `EndFrame`, where the host loop owns timing across the boundary.
+The user never has to remember to call an `End`. The single deliberate exception is `BeginFrame` / `EndFrame`, where the host loop owns timing across the boundary.
 
 ## The Three Scope Idioms
 
@@ -84,8 +82,8 @@ ui.Window("Inspector", inspectorWindow, 320f, selected, static (w, sel) =>
 - `static` on the lambda forbids captures, so the delegate is cached once per call site and never reallocated.
 - `TState` flows the per-iteration data in by parameter instead of by capture. Use a tuple when more than one value is needed: `(item, index, isSelected)`.
 - Best fit for content inside loops, scrolled lists, virtualised trees, or any other path that runs many times per frame.
-- A `TState` overload is only worth publishing when the construct can pass that state through without hiding a closure allocation. Consistency overloads that internally do `ui => content(ui, state)` are misleading and should not be added.
-- Delayed constructs that expose `TState` must store the content delegate and state separately in the queued request. Vellum uses an internal type-erased deferred-content carrier for this in window/popup/menu/tab paths. That removes the hidden closure/delegate wrapper; value-type state may still box when it is stored in a delayed request.
+- A `TState` overload is only published when the construct can pass that state through without hiding a closure allocation. Consistency overloads that internally do `ui => content(ui, state)` are misleading and are not added.
+- Delayed constructs that expose `TState` store the content delegate and state separately in the queued request. Vellum uses an internal type-erased deferred-content carrier for this in window/popup/menu/tab paths. That removes the hidden closure/delegate wrapper; value-type state may still box when it is stored in a delayed request.
 
 Used by today: immediate scopes and delayed scopes with an explicit state carrier expose paired `Action<Ui, TState>` overloads — `Frame`, `Id`, `Disabled`, `Window`, `Panel`, `MenuBar`, `Menu`, `ContextMenu`, `Popup`, `ModalPopup`, `TabBar`, `Tab`, `TreeNode`, `ScrollArea`, `ScrollAreaBoth`.
 
@@ -123,7 +121,7 @@ Two patterns to notice:
 | Need to `return` / `break` / `continue` out            | `using` handle                      |
 | Construct only exposes lambda forms                    | `static` `TState` lambda when available and in a loop, plain lambda otherwise |
 
-The `using` handle should be presented as a first-class option, not as an advanced escape hatch — it is the only form that composes cleanly with `ref`, `Span<T>`, and ordinary control flow.
+The `using` handle is a first-class option, not an advanced escape hatch — it is the only form that composes cleanly with `ref`, `Span<T>`, and ordinary control flow.
 
 ## Mixing Idioms
 
@@ -176,19 +174,19 @@ The split is justified because `BeginFrame` and `EndFrame` straddle host concern
 ## Naming
 
 - Scope-opening methods are named after the construct, not the action: `Window`, `Panel`, `TreeNode`, `Row`, `Disabled`, `Id`. Never `BeginWindow` / `EndWindow`.
-- `Frame` keeps its `BeginFrame` / `EndFrame` pair for host-loop integration. No other public `Begin*` / `End*` methods should be added.
+- `Frame` keeps its `BeginFrame` / `EndFrame` pair for host-loop integration. No other public `Begin*` / `End*` methods are added.
 - Handle types are named `<Scope>ScopeHandle` (`IdScopeHandle`, `LayoutScopeHandle`, `DisabledScopeHandle`) and are always nested `ref struct` types on `Ui`.
 
 ## Adding a New Scope
 
-When introducing a new scoped construct, the default checklist is:
+Checklist for a new scoped construct:
 
 1. Pick the verb-free name (`Foo`, not `BeginFoo`).
 2. Implement an internal `EnterFoo` / `ExitFoo` pair that mutates `Ui` state.
 3. If the scope is layout-like or runs inside hot loops, expose a `FooScopeHandle` (`ref struct`) and a public `FooScopeHandle Foo(...)` method. Otherwise skip the handle.
 4. Expose `void Foo(..., Action<Ui> content)` for normal callback usage.
-5. Add `void Foo<TState>(..., TState state, Action<Ui, TState> content)` only when the construct executes content immediately, or when delayed execution can store and replay the state without hidden closure allocation. Do not add a `TState` overload just by wrapping it in a capturing `Action<Ui>`.
-6. If a `TState` overload exists, add XML docs that show the `static` shape — that is the form users should learn first.
+5. Add `void Foo<TState>(..., TState state, Action<Ui, TState> content)` only when the construct executes content immediately, or when delayed execution can store and replay the state without hidden closure allocation. Never add a `TState` overload just by wrapping it in a capturing `Action<Ui>`.
+6. If a `TState` overload exists, add XML docs that show the `static` shape — that is the form users learn first.
 7. Do not add `BeginFoo` / `EndFoo` unless the scope genuinely needs to straddle host code, the way `Frame` does.
 
 `Frame` itself does not follow step 2 — there is no internal `EnterFrame` / `ExitFrame` pair. `BeginFrame` and `EndFrame` are the exposed entry points that host loops use directly, and they do their work inline rather than routing through a private `Enter` / `Exit` pair. Treat that as the deliberate exception, not the model for new scopes.
