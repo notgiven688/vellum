@@ -362,6 +362,8 @@ public sealed partial class Ui : IDisposable
     public double DoubleClickIntervalSeconds { get; set; } = 0.35;
     /// <summary>Maximum pointer distance for double-click detection.</summary>
     public float DoubleClickDistance { get; set; } = 6f;
+    /// <summary>Seconds an open hover menu remains active after the pointer leaves its anchor/popup path.</summary>
+    public double MenuHoverGraceSeconds { get; set; } = 0.3;
     /// <summary>Pointer distance required before a held pointer counts as dragging.</summary>
     public float DragStartThreshold { get; set; } = 4f;
     /// <summary>Padding around the root layout scope in logical pixels.</summary>

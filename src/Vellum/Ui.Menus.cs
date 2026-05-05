@@ -6,6 +6,11 @@ public sealed partial class Ui
     private const float SubmenuPopupGap = 4f;
     private const float MenuBridgePadding = 6f;
 
+    private sealed class MenuState
+    {
+        public double LastHoverPathSeconds = double.NegativeInfinity;
+    }
+
     private readonly struct UiActionState
     {
         public readonly Action<Ui> Content;
@@ -197,6 +202,7 @@ public sealed partial class Ui
         _menuPopupIds.Add(popupWidgetId);
         bool popupOpen = IsPopupOpen(popupWidgetId);
         bool menuRootActive = topLevel && IsRootMenuPopupActive();
+        MenuState? menuState = popupOpen ? GetState<MenuState>(widgetId) : null;
 
         bool focused = RegisterFocusable(widgetId, enabled);
         bool hover = enabled && (menuRootActive
@@ -221,6 +227,7 @@ public sealed partial class Ui
         bool closedThisFrame = false;
         bool popupTransitionHovered = popupOpen && IsMenuPopupBridgeHovered(x, y, resolvedWidth, resolvedHeight, popupWidgetId);
         bool popupPathHovered = popupOpen && IsPopupHierarchyHoveredOrBridged(popupWidgetId);
+        double nowSeconds = GetMenuTimeSeconds();
 
         bool allowHoverOpen = !topLevel || menuRootActive || openOnHover;
         if (enabled && !popupOpen && hover && allowHoverOpen)
@@ -228,6 +235,7 @@ public sealed partial class Ui
             OpenPopupById(popupWidgetId);
             popupOpen = true;
             openedThisFrame = true;
+            menuState ??= GetState<MenuState>(widgetId);
             popupTransitionHovered = false;
             popupPathHovered = false;
         }
@@ -245,6 +253,7 @@ public sealed partial class Ui
                 OpenPopupById(popupWidgetId);
                 popupOpen = true;
                 openedThisFrame = true;
+                menuState ??= GetState<MenuState>(widgetId);
             }
         }
 
@@ -255,6 +264,22 @@ public sealed partial class Ui
             closedThisFrame = true;
         }
 
+        bool popupHoverPathActive = popupOpen && (hover || popupTransitionHovered || popupPathHovered);
+        if (popupOpen && (openedThisFrame || popupHoverPathActive))
+        {
+            menuState ??= GetState<MenuState>(widgetId);
+            menuState.LastHoverPathSeconds = nowSeconds;
+        }
+
+        double hoverGraceSeconds = Math.Max(0, MenuHoverGraceSeconds);
+        bool popupHoverGraceActive =
+            popupOpen &&
+            menuState is not null &&
+            hoverGraceSeconds > 0 &&
+            !openedThisFrame &&
+            !popupHoverPathActive &&
+            nowSeconds - menuState.LastHoverPathSeconds < hoverGraceSeconds;
+
         if (enabled &&
             topLevel &&
             openOnHover &&
@@ -262,7 +287,8 @@ public sealed partial class Ui
             !openedThisFrame &&
             !hover &&
             !popupTransitionHovered &&
-            !popupPathHovered)
+            !popupPathHovered &&
+            !popupHoverGraceActive)
         {
             ClosePopupById(popupWidgetId);
             popupOpen = false;
@@ -298,7 +324,7 @@ public sealed partial class Ui
 
         if (popupOpen)
         {
-            bool shouldRenderPopup = topLevel || openedThisFrame || hover || popupTransitionHovered || popupPathHovered;
+            bool shouldRenderPopup = topLevel || openedThisFrame || hover || popupTransitionHovered || popupPathHovered || popupHoverGraceActive;
             if (shouldRenderPopup)
             {
                 float resolvedPopupWidth;
@@ -356,6 +382,9 @@ public sealed partial class Ui
 
     private bool IsRootMenuPopupActive()
         => _openPopupIds.Count > 0 && _menuPopupIds.Contains(_openPopupIds[0]);
+
+    private double GetMenuTimeSeconds()
+        => _input.TimeSeconds ?? _frameIndex / 60.0;
 
     private float MeasureAutoMenuPopupWidth<TState>(int popupId, float maxPopupHeight, TState state, Action<Ui, TState> content)
     {

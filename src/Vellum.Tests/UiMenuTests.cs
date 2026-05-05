@@ -63,6 +63,83 @@ public sealed class UiMenuTests
     }
 
     [Fact]
+    public void Hover_Menu_Stays_Open_During_Brief_Pointer_Slip()
+    {
+        var renderer = new UiTestRenderer();
+        var ui = UiTestSupport.CreateUi(renderer);
+        ui.MenuHoverGraceSeconds = 0.2;
+
+        Response item = default;
+
+        void Frame(Vector2 mouse, double timeSeconds)
+        {
+            item = default;
+
+            ui.Frame(420, 240, mouse, UiTestSupport.Input(timeSeconds: timeSeconds), frame =>
+            {
+                frame.Menu("Hover", popup =>
+                {
+                    item = popup.MenuItem("Action");
+                }, width: 120f, openOnHover: true, openToSide: true);
+            });
+        }
+
+        Frame(new Vector2(4, 4), 0.0);
+        Assert.True(ui.IsChildPopupOpen(UiWidgetKind.Menu, "Hover", "menu"));
+        Assert.True(item.W > 0);
+
+        Vector2 outsideMenuPath = new(360, 200);
+        Frame(outsideMenuPath, 0.1);
+        Assert.True(ui.IsChildPopupOpen(UiWidgetKind.Menu, "Hover", "menu"));
+        Assert.True(item.W > 0);
+
+        Frame(outsideMenuPath, 0.31);
+        Assert.False(ui.IsChildPopupOpen(UiWidgetKind.Menu, "Hover", "menu"));
+        Assert.Equal(0f, item.W);
+    }
+
+    [Fact]
+    public void Submenu_Stays_Open_During_Brief_Pointer_Slip()
+    {
+        var renderer = new UiTestRenderer();
+        var ui = UiTestSupport.CreateUi(renderer);
+        ui.MenuHoverGraceSeconds = 0.2;
+
+        Response submenu = default;
+        Response childItem = default;
+
+        void Frame(Vector2 mouse, double timeSeconds)
+        {
+            submenu = default;
+            childItem = default;
+
+            ui.Frame(640, 260, mouse, UiTestSupport.Input(timeSeconds: timeSeconds), frame =>
+            {
+                frame.Menu("Root", popup =>
+                {
+                    submenu = popup.Menu("More", child =>
+                    {
+                        childItem = child.MenuItem("Child");
+                    });
+                }, width: 120f, openOnHover: true, openToSide: true);
+            });
+        }
+
+        Frame(new Vector2(4, 4), 0.0);
+        Vector2 submenuPoint = UiTestSupport.Inside(submenu);
+
+        Frame(submenuPoint, 0.02);
+        Assert.True(childItem.W > 0);
+
+        Vector2 outsideSubmenuPath = new(childItem.X + childItem.W + 40f, childItem.Y + childItem.H + 60f);
+        Frame(outsideSubmenuPath, 0.1);
+        Assert.True(childItem.W > 0);
+
+        Frame(outsideSubmenuPath, 0.31);
+        Assert.Equal(0f, childItem.W);
+    }
+
+    [Fact]
     public void ContextMenu_Opens_On_Right_Click_And_CloseAllPopups_Clears_State()
     {
         var renderer = new UiTestRenderer();
