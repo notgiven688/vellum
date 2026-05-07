@@ -2836,6 +2836,49 @@ public sealed class VellumTests
             Check("color picker popup closes after hover leaves", !ui.IsChildPopupOpen(UiWidgetKind.ColorPickerPopup, "picker", "popup"));
         }
 
+        {
+            var renderer = new TestRenderer();
+            var ui = new Ui(renderer)
+            {
+                Font = font,
+                DefaultFontSize = 18f,
+                Lcd = false
+            };
+
+            Color color = new(255, 0, 0, 255);
+            Response picker = default;
+
+            void Frame(Vector2 mouse, UiInputState input = default)
+            {
+                ui.Frame(500, 520, mouse, false, input, frame =>
+                {
+                    picker = frame.ColorPickerPopup(
+                        "Accent",
+                        ref color,
+                        180f,
+                        pickerWidth: 180f,
+                        id: "click-picker",
+                        openOnHover: false);
+                });
+            }
+
+            Frame(new Vector2(24f, 24f), Input(timeSeconds: 0));
+            Check(
+                "color picker popup click mode does not open on hover",
+                !picker.Opened && !ui.IsChildPopupOpen(UiWidgetKind.ColorPickerPopup, "click-picker", "popup"));
+
+            Frame(new Vector2(24f, 24f), Input(mouseButtons: [UiMouseButton.Left], timeSeconds: 0.01));
+            Frame(new Vector2(24f, 24f), Input(timeSeconds: 0.02));
+            Check(
+                "color picker popup click mode opens on click",
+                picker.Opened && ui.IsChildPopupOpen(UiWidgetKind.ColorPickerPopup, "click-picker", "popup"));
+
+            Frame(new Vector2(470f, 500f), Input(mouseButtons: [UiMouseButton.Left], timeSeconds: 0.03));
+            Check(
+                "color picker popup click mode closes on outside click",
+                !ui.IsChildPopupOpen(UiWidgetKind.ColorPickerPopup, "click-picker", "popup"));
+        }
+
         Console.WriteLine($"Ui widgets: {passed} passed, {failed} failed\n");
     }
 

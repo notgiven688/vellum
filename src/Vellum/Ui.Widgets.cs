@@ -2792,7 +2792,7 @@ public sealed partial class Ui
             disabled: response.Disabled);
     }
 
-    /// <summary>Draws a compact color swatch that opens the full color picker in a hover popup.</summary>
+    /// <summary>Draws a compact color swatch that opens the full color picker in a popup.</summary>
     public Response ColorPickerPopup(
         string label,
         ref Color value,
@@ -2801,7 +2801,8 @@ public sealed partial class Ui
         float maxPopupHeight = 440f,
         bool alpha = true,
         bool enabled = true,
-        UiId? id = null)
+        UiId? id = null,
+        bool openOnHover = true)
     {
         enabled = ResolveEnabled(enabled);
         float resolvedWidth = MathF.Max(64f, width);
@@ -2854,12 +2855,29 @@ public sealed partial class Ui
         bool openedThisFrame = false;
         bool closedThisFrame = false;
 
-        if (enabled && hover && !popupOpen)
+        if (enabled && openOnHover && hover && !popupOpen)
         {
             popupState.EditorValue = value;
             OpenPopupById(popupWidgetId);
             popupOpen = true;
             openedThisFrame = true;
+        }
+
+        if (enabled && !openOnHover && clicked)
+        {
+            if (popupOpen)
+            {
+                ClosePopupById(popupWidgetId);
+                popupOpen = false;
+                closedThisFrame = true;
+            }
+            else
+            {
+                popupState.EditorValue = value;
+                OpenPopupById(popupWidgetId);
+                popupOpen = true;
+                openedThisFrame = true;
+            }
         }
 
         if (enabled && focused && (_input.IsPressed(UiKey.Enter) || _input.IsPressed(UiKey.Space)))
@@ -2901,12 +2919,25 @@ public sealed partial class Ui
             !popupHoverPathActive &&
             nowSeconds - popupState.LastHoverPathSeconds < hoverGraceSeconds;
 
-        if (popupOpen &&
+        if (openOnHover &&
+            popupOpen &&
             !openedThisFrame &&
             !hover &&
             !popupTransitionHovered &&
             !popupPathHovered &&
             !popupHoverGraceActive)
+        {
+            ClosePopupById(popupWidgetId);
+            popupOpen = false;
+            closedThisFrame = true;
+        }
+
+        if (!openOnHover &&
+            popupOpen &&
+            !openedThisFrame &&
+            !hover &&
+            !popupPathHovered &&
+            IsMousePressed(UiMouseButton.Left))
         {
             ClosePopupById(popupWidgetId);
             popupOpen = false;
@@ -2928,7 +2959,7 @@ public sealed partial class Ui
 
         if (popupOpen)
         {
-            bool shouldRenderPopup = openedThisFrame || hover || popupTransitionHovered || popupPathHovered || popupHoverGraceActive;
+            bool shouldRenderPopup = !openOnHover || openedThisFrame || hover || popupTransitionHovered || popupPathHovered || popupHoverGraceActive;
             if (shouldRenderPopup)
             {
                 float popupOuterWidth = MathF.Min(

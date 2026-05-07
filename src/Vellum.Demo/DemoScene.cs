@@ -55,6 +55,14 @@ internal static class DemoScene
                 static (window, state) => DrawMetricsWindow(window, state),
                 resizable: true,
                 id: "metrics");
+            root.Window(
+                "Theme",
+                state.ThemeWindow,
+                320,
+                state,
+                static (window, state) => DrawThemeWindow(window, state),
+                resizable: true,
+                id: "theme-editor");
             for (int i = 0; i < state.ExtraMetricsWindows.Count; i++)
             {
                 root.Window(
@@ -70,12 +78,6 @@ internal static class DemoScene
             root.Popup("quickMenu", state.QuickMenuButton, 220, 180, popup => DrawQuickMenu(popup, state));
         }
     }
-
-    public static Theme ResolveDemoTheme(int selectedTheme) => selectedTheme switch
-    {
-        1 => ThemeCache.Light,
-        _ => ThemeCache.Dark
-    };
 
     public static byte[] CreateCheckerRgba()
     {
@@ -147,6 +149,16 @@ internal static class DemoScene
             {
                 DrawThemeMenuItem(menu, state, 0, "Dark", new Color(80, 91, 112), "Alt+1");
                 DrawThemeMenuItem(menu, state, 1, "Light", new Color(224, 196, 122), "Alt+2");
+                menu.MenuSeparator();
+
+                if (menu.MenuItem("Show editor", closeOnActivate: true).Clicked)
+                {
+                    state.ThemeWindow.Open = true;
+                    state.ThemeWindow.Collapsed = false;
+                }
+
+                if (menu.MenuItem("Reset edited theme", closeOnActivate: true).Clicked)
+                    state.ResetThemeToSelectedPreset();
             });
 
             bar.Menu("View", state, static (menu, state) =>
@@ -189,6 +201,7 @@ internal static class DemoScene
         }, id: id, selected: state.SelectedTheme == index, closeOnActivate: true, shortcut: shortcut).Clicked)
         {
             state.SelectedTheme = index;
+            state.ResetThemeToSelectedPreset();
         }
     }
 
@@ -736,6 +749,141 @@ internal static class DemoScene
             state.ResetDockingWindows();
     }
 
+    private static void DrawThemeWindow(Ui window, DemoState state)
+    {
+        Theme theme = state.ResolveTheme();
+
+        window.Label("Live theme editor", color: theme.Accent);
+        BodyLabel(window, "Changes are applied to the active demo theme immediately. Reset restores the selected preset.", color: theme.TextSecondary);
+        window.Separator();
+
+        int previousTheme = state.SelectedTheme;
+        if (window.ComboBox("Preset", DemoState.ThemeOptions, ref state.SelectedTheme, window.AvailableWidth, maxPopupHeight: 140f).Changed &&
+            state.SelectedTheme != previousTheme)
+        {
+            state.ResetThemeToSelectedPreset();
+            theme = state.ResolveTheme();
+        }
+
+        if (window.Button("Reset selected preset", width: window.AvailableWidth).Clicked)
+        {
+            state.ResetThemeToSelectedPreset();
+            theme = state.ResolveTheme();
+        }
+
+        window.Checkbox("LCD text", ref theme.UseLcdText, width: window.AvailableWidth);
+        window.Slider("Corner radius", ref theme.BorderRadius, 0f, 14f, window.AvailableWidth, format: "{0:0.0}", id: "border-radius");
+        window.Slider("Border width", ref theme.BorderWidth, 0f, 3f, window.AvailableWidth, format: "{0:0.0}", id: "border-width");
+        window.Slider("Gap", ref theme.Gap, 0f, 20f, window.AvailableWidth, format: "{0:0.0}", id: "gap");
+        window.Slider("Scrollbar width", ref theme.ScrollbarWidth, 6f, 20f, window.AvailableWidth, format: "{0:0.0}", id: "scrollbar-width");
+        window.Slider("Slider height", ref theme.SliderHeight, 14f, 36f, window.AvailableWidth, format: "{0:0.0}", id: "slider-height");
+        window.Separator();
+
+        ThemeSection(window, "Surfaces");
+        ThemeColor(window, "Surface", ref theme.SurfaceBg, "surface-bg");
+        ThemeColor(window, "Panel", ref theme.PanelBg, "panel-bg");
+        ThemeColor(window, "Panel border", ref theme.PanelBorder, "panel-border");
+        ThemeColor(window, "Scroll area", ref theme.ScrollAreaBg, "scroll-area-bg");
+        ThemeColor(window, "Scroll border", ref theme.ScrollAreaBorder, "scroll-area-border");
+
+        ThemeSection(window, "Text");
+        ThemeColor(window, "Primary", ref theme.TextPrimary, "text-primary");
+        ThemeColor(window, "Secondary", ref theme.TextSecondary, "text-secondary");
+        ThemeColor(window, "Muted", ref theme.TextMuted, "text-muted");
+        ThemeColor(window, "Window title", ref theme.WindowTitleText, "window-title-text");
+        ThemeColor(window, "Title fill", ref theme.WindowTitleBg, "window-title-bg", alpha: true);
+        ThemeColor(window, "Title hover", ref theme.WindowTitleBgHover, "window-title-hover", alpha: true);
+
+        ThemeSection(window, "Accent");
+        ThemeColor(window, "Accent", ref theme.Accent, "accent");
+        ThemeColor(window, "Focus border", ref theme.FocusBorder, "focus-border");
+
+        ThemeSection(window, "Buttons");
+        ThemeColor(window, "Button", ref theme.ButtonBg, "button-bg");
+        ThemeColor(window, "Button hover", ref theme.ButtonBgHover, "button-hover");
+        ThemeColor(window, "Button pressed", ref theme.ButtonBgPressed, "button-pressed");
+        ThemeColor(window, "Button border", ref theme.ButtonBorder, "button-border");
+        ThemeColor(window, "Button border hover", ref theme.ButtonBorderHover, "button-border-hover");
+        ThemeColor(window, "Button border pressed", ref theme.ButtonBorderPressed, "button-border-pressed");
+
+        ThemeSection(window, "Inputs");
+        ThemeColor(window, "Text field", ref theme.TextFieldBg, "text-field-bg");
+        ThemeColor(window, "Text field hover", ref theme.TextFieldBgHover, "text-field-hover");
+        ThemeColor(window, "Text field focus", ref theme.TextFieldBgFocused, "text-field-focus");
+        ThemeColor(window, "Field border", ref theme.TextFieldBorder, "text-field-border");
+        ThemeColor(window, "Field border focus", ref theme.TextFieldBorderFocused, "text-field-border-focus");
+        ThemeColor(window, "Selection", ref theme.TextFieldSelectionBg, "text-selection", alpha: true);
+        ThemeColor(window, "Caret", ref theme.TextFieldCaret, "text-field-caret");
+        ThemeColor(window, "Placeholder", ref theme.TextFieldPlaceholder, "text-field-placeholder");
+
+        ThemeSection(window, "Selection");
+        ThemeColor(window, "Selectable", ref theme.SelectableBg, "selectable-bg");
+        ThemeColor(window, "Selectable hover", ref theme.SelectableBgHover, "selectable-hover");
+        ThemeColor(window, "Selectable pressed", ref theme.SelectableBgPressed, "selectable-pressed");
+        ThemeColor(window, "Selected", ref theme.SelectableBgSelected, "selectable-selected");
+        ThemeColor(window, "Border", ref theme.SelectableBorder, "selectable-border");
+        ThemeColor(window, "Border hover", ref theme.SelectableBorderHover, "selectable-border-hover");
+        ThemeColor(window, "Border pressed", ref theme.SelectableBorderPressed, "selectable-border-pressed");
+        ThemeColor(window, "Border selected", ref theme.SelectableBorderSelected, "selectable-border-selected");
+        ThemeColor(window, "Indicator", ref theme.SelectableIndicator, "selectable-indicator");
+
+        ThemeSection(window, "Toggles");
+        ThemeColor(window, "Toggle", ref theme.ToggleBg, "toggle-bg");
+        ThemeColor(window, "Toggle hover", ref theme.ToggleBgHover, "toggle-hover");
+        ThemeColor(window, "Toggle pressed", ref theme.ToggleBgPressed, "toggle-pressed");
+        ThemeColor(window, "Toggle active", ref theme.ToggleBgActive, "toggle-active");
+        ThemeColor(window, "Toggle border", ref theme.ToggleBorder, "toggle-border");
+        ThemeColor(window, "Toggle border hover", ref theme.ToggleBorderHover, "toggle-border-hover");
+        ThemeColor(window, "Toggle border pressed", ref theme.ToggleBorderPressed, "toggle-border-pressed");
+        ThemeColor(window, "Toggle border active", ref theme.ToggleBorderActive, "toggle-border-active");
+        ThemeColor(window, "Toggle indicator", ref theme.ToggleIndicator, "toggle-indicator");
+
+        ThemeSection(window, "Scrollbars");
+        ThemeColor(window, "Track", ref theme.ScrollbarTrack, "scrollbar-track", alpha: true);
+        ThemeColor(window, "Thumb", ref theme.ScrollbarThumb, "scrollbar-thumb", alpha: true);
+        ThemeColor(window, "Thumb hover", ref theme.ScrollbarThumbHover, "scrollbar-hover", alpha: true);
+        ThemeColor(window, "Thumb active", ref theme.ScrollbarThumbActive, "scrollbar-active", alpha: true);
+
+        ThemeSection(window, "Popups");
+        ThemeColor(window, "Popup", ref theme.PopupBg, "popup-bg");
+        ThemeColor(window, "Popup border", ref theme.PopupBorder, "popup-border");
+        ThemeColor(window, "Modal backdrop", ref theme.ModalBackdrop, "modal-backdrop", alpha: true);
+        ThemeColor(window, "Tooltip", ref theme.TooltipBg, "tooltip-bg", alpha: true);
+        ThemeColor(window, "Tooltip border", ref theme.TooltipBorder, "tooltip-border", alpha: true);
+
+        ThemeSection(window, "Progress And Plots");
+        ThemeColor(window, "Progress bg", ref theme.ProgressBarBg, "progress-bg");
+        ThemeColor(window, "Progress border", ref theme.ProgressBarBorder, "progress-border");
+        ThemeColor(window, "Progress", ref theme.ProgressBarFill, "progress-fill");
+        ThemeColor(window, "Plot bg", ref theme.PlotBg, "plot-bg");
+        ThemeColor(window, "Plot border", ref theme.PlotBorder, "plot-border");
+        ThemeColor(window, "Plot fill", ref theme.PlotFill, "plot-fill", alpha: true);
+        ThemeColor(window, "Separator", ref theme.Separator, "separator", alpha: true);
+
+        ThemeSection(window, "Headers");
+        ThemeColor(window, "Header", ref theme.CollapsingHeaderBg, "header-bg", alpha: true);
+        ThemeColor(window, "Header hover", ref theme.CollapsingHeaderBgHover, "header-hover", alpha: true);
+        ThemeColor(window, "Header pressed", ref theme.CollapsingHeaderBgPressed, "header-pressed", alpha: true);
+        ThemeColor(window, "Header open", ref theme.CollapsingHeaderBgOpen, "header-open", alpha: true);
+
+        ThemeSection(window, "Sliders");
+        ThemeColor(window, "Slider", ref theme.SliderBg, "slider-bg");
+        ThemeColor(window, "Slider hover", ref theme.SliderBgHover, "slider-hover");
+        ThemeColor(window, "Slider active", ref theme.SliderBgActive, "slider-active");
+        ThemeColor(window, "Slider fill", ref theme.SliderFill, "slider-fill");
+        ThemeColor(window, "Slider fill active", ref theme.SliderFillActive, "slider-fill-active");
+        ThemeColor(window, "Slider border", ref theme.SliderBorder, "slider-border");
+    }
+
+    private static void ThemeSection(Ui window, string label)
+    {
+        window.Spacing(6f);
+        window.Label(label, color: window.Theme.Accent);
+    }
+
+    private static void ThemeColor(Ui window, string label, ref Color color, string id, bool alpha = true)
+        => window.ColorPickerPopup(label, ref color, window.AvailableWidth, pickerWidth: 280f, alpha: alpha, id: id, openOnHover: false);
+
     private static void DrawQuickMenu(Ui popup, DemoState state)
     {
         popup.Label("Quick actions", color: popup.Theme.Accent);
@@ -895,6 +1043,8 @@ internal sealed class DemoState
     public float Sensitivity = 1.5f;
     public int MaxRetries = 3;
     public int SelectedTheme;
+    private int _resolvedTheme = -1;
+    public Theme EditableTheme = ThemePresets.Dark();
     public Color AccentColor = new(86, 122, 178, 220);
     public bool MenuOpenedThisFrame;
     public bool DetailsOpen;
@@ -907,6 +1057,7 @@ internal sealed class DemoState
     public DockingState Docking = new();
     public WindowState InspectorWindow = new(new Vector2(720, 76));
     public WindowState MetricsWindow = new(new Vector2(690, 310));
+    public WindowState ThemeWindow = new(new Vector2(650, 420), new Vector2(320, 420));
     public List<WindowState> ExtraMetricsWindows = new();
     public Response QuickMenuButton;
     public float UiCpuTimeMs;
@@ -943,10 +1094,13 @@ internal sealed class DemoState
         Docking.Reset();
         InspectorWindow.Position = new Vector2(720, 76);
         MetricsWindow.Position = new Vector2(690, 310);
+        ThemeWindow.Position = new Vector2(650, 420);
         InspectorWindow.Open = true;
         MetricsWindow.Open = true;
+        ThemeWindow.Open = true;
         InspectorWindow.Collapsed = false;
         MetricsWindow.Collapsed = false;
+        ThemeWindow.Collapsed = false;
 
         for (int i = 0; i < ExtraMetricsWindows.Count; i++)
         {
@@ -956,10 +1110,22 @@ internal sealed class DemoState
             window.Collapsed = false;
         }
     }
-}
 
-internal static class ThemeCache
-{
-    public static readonly Theme Dark = ThemePresets.Dark();
-    public static readonly Theme Light = ThemePresets.Light();
+    public Theme ResolveTheme()
+    {
+        if (_resolvedTheme != SelectedTheme)
+            ResetThemeToSelectedPreset();
+
+        return EditableTheme;
+    }
+
+    public void ResetThemeToSelectedPreset()
+    {
+        EditableTheme = SelectedTheme switch
+        {
+            1 => ThemePresets.Light(),
+            _ => ThemePresets.Dark()
+        };
+        _resolvedTheme = SelectedTheme;
+    }
 }

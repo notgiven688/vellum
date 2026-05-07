@@ -3,7 +3,7 @@
 [![Tests](https://github.com/notgiven688/vellum/actions/workflows/tests.yml/badge.svg)](https://github.com/notgiven688/vellum/actions/workflows/tests.yml)
 [![NuGet](https://img.shields.io/nuget/v/VellumUI.svg?label=NuGet&color=yellow)](https://www.nuget.org/packages/VellumUI/)
 
-`Vellum` is an immediate-mode GUI library for C#.
+`Vellum` is a backend-neutral immediate-mode GUI library for C#.
 
 🌐 [Interactive Web Demo](https://notgiven688.github.io/vellum/) ·
 📚 [Documentation](https://notgiven688.github.io/vellum/docs/) ·
@@ -78,20 +78,44 @@ sealed class AppState
 - the core UI library
 - the default OpenTK desktop demo
 - the Raylib browser demo
+- the generated documentation and widget gallery
 - the built-in TrueType parser/rasterizer used by the text system
+
+The NuGet package contains the core UI library. The demos and gallery generator live in this repository.
 
 The current library already includes:
 
-- labels, panels, buttons, toggles, and switches
-- selectables, combo boxes, sliders, color pickers, histograms, progress bars, and spinners
+- labels, panels, buttons, checkboxes, switches, and radio buttons
+- selectables, combo boxes, sliders, drag controls, color pickers, histograms, progress bars, and spinners
 - text fields and multiline text areas
 - menu bars, cascading menus, shortcut gutters, popups, and modal popups
 - vertical and both-axis scroll areas
-- tabs, tree views, movable windows, tooltips, and a custom canvas/painter path
+- tabs, tree views, movable windows, dock spaces, tooltips, and a custom canvas/painter path
 
-The basic functionality is there. The missing work is now mostly polish, hardening, and higher-end desktop features.
+The basic functionality is there. The remaining work is mostly polish, hardening, broader backend coverage, and deeper edge-case testing.
 
 The core library also ships two built-in theme presets: `ThemePresets.Dark()` and `ThemePresets.Light()`.
+
+## Windows And Docking
+
+Windows keep persistent position, size, collapse, and close state in `WindowState`. Docking is opt-in through `DockingState`; once assigned to `Ui.Docking`, declared windows can be dragged into a `DockSpace`.
+
+```csharp
+var docking = new DockingState();
+var inspector = new WindowState(new Vector2(40f, 40f), new Vector2(320f, 220f));
+
+ui.Docking = docking;
+
+ui.Frame(width, height, mouse, input, root =>
+{
+    root.DockSpace("main-dock", root.AvailableWidth, 360f);
+
+    root.Window("Inspector", inspector, 320f, body =>
+    {
+        body.Label("Selected entity");
+    }, resizable: true);
+});
+```
 
 ## Fonts
 

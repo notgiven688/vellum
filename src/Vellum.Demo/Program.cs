@@ -109,7 +109,7 @@ internal sealed class OpenTkDemoWindow : GameWindow
 
         UpdateDemoMetrics(args.Time);
 
-        _ui.Theme = DemoScene.ResolveDemoTheme(_state.SelectedTheme);
+        _ui.Theme = _state.ResolveTheme();
         UiInputState input = BuildInput();
         var mouse = new Vector2(MouseState.Position.X, MouseState.Position.Y);
         RenderFrameInfo frame = GetCurrentRenderFrameInfo();
