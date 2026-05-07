@@ -929,7 +929,6 @@ static void DrawThemeWindow(Ui window, DemoState state)
         theme = state.ResolveTheme();
     }
 
-    window.Checkbox("LCD text", ref theme.UseLcdText, width: window.AvailableWidth);
     window.Slider("Corner radius", ref theme.BorderRadius, 0f, 14f, window.AvailableWidth, format: "{0:0.0}", id: "border-radius");
     window.Slider("Border width", ref theme.BorderWidth, 0f, 3f, window.AvailableWidth, format: "{0:0.0}", id: "border-width");
     NormalizeThemeShape(theme);
