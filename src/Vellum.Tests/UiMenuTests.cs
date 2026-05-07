@@ -140,6 +140,54 @@ public sealed class UiMenuTests
     }
 
     [Fact]
+    public void TopLevel_MenuItem_Leaves_Space_For_Shortcut()
+    {
+        var renderer = new UiTestRenderer();
+        var ui = UiTestSupport.CreateUi(renderer);
+
+        Response appMenu = default;
+        Response item = default;
+
+        void Frame(Vector2 mouse, UiInputState input = default)
+        {
+            appMenu = default;
+            item = default;
+
+            ui.Frame(420, 220, mouse, input, frame =>
+            {
+                frame.MenuBar(240, bar =>
+                {
+                    appMenu = bar.Menu("App", popup =>
+                    {
+                        item = popup.MenuItem("Increment clicks", closeOnActivate: true, shortcut: "Ctrl+I");
+                        popup.MenuItem("Reset clicks", closeOnActivate: true, shortcut: "Ctrl+R");
+                    });
+                });
+            });
+        }
+
+        Frame(Vector2.Zero);
+        Vector2 appPoint = UiTestSupport.Inside(appMenu);
+        Frame(appPoint, UiTestSupport.Input(mouseButtons: [UiMouseButton.Left]));
+        Frame(appPoint);
+
+        Assert.True(item.W > 0f);
+        Assert.True(ui.TryGetChildPopupBounds(UiWidgetKind.Menu, "App", "menu", out _, out _, out float popupW, out _));
+        Assert.InRange(popupW, 179.4f, 180.6f);
+
+        var labelVertices = UiTestSupport.VerticesWithColor(renderer.LastRenderList, ui.Theme.TextPrimary)
+            .Where(vertex => vertex.Pos.Y >= item.Y && vertex.Pos.Y <= item.Y + item.H)
+            .ToArray();
+        var shortcutVertices = UiTestSupport.VerticesWithColor(renderer.LastRenderList, ui.Theme.TextSecondary)
+            .Where(vertex => vertex.Pos.Y >= item.Y && vertex.Pos.Y <= item.Y + item.H)
+            .ToArray();
+
+        Assert.NotEmpty(labelVertices);
+        Assert.NotEmpty(shortcutVertices);
+        Assert.True(labelVertices.Max(vertex => vertex.Pos.X) < shortcutVertices.Min(vertex => vertex.Pos.X));
+    }
+
+    [Fact]
     public void ContextMenu_Opens_On_Right_Click_And_CloseAllPopups_Clears_State()
     {
         var renderer = new UiTestRenderer();

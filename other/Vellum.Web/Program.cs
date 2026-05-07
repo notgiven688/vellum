@@ -279,7 +279,7 @@ static Response DrawDemoMenuBar(Ui host, DemoState state)
                 if (submenu.MenuItem("Clear action", selected: state.SelectedAction < 0, closeOnActivate: true).Clicked)
                     state.SelectedAction = -1;
             });
-        });
+        }, popupWidth: 260f);
 
         bar.Menu("Theme", state, static (menu, state) =>
         {

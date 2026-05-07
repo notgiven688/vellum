@@ -2069,10 +2069,11 @@ public sealed partial class Ui
         var pad2 = Theme.MenuItemPadding;
         var labelLayout = LayoutText(label, s2);
         TextLayoutResult? shortcutLayout = hasShortcut ? LayoutText(shortcut!, s2) : null;
+        float shortcutWidth2 = shortcutLayout?.Width ?? 0f;
         float shortcutGap2 = hasShortcut ? MathF.Max(12f, Theme.Gap * 1.5f) : 0f;
         float markerSize2 = selected ? MathF.Max(10f, MathF.Ceiling(s2 * 0.35f)) : 0f;
         float markerGap2 = selected ? Theme.Gap : 0f;
-        float intrinsicW2 = labelLayout.Width + pad2.Horizontal + markerSize2 + markerGap2 + shortcutGap2 + (shortcutLayout?.Width ?? 0f);
+        float intrinsicW2 = labelLayout.Width + pad2.Horizontal + markerSize2 + markerGap2 + shortcutGap2 + shortcutWidth2;
         float resolvedWidth2 = width.HasValue ? MathF.Max(width.Value, intrinsicW2) : MathF.Max(AvailableWidth, intrinsicW2);
         float resolvedHeight2 = labelLayout.Height + pad2.Vertical;
         UiId resolvedId2 = ResolveWidgetId(id, label);
@@ -2108,13 +2109,17 @@ public sealed partial class Ui
             contentX2 += markerSize2 + Theme.Gap;
         }
 
+        float textRight = x2 + resolvedWidth2 - pad2.Right;
         if (hasShortcut)
         {
-            float shortcutX = x2 + resolvedWidth2 - pad2.Right - (shortcutLayout?.Width ?? 0f);
+            float shortcutX = textRight - shortcutWidth2;
             DrawTextLayout(shortcutLayout!.Value, shortcutX, textY2, Theme.TextSecondary);
+            textRight = shortcutX - shortcutGap2;
         }
 
-        DrawTextLayout(labelLayout, contentX2, textY2, visuals2.Foreground);
+        float labelMaxW = MathF.Max(0, textRight - contentX2);
+        TextLayoutResult displayLabelLayout = LayoutText(label, s2, maxWidth: labelMaxW, overflow: TextOverflowMode.Ellipsis);
+        DrawTextLayout(displayLabelLayout, contentX2, textY2, visuals2.Foreground);
 
         Advance(resolvedWidth2, resolvedHeight2);
         var response = new Response(x2, y2, resolvedWidth2, resolvedHeight2, hover2, pressed2, clicked2, focused: focused2, changed: clicked2, disabled: !enabled);
