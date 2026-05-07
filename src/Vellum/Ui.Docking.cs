@@ -651,20 +651,54 @@ public sealed partial class Ui
                 continue;
 
             TextLayoutResult label = LayoutText(request.Title, DefaultFontSize, overflow: TextOverflowMode.Ellipsis);
-            float desiredW = label.Width + Theme.TabPadding.Horizontal;
+            bool active = windowId == activeWindowId;
+            const float TabButtonInset = 2f;
+            const float TabButtonGap = 4f;
+            float tabButtonSize = MathF.Min(16f, MathF.Max(14f, tabHeight - TabButtonInset * 2f));
+            int tabButtonCount = 1 + (request.Closable ? 1 : 0);
+            float activeButtonReserve = active
+                ? tabButtonSize * tabButtonCount +
+                  TabButtonGap * Math.Max(0, tabButtonCount - 1) +
+                  TabButtonInset
+                : 0f;
+            float desiredW = label.Width + Theme.TabPadding.Horizontal + activeButtonReserve;
             float tabW = Math.Clamp(desiredW, 58f, MathF.Max(58f, tabMaxRight - tabX));
             if (tabX + tabW > tabMaxRight + 0.1f)
                 break;
 
-            bool active = windowId == activeWindowId;
             var tabRect = new ClipRect(tabX, tabY, tabW, tabHeight);
             int tabId = HashMix(windowId, UiId.HashString("dock-tab"));
             MarkWidgetSeen(tabId);
-            bool hover = PointInRect(tabRect, _mouse) &&
-                         dockInteractive &&
-                         MouseInHitClip() &&
-                         _openPopupIds.Count == 0 &&
-                         !_popupDismissedThisPress;
+            bool rawHover = PointInRect(tabRect, _mouse) &&
+                            dockInteractive &&
+                            MouseInHitClip() &&
+                            _openPopupIds.Count == 0 &&
+                            !_popupDismissedThisPress;
+            bool showButtons = active || rawHover;
+            float buttonY = tabY + MathF.Max(0, (tabHeight - tabButtonSize) * 0.5f);
+            float buttonX = tabX + tabW - Theme.TabPadding.Right - tabButtonSize;
+            ClipRect closeButtonRect = default;
+            ClipRect undockButtonRect;
+            if (request.Closable)
+            {
+                closeButtonRect = new ClipRect(buttonX, buttonY, tabButtonSize, tabButtonSize);
+                buttonX -= tabButtonSize + TabButtonGap;
+            }
+
+            undockButtonRect = new ClipRect(buttonX, buttonY, tabButtonSize, tabButtonSize);
+            int undockButtonId = HashMix(windowId, UiId.HashString("dock-undock"));
+            int closeButtonId = HashMix(windowId, UiId.HashString("dock-close"));
+            (bool Hover, bool Pressed, bool Clicked) undockButton = default;
+            (bool Hover, bool Pressed, bool Clicked) closeButton = default;
+            if (showButtons)
+            {
+                undockButton = EvaluateDockTabButton(undockButtonId, undockButtonRect, dockInteractive);
+                if (request.Closable)
+                    closeButton = EvaluateDockTabButton(closeButtonId, closeButtonRect, dockInteractive);
+            }
+
+            bool buttonHovered = undockButton.Hover || closeButton.Hover;
+            bool hover = rawHover && !buttonHovered;
             if (hover)
             {
                 _hotId = tabId;
@@ -678,22 +712,53 @@ public sealed partial class Ui
                 activeWindowId = windowId;
             }
 
+            if ((undockButton.Hover || closeButton.Hover) && IsMousePressed(UiMouseButton.Left))
+            {
+                node.ActiveWindowId = windowId;
+                activeWindowId = windowId;
+            }
+
             bool pressed = _activeId == tabId && IsMouseDown(UiMouseButton.Left);
             if (pressed && Vector2.DistanceSquared(_mousePressOrigins[MouseButtonIndex(UiMouseButton.Left)], _mouse) >= DragStartThreshold * DragStartThreshold)
             {
-                DetachDockedWindow(space, windowId, tabHeight);
+                DetachDockedWindow(space, windowId, tabHeight, beginDrag: true);
                 return;
             }
 
-            Color fill = active ? Theme.PanelBg : hover ? Theme.ButtonBgHover : Theme.ButtonBg;
+            if (undockButton.Clicked)
+            {
+                DetachDockedWindow(space, windowId, tabHeight, beginDrag: false);
+                return;
+            }
+
+            if (closeButton.Clicked)
+            {
+                request.State.Open = false;
+                Docking!.RemoveWindow(windowId);
+                var runtime = GetWindowRuntimeState(windowId);
+                runtime.Dragging = false;
+                runtime.ReleasedDrag = false;
+                runtime.Resizing = false;
+                runtime.DraggingScrollThumb = false;
+                return;
+            }
+
+            Color fill = active ? Theme.PanelBg : rawHover ? Theme.ButtonBgHover : Theme.ButtonBg;
             Color stroke = active ? Theme.Accent.WithAlpha(220) : Theme.ButtonBorder;
             _painter.DrawRect(tabX, tabY, tabW, tabHeight, fill, stroke, FrameBorderWidth, MathF.Min(FrameRadius, tabHeight * 0.35f));
 
             float labelX = tabX + Theme.TabPadding.Left;
             float labelY = tabY + MathF.Max(0, (tabHeight - label.Height) * 0.5f);
-            float labelMaxW = MathF.Max(0, tabW - Theme.TabPadding.Horizontal);
+            float labelMaxW = MathF.Max(0, (showButtons ? undockButtonRect.X - TabButtonGap : tabX + tabW - Theme.TabPadding.Right) - labelX);
             TextLayoutResult clippedLabel = LayoutText(request.Title, DefaultFontSize, maxWidth: labelMaxW, overflow: TextOverflowMode.Ellipsis);
             DrawTextLayout(clippedLabel, labelX, labelY, active ? Theme.TextPrimary : Theme.TextSecondary);
+
+            if (showButtons)
+            {
+                DrawWindowTitleButton(undockButtonRect, WindowTitleIcon.Undock, undockButton.Hover, undockButton.Pressed);
+                if (request.Closable)
+                    DrawWindowTitleButton(closeButtonRect, WindowTitleIcon.Close, closeButton.Hover, closeButton.Pressed);
+            }
 
             tabX += tabW + Theme.TabSpacing;
         }
@@ -914,7 +979,30 @@ public sealed partial class Ui
         }
     }
 
-    private void DetachDockedWindow(DockSpaceRuntime space, int windowId, float tabHeight)
+    private (bool Hover, bool Pressed, bool Clicked) EvaluateDockTabButton(int id, in ClipRect rect, bool dockInteractive)
+    {
+        MarkWidgetSeen(id);
+
+        bool hover = dockInteractive &&
+                     PointInRect(rect, _mouse) &&
+                     MouseInHitClip() &&
+                     _openPopupIds.Count == 0 &&
+                     !_popupDismissedThisPress;
+        if (hover)
+        {
+            _hotId = id;
+            RequestCursor(UiCursor.PointingHand);
+        }
+
+        if (hover && IsMousePressed(UiMouseButton.Left))
+            _activeId = id;
+
+        bool pressed = _activeId == id && IsMouseDown(UiMouseButton.Left);
+        bool clicked = IsMouseReleased(UiMouseButton.Left) && _activeId == id && hover;
+        return (hover, pressed, clicked);
+    }
+
+    private void DetachDockedWindow(DockSpaceRuntime space, int windowId, float tabHeight, bool beginDrag)
     {
         if (Docking == null || !_windowRequests.TryGetValue(windowId, out var request))
             return;
@@ -929,13 +1017,21 @@ public sealed partial class Ui
         runtime.TitleBarHeight = tabHeight;
         runtime.DragOffset = _mouse - runtime.Position;
         runtime.Initialized = true;
-        runtime.Dragging = true;
+        runtime.Dragging = beginDrag;
         runtime.ReleasedDrag = false;
         runtime.Resizing = false;
         runtime.DraggingScrollThumb = false;
         request.State.Position = runtime.Position;
-        _activeId = request.WindowId;
-        Docking.DraggingWindowId = windowId;
+        if (beginDrag)
+        {
+            _activeId = request.WindowId;
+            Docking.DraggingWindowId = windowId;
+        }
+        else if (_activeId != 0)
+        {
+            _activeId = 0;
+        }
+
         BringWindowToFront(windowId);
     }
 

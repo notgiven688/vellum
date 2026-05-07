@@ -36,7 +36,7 @@ public sealed partial class Ui
         public DeferredUiContent Content;
     }
 
-    private enum WindowTitleIcon { Collapse, Expand, Close }
+    private enum WindowTitleIcon { Collapse, Expand, Close, Undock }
 
     /// <summary>Declares a floating window.</summary>
     public Response Window(string title, WindowState state, float width, Action<Ui> content,
@@ -867,6 +867,13 @@ public sealed partial class Ui
             case WindowTitleIcon.Close:
                 DrawIconLine(left, top, right, bottom, thickness, color);
                 DrawIconLine(left, bottom, right, top, thickness, color);
+                break;
+            case WindowTitleIcon.Undock:
+                DrawIconLine(left, midY, left, bottom, thickness, color);
+                DrawIconLine(left, bottom, midX, bottom, thickness, color);
+                DrawIconLine(midX, top, right, top, thickness, color);
+                DrawIconLine(right, top, right, midY, thickness, color);
+                DrawIconLine(midX, midY, right, top, thickness, color);
                 break;
         }
     }

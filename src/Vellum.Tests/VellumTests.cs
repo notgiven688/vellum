@@ -2244,6 +2244,159 @@ public sealed class VellumTests
                 RootPadding = 0f
             };
 
+            var windowState = new WindowState(new Vector2(260, 24));
+            Response dockSpace = default;
+            Response window = default;
+
+            void Frame(Vector2 mouse, UiInputState input = default)
+            {
+                ui.Frame(560, 280, mouse, false, input, frame =>
+                {
+                    dockSpace = frame.DockSpace("main", 220, 150);
+                    window = frame.Window("Inspector", windowState, 180, content =>
+                    {
+                        content.Label("Dockable body");
+                    }, id: "dock-close-button");
+                });
+            }
+
+            Frame(Vector2.Zero);
+            Frame(Vector2.Zero);
+            Vector2 dragStart = new(window.X + 18f, window.Y + window.H - 10f);
+            Vector2 dropPoint = new(dockSpace.X + dockSpace.W * 0.5f, dockSpace.Y + dockSpace.H * 0.5f);
+            Frame(dragStart, Input(mouseButtons: [UiMouseButton.Left]));
+            Frame(dropPoint, Input(mouseButtons: [UiMouseButton.Left]));
+            Frame(dropPoint);
+            Frame(Vector2.Zero);
+
+            for (float buttonX = dockSpace.X + 170f; buttonX >= dockSpace.X + 70f && windowState.Open; buttonX -= 4f)
+            {
+                Vector2 closeButton = new(buttonX, dockSpace.Y + 13f);
+                Frame(closeButton, Input(mouseButtons: [UiMouseButton.Left]));
+                Frame(closeButton);
+            }
+
+            Check(
+                "docked close button closes closable windows",
+                !windowState.Open &&
+                docking.WindowSpaces.Count == 0);
+        }
+
+        {
+            var renderer = new TestRenderer();
+            var docking = new DockingState();
+            var ui = new Ui(renderer)
+            {
+                Font = font,
+                DefaultFontSize = 18f,
+                Lcd = false,
+                Docking = docking,
+                RootPadding = 0f
+            };
+
+            var windowState = new WindowState(new Vector2(260, 24));
+            Response dockSpace = default;
+            Response window = default;
+
+            void Frame(Vector2 mouse, UiInputState input = default)
+            {
+                ui.Frame(560, 280, mouse, false, input, frame =>
+                {
+                    dockSpace = frame.DockSpace("main", 220, 150);
+                    window = frame.Window("Inspector", windowState, 180, content =>
+                    {
+                        content.Label("Dockable body");
+                    }, id: "dock-undock-button");
+                });
+            }
+
+            Frame(Vector2.Zero);
+            Frame(Vector2.Zero);
+            Vector2 dragStart = new(window.X + 18f, window.Y + window.H - 10f);
+            Vector2 dropPoint = new(dockSpace.X + dockSpace.W * 0.5f, dockSpace.Y + dockSpace.H * 0.5f);
+            Frame(dragStart, Input(mouseButtons: [UiMouseButton.Left]));
+            Frame(dropPoint, Input(mouseButtons: [UiMouseButton.Left]));
+            Frame(dropPoint);
+            Frame(Vector2.Zero);
+
+            for (float buttonX = dockSpace.X + 40f; buttonX <= dockSpace.X + 170f && docking.WindowSpaces.Count > 0 && windowState.Open; buttonX += 4f)
+            {
+                Vector2 undockButton = new(buttonX, dockSpace.Y + 13f);
+                Frame(undockButton, Input(mouseButtons: [UiMouseButton.Left]));
+                Frame(undockButton);
+            }
+            Frame(Vector2.Zero);
+
+            Check(
+                "docked undock button restores a floating window",
+                windowState.Open &&
+                docking.WindowSpaces.Count == 0 &&
+                window.W > 0f &&
+                window.H > 0f &&
+                MathF.Abs(window.X - dockSpace.X) > 1f);
+        }
+
+        {
+            var renderer = new TestRenderer();
+            var docking = new DockingState();
+            var ui = new Ui(renderer)
+            {
+                Font = font,
+                DefaultFontSize = 18f,
+                Lcd = false,
+                Docking = docking,
+                RootPadding = 0f
+            };
+
+            var windowState = new WindowState(new Vector2(260, 24));
+            Response dockSpace = default;
+            Response window = default;
+
+            void Frame(Vector2 mouse, UiInputState input = default)
+            {
+                ui.Frame(560, 280, mouse, false, input, frame =>
+                {
+                    dockSpace = frame.DockSpace("main", 220, 150);
+                    window = frame.Window("Inspector", windowState, 180, content =>
+                    {
+                        content.Label("Dockable body");
+                    }, closable: false, id: "dock-no-close-button");
+                });
+            }
+
+            Frame(Vector2.Zero);
+            Frame(Vector2.Zero);
+            Vector2 dragStart = new(window.X + 18f, window.Y + window.H - 10f);
+            Vector2 dropPoint = new(dockSpace.X + dockSpace.W * 0.5f, dockSpace.Y + dockSpace.H * 0.5f);
+            Frame(dragStart, Input(mouseButtons: [UiMouseButton.Left]));
+            Frame(dropPoint, Input(mouseButtons: [UiMouseButton.Left]));
+            Frame(dropPoint);
+            Frame(Vector2.Zero);
+
+            for (float buttonX = dockSpace.X + 170f; buttonX >= dockSpace.X + 70f && windowState.Open && docking.WindowSpaces.Count > 0; buttonX -= 4f)
+            {
+                Vector2 wouldBeCloseButton = new(buttonX, dockSpace.Y + 13f);
+                Frame(wouldBeCloseButton, Input(mouseButtons: [UiMouseButton.Left]));
+                Frame(wouldBeCloseButton);
+            }
+
+            Check(
+                "docked close button is omitted when the window is not closable",
+                windowState.Open);
+        }
+
+        {
+            var renderer = new TestRenderer();
+            var docking = new DockingState();
+            var ui = new Ui(renderer)
+            {
+                Font = font,
+                DefaultFontSize = 18f,
+                Lcd = false,
+                Docking = docking,
+                RootPadding = 0f
+            };
+
             var floatingState = new WindowState(new Vector2(32, 32));
             var dockedState = new WindowState(new Vector2(300, 24));
             Response dockSpace = default;
