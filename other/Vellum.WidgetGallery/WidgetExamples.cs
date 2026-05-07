@@ -238,6 +238,15 @@ internal static class WidgetExamples
             });
         }),
 
+        new(
+            "dock-space",
+            "DockSpace",
+            "Windows",
+            560,
+            300,
+            DrawDockSpaceExample,
+            WarmupFrames: CreateDockSpaceWarmupFrames()),
+
         new("window", "Window", "Windows", 460, 250, (ui, _) =>
         {
             var state = new WindowState(new Vector2(32f, 30f), new Vector2(300f, 160f));
@@ -251,4 +260,59 @@ internal static class WidgetExamples
             }, resizable: true, id: "inspector");
         }),
     ];
+
+    private static void DrawDockSpaceExample(Ui ui, WidgetExampleContext context)
+    {
+        var docking = context.GetState("dock-space-docking", static () => new DockingState());
+        var inspectorState = context.GetState(
+            "dock-space-inspector",
+            static () => new WindowState(new Vector2(370f, 34f), new Vector2(180f, 128f)));
+        var metricsState = context.GetState(
+            "dock-space-metrics",
+            static () => new WindowState(new Vector2(370f, 148f), new Vector2(180f, 128f)));
+
+        ui.Docking = docking;
+        ui.DockSpace("main-dock", ui.AvailableWidth, 220f);
+
+        ui.Window("Inspector", inspectorState, 180f, window =>
+        {
+            string entityName = "Camera";
+            bool enabled = true;
+            window.Label("Entity", color: window.Theme.Accent);
+            window.TextField("entity", ref entityName, window.AvailableWidth);
+            window.Checkbox("Enabled", ref enabled);
+        }, resizable: true, id: "dock-inspector");
+
+        ui.Window("Metrics", metricsState, 180f, window =>
+        {
+            window.Label("Frame", color: window.Theme.Accent);
+            window.ProgressBar(0.42f, window.AvailableWidth, overlay: "7.0 ms");
+            float[] samples = [0.18f, 0.32f, 0.28f, 0.54f, 0.48f, 0.68f, 0.44f, 0.58f];
+            window.Histogram(samples, window.AvailableWidth, 64f);
+        }, resizable: true, id: "dock-metrics");
+    }
+
+    private static IReadOnlyList<WidgetExampleFrame> CreateDockSpaceWarmupFrames()
+    {
+        Vector2 dockCenter = new(280f, 124f);
+        Vector2 dockRightEdge = new(534f, 124f);
+        Vector2 inspectorGrab = new(388f, 48f);
+        Vector2 metricsGrab = new(388f, 162f);
+
+        return
+        [
+            new(Vector2.Zero, default),
+            new(inspectorGrab, LeftMouseInput()),
+            new(dockCenter, LeftMouseInput()),
+            new(dockCenter, default),
+            new(Vector2.Zero, default),
+            new(metricsGrab, LeftMouseInput()),
+            new(dockRightEdge, LeftMouseInput()),
+            new(dockRightEdge, default),
+            new(Vector2.Zero, default)
+        ];
+    }
+
+    private static UiInputState LeftMouseInput()
+        => new(downMouseButtons: new HashSet<UiMouseButton> { UiMouseButton.Left });
 }

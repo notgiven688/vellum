@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Numerics;
 using System.Text;
 using Vellum.Rendering;
 using Vellum.SoftwareRendering;
@@ -60,13 +61,23 @@ internal static class Program
             RootPadding = 14f
         };
 
-        ui.Frame(example.Width, example.Height, example.Mouse, example.Input, root =>
+        if (example.WarmupFrames != null)
+        {
+            foreach (WidgetExampleFrame frame in example.WarmupFrames)
+                RenderExampleFrame(ui, example, context, frame.Mouse, frame.Input);
+        }
+
+        RenderExampleFrame(ui, example, context, example.Mouse, example.Input);
+        renderer.SavePng(imagePath);
+    }
+
+    private static void RenderExampleFrame(Ui ui, WidgetExample example, WidgetExampleContext context, Vector2 mouse, UiInputState input)
+    {
+        ui.Frame(example.Width, example.Height, mouse, input, root =>
         {
             root.FillViewport(root.Theme.SurfaceBg);
             example.Draw(root, context);
         });
-
-        renderer.SavePng(imagePath);
     }
 
     private static void WriteMarkdown(string path)

@@ -200,6 +200,12 @@ This page is generated from curated widget examples in `other/Vellum.WidgetGalle
 
 ## Windows
 
+### DockSpace
+
+| Dark | Light |
+| --- | --- |
+| ![DockSpace - Dark](images/widgets/dock-space-dark.png) | ![DockSpace - Light](images/widgets/dock-space-light.png) |
+
 ### Window
 
 | Dark | Light |

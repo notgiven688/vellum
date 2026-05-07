@@ -5,6 +5,8 @@ namespace Vellum.WidgetGallery;
 
 internal sealed class WidgetExampleContext
 {
+    private readonly Dictionary<string, object> _state = new();
+
     public WidgetExampleContext(SoftwareRenderer renderer)
     {
         Renderer = renderer;
@@ -14,6 +16,16 @@ internal sealed class WidgetExampleContext
     public SoftwareRenderer Renderer { get; }
 
     public int CheckerTexture { get; }
+
+    public T GetState<T>(string key, Func<T> factory) where T : class
+    {
+        if (_state.TryGetValue(key, out object? existing))
+            return (T)existing;
+
+        T created = factory();
+        _state[key] = created;
+        return created;
+    }
 
     private static int CreateCheckerTexture(SoftwareRenderer renderer)
     {
