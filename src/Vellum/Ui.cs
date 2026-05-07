@@ -113,7 +113,7 @@ public sealed class WindowState
     public Vector2 Size;
     /// <summary>Minimum size for resizable windows.</summary>
     public Vector2 MinSize = new(160f, 80f);
-    /// <summary>Reserved maximum size for future window constraints.</summary>
+    /// <summary>Maximum size for resizable windows. A zero component means unbounded on that axis.</summary>
     public Vector2 MaxSize;
     /// <summary>Whether the window is open and should be rendered.</summary>
     public bool Open = true;

@@ -158,11 +158,11 @@ public sealed partial class Ui
         {
             Vector2 delta = _mouse - runtime.ResizeAnchor;
             Vector2 newSize = runtime.ResizeStartSize + delta;
-            Vector2 minSize = new(MathF.Max(60f, state.MinSize.X), MathF.Max(40f, state.MinSize.Y));
-            newSize.X = MathF.Max(minSize.X, newSize.X);
-            newSize.Y = MathF.Max(minSize.Y, newSize.Y);
-            state.Size = newSize;
+            state.Size = ClampWindowSize(newSize, state);
         }
+
+        if (resizable)
+            state.Size = ClampWindowSize(state.Size, state);
 
         state.Position = runtime.Position;
         effectiveWidth = resizable && state.Size.X > 0 ? state.Size.X : width;
@@ -198,6 +198,27 @@ public sealed partial class Ui
             Header = header,
             Content = content
         };
+    }
+
+    private static Vector2 ClampWindowSize(Vector2 size, WindowState state)
+    {
+        Vector2 minSize = new(MathF.Max(60f, state.MinSize.X), MathF.Max(40f, state.MinSize.Y));
+
+        if (size.X > 0f)
+        {
+            size.X = MathF.Max(minSize.X, size.X);
+            if (state.MaxSize.X > 0f)
+                size.X = MathF.Min(size.X, MathF.Max(minSize.X, state.MaxSize.X));
+        }
+
+        if (size.Y > 0f)
+        {
+            size.Y = MathF.Max(minSize.Y, size.Y);
+            if (state.MaxSize.Y > 0f)
+                size.Y = MathF.Min(size.Y, MathF.Max(minSize.Y, state.MaxSize.Y));
+        }
+
+        return size;
     }
 
     private void PrepareWindowFrame()

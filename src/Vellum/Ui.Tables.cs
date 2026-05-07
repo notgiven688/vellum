@@ -311,8 +311,9 @@ public sealed partial class Ui
         Action<TableBuilder> content,
         float? width = null,
         bool header = true,
-        bool stripedRows = true)
-        => TableCore(id, columns, content, static (table, action) => action(table), width, header, stripedRows);
+        bool stripedRows = true,
+        EdgeInsets? cellPadding = null)
+        => TableCore(id, columns, content, static (table, action) => action(table), width, header, stripedRows, cellPadding);
 
     /// <summary>Renders a compact immediate-mode table with explicit state passed to the callback.</summary>
     public Response Table<TState>(
@@ -322,10 +323,11 @@ public sealed partial class Ui
         Action<TableBuilder, TState> content,
         float? width = null,
         bool header = true,
-        bool stripedRows = true)
+        bool stripedRows = true,
+        EdgeInsets? cellPadding = null)
     {
         ArgumentNullException.ThrowIfNull(content);
-        return TableCore(id, columns, state, content, width, header, stripedRows);
+        return TableCore(id, columns, state, content, width, header, stripedRows, cellPadding);
     }
 
     private Response TableCore<TState>(
@@ -335,7 +337,8 @@ public sealed partial class Ui
         Action<TableBuilder, TState> content,
         float? width,
         bool header,
-        bool stripedRows)
+        bool stripedRows,
+        EdgeInsets? cellPadding)
     {
         ArgumentNullException.ThrowIfNull(columns);
         ArgumentNullException.ThrowIfNull(content);
@@ -349,7 +352,7 @@ public sealed partial class Ui
         var (x, y) = Place(resolvedWidth, 0f);
         float border = FrameBorderWidth;
         var columnLayouts = ResolveTableColumns(columns, x + border, MathF.Max(0f, resolvedWidth - border * 2f));
-        var layout = new TableLayout(widgetId, x, y, resolvedWidth, border, Theme.MenuItemPadding, columnLayouts);
+        var layout = new TableLayout(widgetId, x, y, resolvedWidth, border, cellPadding ?? Theme.MenuItemPadding, columnLayouts);
 
         var parentPainter = _painter;
         var tablePainter = AcquireDeferredPainter();

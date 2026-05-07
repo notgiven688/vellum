@@ -2029,6 +2029,54 @@ public sealed class VellumTests
 
         {
             var renderer = new TestRenderer();
+            var ui = new Ui(renderer)
+            {
+                Font = font,
+                DefaultFontSize = 18f,
+                Lcd = false
+            };
+
+            var windowState = new WindowState(new Vector2(32, 24))
+            {
+                MaxSize = new Vector2(180, 0)
+            };
+            Response window = default;
+
+            void Frame(Vector2 mouse, UiInputState input = default)
+            {
+                ui.Frame(420, 260, mouse, input, frame =>
+                {
+                    window = frame.Window("Limited", windowState, 180, content =>
+                    {
+                        content.Label("Window body");
+                    }, resizable: true, id: "limited-resize");
+                });
+            }
+
+            Frame(Vector2.Zero);
+            Frame(Vector2.Zero);
+
+            Vector2 grip = new(window.X + window.W - 4f, window.Y + window.H - 4f);
+            Frame(grip, Input(mouseButtons: [UiMouseButton.Left]));
+            Frame(grip + new Vector2(120f, 0f), Input(mouseButtons: [UiMouseButton.Left]));
+            Frame(grip + new Vector2(120f, 0f));
+
+            Vector2 probePastVisibleWidth = new(windowState.Position.X + 220f, windowState.Position.Y + 40f);
+            ui.BeginFrame(420, 260, probePastVisibleWidth, default(UiInputState));
+            ui.Window("Limited", windowState, 180, content =>
+            {
+                content.Label("Window body");
+            }, resizable: true, id: "limited-resize");
+            bool capturedPastVisibleWidth = ui.WantsCaptureMouse;
+            ui.EndFrame();
+
+            Check(
+                "resizable window max width clamps state before capture checks",
+                windowState.Size.X <= 180.1f && !capturedPastVisibleWidth);
+        }
+
+        {
+            var renderer = new TestRenderer();
             var docking = new DockingState();
             var ui = new Ui(renderer)
             {
