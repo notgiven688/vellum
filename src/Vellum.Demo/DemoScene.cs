@@ -774,6 +774,7 @@ internal static class DemoScene
         window.Checkbox("LCD text", ref theme.UseLcdText, width: window.AvailableWidth);
         window.Slider("Corner radius", ref theme.BorderRadius, 0f, 14f, window.AvailableWidth, format: "{0:0.0}", id: "border-radius");
         window.Slider("Border width", ref theme.BorderWidth, 0f, 3f, window.AvailableWidth, format: "{0:0.0}", id: "border-width");
+        NormalizeThemeShape(theme);
         window.Slider("Gap", ref theme.Gap, 0f, 20f, window.AvailableWidth, format: "{0:0.0}", id: "gap");
         window.Slider("Scrollbar width", ref theme.ScrollbarWidth, 6f, 20f, window.AvailableWidth, format: "{0:0.0}", id: "scrollbar-width");
         window.Slider("Slider height", ref theme.SliderHeight, 14f, 36f, window.AvailableWidth, format: "{0:0.0}", id: "slider-height");
@@ -879,6 +880,15 @@ internal static class DemoScene
     {
         window.Spacing(6f);
         window.Label(label, color: window.Theme.Accent);
+    }
+
+    private static void NormalizeThemeShape(Theme theme)
+    {
+        theme.BorderWidth = MathF.Max(0f, theme.BorderWidth);
+        theme.BorderRadius = MathF.Max(0f, theme.BorderRadius);
+        float minPositiveRadius = theme.BorderWidth > 0f ? theme.BorderWidth + 1f : 0f;
+        if (theme.BorderRadius > 0f && theme.BorderRadius < minPositiveRadius)
+            theme.BorderRadius = minPositiveRadius;
     }
 
     private static void ThemeColor(Ui window, string label, ref Color color, string id, bool alpha = true)

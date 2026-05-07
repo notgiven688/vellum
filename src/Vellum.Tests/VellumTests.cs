@@ -3567,6 +3567,23 @@ public sealed class VellumTests
             HasVertexColor(renderer.LastRenderList, ui.Theme.ButtonBorder);
         Check("button uses themed border and radius", buttonFrame);
 
+        ui.Theme.BorderWidth = 4f;
+        ui.Theme.BorderRadius = 2f;
+        Response smallRadiusButton = default;
+        ui.Frame(360, 220, Vector2.Zero, false, frame =>
+        {
+            smallRadiusButton = frame.Button("Small radius");
+        });
+
+        float rightMostTopFillX = renderer.LastRenderList!.Vertices
+            .Where(v => v.Color == ui.Theme.ButtonBg && MathF.Abs(v.Pos.Y - smallRadiusButton.Y) < 0.01f)
+            .Select(v => v.Pos.X)
+            .DefaultIfEmpty(float.PositiveInfinity)
+            .Max();
+        Check("positive frame radius keeps a visible inner radius", rightMostTopFillX <= smallRadiusButton.X + smallRadiusButton.W - ui.Theme.BorderWidth - 1f + 0.1f);
+        ui.Theme.BorderWidth = 2f;
+        ui.Theme.BorderRadius = 7f;
+
         ui.Frame(360, 220, Vector2.Zero, false, Input(keys: new[] { UiKey.Tab }), frame =>
         {
             frame.Button("Styled");

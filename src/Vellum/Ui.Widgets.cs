@@ -56,8 +56,18 @@ public sealed partial class Ui
         }
     }
 
+    private const float MinPositiveFrameInnerRadius = 1f;
+
     private float FrameBorderWidth => MathF.Max(0, Theme.BorderWidth);
-    private float FrameRadius => MathF.Max(0, Theme.BorderRadius);
+    private float FrameRadius
+    {
+        get
+        {
+            float radius = MathF.Max(0, Theme.BorderRadius);
+            float border = FrameBorderWidth;
+            return radius > 0f && border > 0f ? MathF.Max(radius, border + MinPositiveFrameInnerRadius) : radius;
+        }
+    }
 
     private void DrawFrameRect(float x, float y, float width, float height, Color fill, Color border)
     {
