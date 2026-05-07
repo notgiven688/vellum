@@ -565,9 +565,10 @@ public sealed partial class Ui
                 Docking.DraggingWindowId = windowId;
 
             if (runtime.ReleasedDrag &&
-                _windowRequests.ContainsKey(windowId) &&
+                _windowRequests.TryGetValue(windowId, out var request) &&
                 Docking.TryFindDropTarget(_mouse, _frameIndex, out var target))
             {
+                request.State.Collapsed = false;
                 Docking.DockWindow(windowId, target);
                 runtime.Dragging = false;
                 runtime.ReleasedDrag = false;
@@ -654,7 +655,11 @@ public sealed partial class Ui
             node.ActiveWindowId = node.WindowIds[0];
 
         foreach (int windowId in node.WindowIds)
+        {
             _dockedWindowIdsRenderedThisFrame.Add(windowId);
+            if (_windowRequests.TryGetValue(windowId, out var dockedRequest))
+                dockedRequest.State.Collapsed = false;
+        }
 
         float tabHeight = MathF.Max(24f, LayoutText("Ag", DefaultFontSize).Height + Theme.TabPadding.Vertical);
         float tabX = x + border;

@@ -2023,6 +2023,58 @@ public sealed class VellumTests
             var windowState = new WindowState(new Vector2(260, 24));
             Response dockSpace = default;
             Response window = default;
+            Response bodyLabel = default;
+
+            void Frame(Vector2 mouse, UiInputState input = default)
+            {
+                bodyLabel = default;
+                ui.Frame(520, 260, mouse, false, input, frame =>
+                {
+                    dockSpace = frame.DockSpace("main", 220, 150);
+                    window = frame.Window("Tool", windowState, 180, content =>
+                    {
+                        bodyLabel = content.Label("Dockable body");
+                    }, id: "collapsed-dockable-tool");
+                });
+            }
+
+            Frame(Vector2.Zero);
+            Frame(Vector2.Zero);
+            Vector2 collapseButton = new(window.X + window.W - 31f, window.Y + 11f);
+            Frame(collapseButton, Input(mouseButtons: [UiMouseButton.Left]));
+            Frame(collapseButton);
+            Frame(Vector2.Zero);
+
+            Vector2 dragStart = new(window.X + 18f, window.Y + 10f);
+            Vector2 dropPoint = new(dockSpace.X + dockSpace.W * 0.5f, dockSpace.Y + dockSpace.H * 0.5f);
+            Frame(dragStart, Input(mouseButtons: [UiMouseButton.Left]));
+            Frame(dropPoint, Input(mouseButtons: [UiMouseButton.Left]));
+            Frame(dropPoint);
+            Frame(Vector2.Zero);
+
+            Check(
+                "collapsed floating window expands when docked",
+                docking.WindowSpaces.Count == 1 &&
+                !windowState.Collapsed &&
+                bodyLabel.W > 0f &&
+                bodyLabel.H > 0f);
+        }
+
+        {
+            var renderer = new TestRenderer();
+            var docking = new DockingState();
+            var ui = new Ui(renderer)
+            {
+                Font = font,
+                DefaultFontSize = 18f,
+                Lcd = false,
+                Docking = docking,
+                RootPadding = 0f
+            };
+
+            var windowState = new WindowState(new Vector2(260, 24));
+            Response dockSpace = default;
+            Response window = default;
             Response resetButton = default;
 
             void Frame(Vector2 mouse, UiInputState input = default)
