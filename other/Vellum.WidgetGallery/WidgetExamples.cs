@@ -139,6 +139,37 @@ internal static class WidgetExamples
             });
         }),
 
+        new("table", "Table", "Layout", 440, 170, (ui, _) =>
+        {
+            ui.Table("metrics", [
+                new TableColumn("Metric"),
+                new TableColumn("Value", 82f, UiAlign.End),
+                new TableColumn("State", 64f, UiAlign.Center)
+            ], table =>
+            {
+                table.Row(row =>
+                {
+                    row.Cell("Bodies");
+                    row.Cell("128");
+                    row.Cell("ok");
+                });
+
+                table.Row(row =>
+                {
+                    row.Cell("Contacts");
+                    row.Cell("1,284");
+                    row.Cell("hot");
+                });
+
+                table.Row(row =>
+                {
+                    row.Cell("Frame");
+                    row.Cell("1.82 ms");
+                    row.Cell("live");
+                });
+            }, width: 340f);
+        }),
+
         new("canvas", "Canvas", "Layout", 360, 152, (ui, _) =>
         {
             ui.Canvas(280f, 90f, canvas =>

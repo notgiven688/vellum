@@ -197,6 +197,8 @@ public enum UiWidgetKind
     ScrollArea,
     /// <summary>A scroll area that scrolls in both directions.</summary>
     ScrollAreaBoth,
+    /// <summary>A compact row and column table.</summary>
+    Table,
     /// <summary>A floating window.</summary>
     Window,
     /// <summary>A region that hosts docked windows.</summary>

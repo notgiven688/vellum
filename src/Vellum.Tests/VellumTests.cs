@@ -330,6 +330,7 @@ public sealed class VellumTests
             "Vellum.NullUiPlatform",
             "Vellum.Response",
             "Vellum.ScaledGlyphMetrics",
+            "Vellum.TableColumn",
             "Vellum.TextOverflowMode",
             "Vellum.TextWrapMode",
             "Vellum.Theme",
@@ -339,6 +340,8 @@ public sealed class VellumTests
             "Vellum.Ui+DisabledScopeHandle",
             "Vellum.Ui+IdScopeHandle",
             "Vellum.Ui+LayoutScopeHandle",
+            "Vellum.Ui+TableBuilder",
+            "Vellum.Ui+TableRowBuilder",
             "Vellum.UiAlign",
             "Vellum.UiCanvas",
             "Vellum.UiCursor",
@@ -1760,6 +1763,68 @@ public sealed class VellumTests
                 MathF.Abs(panel.W - 200f) < 0.1f &&
                 panel.H >= minimumHeight - 0.1f &&
                 second.Y + second.H <= panel.Y + panel.H + 0.1f);
+        }
+
+        {
+            var renderer = new TestRenderer();
+            var ui = new Ui(renderer)
+            {
+                Font = font,
+                DefaultFontSize = 18f,
+                Lcd = false
+            };
+
+            TableColumn[] columns =
+            [
+                new("Metric"),
+                new("Value", 72f, UiAlign.End),
+                new("Live", 64f, UiAlign.Center)
+            ];
+            Response table = default;
+            Response labelCell = default;
+            Response valueCell = default;
+            Response nestedCell = default;
+            Response nestedLabel = default;
+
+            ui.Frame(420, 220, Vector2.Zero, false, frame =>
+            {
+                table = frame.Table("metrics-table", columns, rows =>
+                {
+                    rows.Row(row =>
+                    {
+                        labelCell = row.Cell("Bodies");
+                        valueCell = row.Cell("128");
+                        row.Cell("yes");
+                    });
+
+                    rows.Row(row =>
+                    {
+                        row.Cell("Frame time");
+                        row.Cell("1.82 ms");
+                        nestedCell = row.Cell(cell =>
+                        {
+                            nestedLabel = cell.Label("ok", width: cell.AvailableWidth, align: UiAlign.Center);
+                        });
+                    });
+                }, width: 300f);
+            });
+
+            float stretchWidth = 300f - ui.Theme.BorderWidth * 2f - 72f - 64f;
+            bool tableLayout =
+                MathF.Abs(table.W - 300f) < 0.1f &&
+                MathF.Abs(labelCell.W - stretchWidth) < 0.1f &&
+                MathF.Abs(valueCell.W - 72f) < 0.1f &&
+                valueCell.X > labelCell.X + labelCell.W - 0.1f &&
+                MathF.Abs(nestedCell.W - 64f) < 0.1f &&
+                nestedLabel.W > 0f;
+            bool tableVisuals =
+                renderer.LastRenderList != null &&
+                HasVertexColor(renderer.LastRenderList, ui.Theme.ButtonBg) &&
+                HasVertexColor(renderer.LastRenderList, ui.Theme.SelectableBg) &&
+                HasVertexColor(renderer.LastRenderList, ui.Theme.Separator) &&
+                HasVertexColor(renderer.LastRenderList, ui.Theme.PanelBorder);
+
+            Check("table lays out stretch and fixed columns", tableLayout && tableVisuals);
         }
 
         {

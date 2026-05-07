@@ -55,7 +55,7 @@ sealed class AppState
 }
 ```
 
-The current widget set includes labels, panels, buttons, checkboxes, switches, radio buttons, selectables, combo boxes, sliders, drag controls, color pickers, text fields, text areas, progress bars, histograms, spinners, scroll areas, tabs, tree views, menu bars, cascading menus, popups, tooltips, movable windows, dock spaces, and custom canvas drawing.
+The current widget set includes labels, panels, buttons, checkboxes, switches, radio buttons, selectables, combo boxes, sliders, drag controls, color pickers, text fields, text areas, progress bars, histograms, spinners, scroll areas, tables, tabs, tree views, menu bars, cascading menus, popups, tooltips, movable windows, dock spaces, and custom canvas drawing.
 
 Windows keep their persistent state in `WindowState`. Docking is opt-in through `DockingState`:
 

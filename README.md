@@ -90,6 +90,7 @@ The current library already includes:
 - text fields and multiline text areas
 - menu bars, cascading menus, shortcut gutters, popups, and modal popups
 - vertical and both-axis scroll areas
+- compact tables
 - tabs, tree views, movable windows, dock spaces, tooltips, and a custom canvas/painter path
 
 The basic functionality is there. The remaining work is mostly polish, hardening, broader backend coverage, and deeper edge-case testing.

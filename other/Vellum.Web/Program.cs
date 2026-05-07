@@ -12,6 +12,11 @@ namespace Vellum.Web;
 public partial class Application
 {
     private const float TargetFrameBudgetMs = 1000f / 60f;
+    private static readonly TableColumn[] s_metricsColumns =
+    [
+        new("Metric"),
+        new("Value", 92f, UiAlign.End)
+    ];
     private static RaylibRenderer? s_renderer;
     private static Ui? s_ui;
     private static int s_checkerTexture;
@@ -874,9 +879,26 @@ static void DrawMetricsWindow(Ui window, DemoState state)
     window.Label("Dock companion", color: window.Theme.Accent);
     BodyLabel(window, "Renderer timing, frame counters, and interaction state for the current demo session.", color: window.Theme.TextSecondary);
     window.Separator();
-    window.Label($"UI CPU: {state.UiCpuTimeMs:0.00} ms", color: window.Theme.TextSecondary);
-    window.Label($"Frame time: {state.FrameTimeMs:0.00} ms", color: window.Theme.TextSecondary);
-    window.Label($"FPS: {state.Fps}", color: window.Theme.TextSecondary);
+    window.Table("metrics-table", s_metricsColumns, state, static (table, state) =>
+    {
+        table.Row(state, static (row, state) =>
+        {
+            row.Cell("UI CPU");
+            row.Cell($"{state.UiCpuTimeMs:0.00} ms");
+        });
+
+        table.Row(state, static (row, state) =>
+        {
+            row.Cell("Frame time");
+            row.Cell($"{state.FrameTimeMs:0.00} ms");
+        });
+
+        table.Row(state, static (row, state) =>
+        {
+            row.Cell("FPS");
+            row.Cell(state.Fps.ToString());
+        });
+    }, width: window.AvailableWidth);
     window.ProgressBar(MathF.Min(1f, state.SmoothedUiCpuTimeMs / TargetFrameBudgetMs), window.AvailableWidth, overlay: "UI budget");
     window.Separator();
     if (window.Button("Increment clicks", width: window.AvailableWidth).Clicked)

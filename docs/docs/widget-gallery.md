@@ -162,6 +162,12 @@ This page is generated from curated widget examples in `other/Vellum.WidgetGalle
 | --- | --- |
 | ![Splitter - Dark](images/widgets/splitter-dark.png) | ![Splitter - Light](images/widgets/splitter-light.png) |
 
+### Table
+
+| Dark | Light |
+| --- | --- |
+| ![Table - Dark](images/widgets/table-dark.png) | ![Table - Light](images/widgets/table-light.png) |
+
 ## Media
 
 ### Image

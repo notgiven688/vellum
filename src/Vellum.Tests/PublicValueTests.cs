@@ -102,6 +102,8 @@ public sealed class PublicValueTests
         int[] contextCount = [0];
         int[] menuCount = [0];
         int[] tabCount = [0];
+        int[] tableCount = [0];
+        TableColumn[] tableColumns = [new("Name")];
         WindowState windowState = new(new Vector2(12f, 12f));
 
         ui.OpenPopup(9);
@@ -159,6 +161,12 @@ public sealed class PublicValueTests
                     tab.Label("Tab");
                 });
             });
+
+            frame.Table(40, tableColumns, tableCount, static (table, count) =>
+            {
+                count[0]++;
+                table.Row(static row => row.Cell("Row"));
+            }, width: 120f);
         });
 
         Assert.Equal(1, windowCount[0]);
@@ -167,6 +175,7 @@ public sealed class PublicValueTests
         Assert.True(contextCount[0] >= 1);
         Assert.Equal(0, menuCount[0]);
         Assert.Equal(1, tabCount[0]);
+        Assert.Equal(1, tableCount[0]);
     }
 
     [Fact]
