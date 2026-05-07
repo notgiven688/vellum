@@ -18,6 +18,7 @@ internal sealed class RaylibUiPlatform : IUiPlatform
             UiCursor.PointingHand => MouseCursor.PointingHand,
             UiCursor.ResizeNWSE => MouseCursor.ResizeNwse,
             UiCursor.ResizeEW => MouseCursor.ResizeEw,
+            UiCursor.ResizeNS => MouseCursor.ResizeNs,
             _ => MouseCursor.Arrow
         };
 

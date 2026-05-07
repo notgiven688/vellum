@@ -17,6 +17,7 @@ public sealed partial class Ui
         public float ThumbDragOffsetY;
         public bool Initialized;
         public bool Dragging;
+        public bool ReleasedDrag;
         public bool Resizing;
         public bool DraggingScrollThumb;
         public Vector2 ResizeAnchor;
@@ -120,7 +121,29 @@ public sealed partial class Ui
         if (!state.Open)
             return false;
 
+        MarkWidgetSeen(windowId);
         var runtime = GetWindowRuntimeState(windowId);
+        bool docked = IsWindowDocked(windowId);
+        if (docked)
+        {
+            if (!runtime.Initialized)
+            {
+                runtime.Position = state.Position;
+                runtime.Initialized = true;
+            }
+
+            effectiveWidth = MathF.Max(0, width);
+            runtime.Width = effectiveWidth;
+            if (TryGetDockedWindowRect(windowId, out var dockedRect))
+            {
+                response = new Response(dockedRect.X, dockedRect.Y, dockedRect.W, dockedRect.H, PointInRect(dockedRect, _mouse), false, false);
+                return true;
+            }
+
+            response = new Response(runtime.Position.X, runtime.Position.Y, runtime.Width, runtime.Height, false, false, false);
+            return true;
+        }
+
         if (!runtime.Initialized)
         {
             runtime.Position = state.Position;
@@ -186,9 +209,14 @@ public sealed partial class Ui
         {
             if (!IsMouseDown(UiMouseButton.Left))
             {
+                runtime.ReleasedDrag = runtime.Dragging && IsMouseReleased(UiMouseButton.Left);
                 runtime.Dragging = false;
                 runtime.Resizing = false;
                 runtime.DraggingScrollThumb = false;
+            }
+            else
+            {
+                runtime.ReleasedDrag = false;
             }
         }
 
@@ -258,6 +286,19 @@ public sealed partial class Ui
         for (int i = _windowOrder.Count - 1; i >= 0; i--)
         {
             int windowId = _windowOrder[i];
+            if (IsWindowDocked(windowId))
+                continue;
+
+            if (TryGetWindowRect(windowId, out var rect) && PointInRect(rect, _mouse))
+                return windowId;
+        }
+
+        for (int i = _windowOrder.Count - 1; i >= 0; i--)
+        {
+            int windowId = _windowOrder[i];
+            if (!IsWindowDocked(windowId))
+                continue;
+
             if (TryGetWindowRect(windowId, out var rect) && PointInRect(rect, _mouse))
                 return windowId;
         }
@@ -292,8 +333,15 @@ public sealed partial class Ui
         if (_windowOrder.Count == 0)
             return;
 
+        ResolveDockingDrops();
+        RenderDockSpaces();
+        RenderDockingPreview();
+
         foreach (int windowId in _windowOrder)
         {
+            if (IsWindowDocked(windowId))
+                continue;
+
             if (_windowRequests.TryGetValue(windowId, out var request))
                 RenderWindowRequest(request);
         }

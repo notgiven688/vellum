@@ -5,6 +5,8 @@ namespace Vellum.Demo;
 
 internal static class DemoScene
 {
+    private const float TargetFrameBudgetMs = 1000f / 60f;
+
     public static void DrawRoot(Ui root, DemoFrameContext context)
     {
         root.FillViewport(root.Theme.SurfaceBg);
@@ -12,6 +14,7 @@ internal static class DemoScene
         using (root.MaxWidth(1040, UiAlign.Center))
         {
             DemoState state = context.State;
+            root.Docking = state.Docking;
             state.MenuOpenedThisFrame = false;
             state.QuickMenuButton = default;
 
@@ -23,7 +26,12 @@ internal static class DemoScene
             Response headerPanel = DrawHeaderPanel(root, state, wideLayout);
 
             root.Spacing(SectionGap);
-            float bodyHeight = MathF.Max(220f, context.ScreenHeight - root.RootPadding * 2f - menuBar.H - headerPanel.H - SectionGap * 2f);
+            float bodyRegionHeight = MathF.Max(260f, context.ScreenHeight - root.RootPadding * 2f - menuBar.H - headerPanel.H - SectionGap * 3f);
+            float dockHeight = Math.Clamp(bodyRegionHeight * 0.32f, 110f, 160f);
+            root.DockSpace("mainDock", root.AvailableWidth, dockHeight);
+
+            root.Spacing(SectionGap);
+            float bodyHeight = MathF.Max(140f, bodyRegionHeight - dockHeight);
             root.ScrollArea(
                 "demoBody",
                 root.AvailableWidth,
@@ -39,6 +47,26 @@ internal static class DemoScene
                 static (window, state) => DrawInspector(window, state),
                 resizable: true,
                 id: "inspector");
+            root.Window(
+                "Metrics",
+                state.MetricsWindow,
+                260,
+                state,
+                static (window, state) => DrawMetricsWindow(window, state),
+                resizable: true,
+                id: "metrics");
+            for (int i = 0; i < state.ExtraMetricsWindows.Count; i++)
+            {
+                root.Window(
+                    $"Metrics {i + 2}",
+                    state.ExtraMetricsWindows[i],
+                    260,
+                    state,
+                    static (window, state) => DrawMetricsWindow(window, state),
+                    resizable: true,
+                    id: $"metrics-{i + 2}");
+            }
+
             root.Popup("quickMenu", state.QuickMenuButton, 220, 180, popup => DrawQuickMenu(popup, state));
         }
     }
@@ -88,6 +116,15 @@ internal static class DemoScene
                     state.InspectorWindow.Collapsed = false;
                 }
 
+                if (menu.MenuItem("Show metrics", closeOnActivate: true).Clicked)
+                {
+                    state.MetricsWindow.Open = true;
+                    state.MetricsWindow.Collapsed = false;
+                }
+
+                if (menu.MenuItem("Add metrics window", closeOnActivate: true).Clicked)
+                    state.AddMetricsWindow();
+
                 menu.MenuSeparator();
 
                 menu.Menu("Action", state, static (submenu, state) =>
@@ -128,6 +165,9 @@ internal static class DemoScene
 
                 if (menu.MenuItem("Toggle details", selected: state.DetailsOpen, closeOnActivate: true).Clicked)
                     state.DetailsOpen = !state.DetailsOpen;
+
+                if (menu.MenuItem("Reset docking", closeOnActivate: true).Clicked)
+                    state.ResetDockingWindows();
             });
         });
     }
@@ -680,6 +720,22 @@ internal static class DemoScene
         window.ModalPopup("settingsDialog", 380, 320, state, static (modal, state) => DrawSettingsDialog(modal, state));
     }
 
+    private static void DrawMetricsWindow(Ui window, DemoState state)
+    {
+        window.Label("Dock companion", color: window.Theme.Accent);
+        BodyLabel(window, "Renderer timing, frame counters, and interaction state for the current demo session.", color: window.Theme.TextSecondary);
+        window.Separator();
+        window.Label($"UI CPU: {state.UiCpuTimeMs:0.00} ms", color: window.Theme.TextSecondary);
+        window.Label($"Frame time: {state.FrameTimeMs:0.00} ms", color: window.Theme.TextSecondary);
+        window.Label($"FPS: {state.Fps}", color: window.Theme.TextSecondary);
+        window.ProgressBar(MathF.Min(1f, state.SmoothedUiCpuTimeMs / TargetFrameBudgetMs), window.AvailableWidth, overlay: "UI budget");
+        window.Separator();
+        if (window.Button("Increment clicks", width: window.AvailableWidth).Clicked)
+            state.ClickCount++;
+        if (window.Button("Reset docking", width: window.AvailableWidth).Clicked)
+            state.ResetDockingWindows();
+    }
+
     private static void DrawQuickMenu(Ui popup, DemoState state)
     {
         popup.Label("Quick actions", color: popup.Theme.Accent);
@@ -848,7 +904,10 @@ internal sealed class DemoState
     public bool ProfileLocked;
     public bool GarbageCollectionOpen = true;
     public float ActivityActionsWidth;
+    public DockingState Docking = new();
     public WindowState InspectorWindow = new(new Vector2(720, 76));
+    public WindowState MetricsWindow = new(new Vector2(690, 310));
+    public List<WindowState> ExtraMetricsWindows = new();
     public Response QuickMenuButton;
     public float UiCpuTimeMs;
     public float SmoothedUiCpuTimeMs;
@@ -871,6 +930,31 @@ internal sealed class DemoState
         TotalGcPauseDuration = GC.GetTotalPauseDuration();
         PreviousTotalGcPauseDuration = TotalGcPauseDuration;
         GcPauseTotalMs = TotalGcPauseDuration.TotalMilliseconds;
+    }
+
+    public void AddMetricsWindow()
+    {
+        int index = ExtraMetricsWindows.Count;
+        ExtraMetricsWindows.Add(new WindowState(new Vector2(660 - index * 24f, 340 + index * 28f)));
+    }
+
+    public void ResetDockingWindows()
+    {
+        Docking.Reset();
+        InspectorWindow.Position = new Vector2(720, 76);
+        MetricsWindow.Position = new Vector2(690, 310);
+        InspectorWindow.Open = true;
+        MetricsWindow.Open = true;
+        InspectorWindow.Collapsed = false;
+        MetricsWindow.Collapsed = false;
+
+        for (int i = 0; i < ExtraMetricsWindows.Count; i++)
+        {
+            var window = ExtraMetricsWindows[i];
+            window.Position = new Vector2(660 - i * 24f, 340 + i * 28f);
+            window.Open = true;
+            window.Collapsed = false;
+        }
     }
 }
 

@@ -14,7 +14,9 @@ public enum UiCursor
     /// <summary>Diagonal resize cursor.</summary>
     ResizeNWSE,
     /// <summary>Horizontal resize cursor.</summary>
-    ResizeEW
+    ResizeEW,
+    /// <summary>Vertical resize cursor.</summary>
+    ResizeNS
 }
 
 /// <summary>

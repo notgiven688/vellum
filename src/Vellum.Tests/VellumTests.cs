@@ -323,39 +323,40 @@ public sealed class VellumTests
         string[] expected =
         [
             "Vellum.EdgeInsets",
-        "Vellum.FontVMetrics",
-        "Vellum.GlyphMetrics",
-        "Vellum.IUiPlatform",
-        "Vellum.NullUiPlatform",
-        "Vellum.Response",
-        "Vellum.ScaledGlyphMetrics",
-        "Vellum.TextOverflowMode",
-        "Vellum.TextWrapMode",
-        "Vellum.Theme",
-        "Vellum.ThemePresets",
-        "Vellum.TrueTypeFont",
-        "Vellum.Ui",
-        "Vellum.Ui+DisabledScopeHandle",
-        "Vellum.Ui+IdScopeHandle",
-        "Vellum.Ui+LayoutScopeHandle",
-        "Vellum.UiAlign",
-        "Vellum.UiCanvas",
-        "Vellum.UiCursor",
-        "Vellum.UiFonts",
-        "Vellum.UiInputState",
-        "Vellum.UiKey",
-        "Vellum.UiId",
-        "Vellum.UiMouseButton",
-        "Vellum.UiWidgetKind",
-        "Vellum.WindowState",
-        "Vellum.Rendering.ClipRect",
-        "Vellum.Rendering.Color",
-        "Vellum.Rendering.DrawCommand",
-        "Vellum.Rendering.DrawVertex",
-        "Vellum.Rendering.IRenderer",
-        "Vellum.Rendering.RenderFrameInfo",
-        "Vellum.Rendering.RenderList",
-        "Vellum.Rendering.RenderTextureIds"
+            "Vellum.DockingState",
+            "Vellum.FontVMetrics",
+            "Vellum.GlyphMetrics",
+            "Vellum.IUiPlatform",
+            "Vellum.NullUiPlatform",
+            "Vellum.Response",
+            "Vellum.ScaledGlyphMetrics",
+            "Vellum.TextOverflowMode",
+            "Vellum.TextWrapMode",
+            "Vellum.Theme",
+            "Vellum.ThemePresets",
+            "Vellum.TrueTypeFont",
+            "Vellum.Ui",
+            "Vellum.Ui+DisabledScopeHandle",
+            "Vellum.Ui+IdScopeHandle",
+            "Vellum.Ui+LayoutScopeHandle",
+            "Vellum.UiAlign",
+            "Vellum.UiCanvas",
+            "Vellum.UiCursor",
+            "Vellum.UiFonts",
+            "Vellum.UiInputState",
+            "Vellum.UiKey",
+            "Vellum.UiId",
+            "Vellum.UiMouseButton",
+            "Vellum.UiWidgetKind",
+            "Vellum.WindowState",
+            "Vellum.Rendering.ClipRect",
+            "Vellum.Rendering.Color",
+            "Vellum.Rendering.DrawCommand",
+            "Vellum.Rendering.DrawVertex",
+            "Vellum.Rendering.IRenderer",
+            "Vellum.Rendering.RenderFrameInfo",
+            "Vellum.Rendering.RenderList",
+            "Vellum.Rendering.RenderTextureIds"
         ];
 
         string[] actual = typeof(Ui).Assembly.GetExportedTypes()
@@ -1959,6 +1960,332 @@ public sealed class VellumTests
                 "window drags from the body",
                 MathF.Abs(windowState.Position.X - (start.X + 42)) < 0.1f &&
                 MathF.Abs(windowState.Position.Y - (start.Y + 24)) < 0.1f);
+        }
+
+        {
+            var renderer = new TestRenderer();
+            var docking = new DockingState();
+            var ui = new Ui(renderer)
+            {
+                Font = font,
+                DefaultFontSize = 18f,
+                Lcd = false,
+                Docking = docking,
+                RootPadding = 0f
+            };
+
+            var windowState = new WindowState(new Vector2(260, 24));
+            Response dockSpace = default;
+            Response window = default;
+
+            void Frame(Vector2 mouse, UiInputState input = default)
+            {
+                ui.Frame(520, 260, mouse, false, input, frame =>
+                {
+                    dockSpace = frame.DockSpace("main", 220, 150);
+                    window = frame.Window("Tool", windowState, 180, content =>
+                    {
+                        content.Label("Dockable body");
+                    }, id: "dockable-tool");
+                });
+            }
+
+            Frame(Vector2.Zero);
+            Frame(Vector2.Zero);
+            Vector2 dragStart = new(window.X + 18f, window.Y + window.H - 10f);
+            Vector2 dropPoint = new(dockSpace.X + dockSpace.W * 0.5f, dockSpace.Y + dockSpace.H * 0.5f);
+            Frame(dragStart, Input(mouseButtons: [UiMouseButton.Left]));
+            Frame(dropPoint, Input(mouseButtons: [UiMouseButton.Left]));
+            Frame(dropPoint);
+            Frame(Vector2.Zero);
+
+            Check(
+                "floating window docks when released over a dock space",
+                docking.WindowSpaces.Count == 1 &&
+                MathF.Abs(window.X - dockSpace.X) < 0.1f &&
+                MathF.Abs(window.Y - dockSpace.Y) < 0.1f &&
+                MathF.Abs(window.W - dockSpace.W) < 0.1f &&
+                MathF.Abs(window.H - dockSpace.H) < 0.1f);
+        }
+
+        {
+            var renderer = new TestRenderer();
+            var docking = new DockingState();
+            var ui = new Ui(renderer)
+            {
+                Font = font,
+                DefaultFontSize = 18f,
+                Lcd = false,
+                Docking = docking,
+                RootPadding = 0f
+            };
+
+            var windowState = new WindowState(new Vector2(260, 24));
+            Response dockSpace = default;
+            Response window = default;
+            Response firstRow = default;
+
+            void Frame(Vector2 mouse, UiInputState input = default)
+            {
+                ui.Frame(420, 220, mouse, false, input, frame =>
+                {
+                    dockSpace = frame.DockSpace("main", 190, 96);
+                    window = frame.Window("Inspector", windowState, 180, content =>
+                    {
+                        firstRow = content.Label("Row 0");
+                        for (int i = 1; i < 18; i++)
+                            content.Label($"Row {i}");
+                    }, id: "dock-scroll-tool");
+                });
+            }
+
+            Frame(Vector2.Zero);
+            Frame(Vector2.Zero);
+            Vector2 dragStart = new(window.X + 18f, window.Y + window.H - 10f);
+            Vector2 dropPoint = new(dockSpace.X + dockSpace.W * 0.5f, dockSpace.Y + dockSpace.H * 0.5f);
+            Frame(dragStart, Input(mouseButtons: [UiMouseButton.Left]));
+            Frame(dropPoint, Input(mouseButtons: [UiMouseButton.Left]));
+            Frame(dropPoint);
+            Frame(Vector2.Zero);
+            Frame(Vector2.Zero);
+
+            float firstRowYBeforeScroll = firstRow.Y;
+            Vector2 wheelPoint = new(dockSpace.X + dockSpace.W * 0.5f, dockSpace.Y + dockSpace.H * 0.7f);
+            Frame(wheelPoint, Input(wheel: new Vector2(0, -2)));
+            Frame(wheelPoint);
+
+            Check(
+                "docked window body scrolls when content exceeds the pane",
+                firstRow.Y < firstRowYBeforeScroll - 4f &&
+                HasVertexColor(renderer.LastRenderList, ui.Theme.ScrollbarThumb));
+        }
+
+        {
+            var renderer = new TestRenderer();
+            var docking = new DockingState();
+            var ui = new Ui(renderer)
+            {
+                Font = font,
+                DefaultFontSize = 18f,
+                Lcd = false,
+                Docking = docking,
+                RootPadding = 0f
+            };
+
+            var windowState = new WindowState(new Vector2(280, 24));
+            Response dockSpace = default;
+            Response window = default;
+
+            void Frame(Vector2 mouse, UiInputState input = default)
+            {
+                ui.Frame(560, 300, mouse, false, input, frame =>
+                {
+                    dockSpace = frame.DockSpace("main", 260, 170);
+                    window = frame.Window("Tool", windowState, 180, content =>
+                    {
+                        content.Label("Dockable body");
+                    }, id: "first-edge-tool");
+                });
+            }
+
+            Frame(Vector2.Zero);
+            Frame(Vector2.Zero);
+            Vector2 dragStart = new(window.X + 18f, window.Y + window.H - 10f);
+            Vector2 edgeDrop = new(dockSpace.X + dockSpace.W - 8f, dockSpace.Y + dockSpace.H * 0.5f);
+            Frame(dragStart, Input(mouseButtons: [UiMouseButton.Left]));
+            Frame(edgeDrop, Input(mouseButtons: [UiMouseButton.Left]));
+            Frame(edgeDrop);
+            Frame(Vector2.Zero);
+
+            Check(
+                "dropping the first window on a dock edge creates an aligned pane",
+                docking.WindowSpaces.Count == 1 &&
+                window.X > dockSpace.X + dockSpace.W * 0.35f &&
+                window.X + window.W <= dockSpace.X + dockSpace.W + 0.1f &&
+                MathF.Abs(window.Y - dockSpace.Y) < 0.1f &&
+                MathF.Abs(window.H - dockSpace.H) < 0.1f);
+        }
+
+        {
+            var renderer = new TestRenderer();
+            var docking = new DockingState();
+            var ui = new Ui(renderer)
+            {
+                Font = font,
+                DefaultFontSize = 18f,
+                Lcd = false,
+                Docking = docking,
+                RootPadding = 0f
+            };
+
+            var leftState = new WindowState(new Vector2(280, 24));
+            var rightState = new WindowState(new Vector2(300, 92));
+            Response dockSpace = default;
+            Response left = default;
+            Response right = default;
+
+            void Frame(Vector2 mouse, UiInputState input = default)
+            {
+                ui.Frame(620, 320, mouse, false, input, frame =>
+                {
+                    dockSpace = frame.DockSpace("main", 260, 170);
+                    left = frame.Window("Left", leftState, 180, content =>
+                    {
+                        content.Label("Left body");
+                    }, id: "split-left");
+                    right = frame.Window("Right", rightState, 180, content =>
+                    {
+                        content.Label("Right body");
+                    }, id: "split-right");
+                });
+            }
+
+            Frame(Vector2.Zero);
+            Frame(Vector2.Zero);
+            Vector2 leftDragStart = new(left.X + 18f, left.Y + left.H - 10f);
+            Vector2 centerDrop = new(dockSpace.X + dockSpace.W * 0.5f, dockSpace.Y + dockSpace.H * 0.5f);
+            Frame(leftDragStart, Input(mouseButtons: [UiMouseButton.Left]));
+            Frame(centerDrop, Input(mouseButtons: [UiMouseButton.Left]));
+            Frame(centerDrop);
+            Frame(Vector2.Zero);
+
+            Vector2 rightDragStart = new(right.X + 18f, right.Y + right.H - 10f);
+            Vector2 edgeDrop = new(dockSpace.X + dockSpace.W - 8f, dockSpace.Y + dockSpace.H * 0.5f);
+            Frame(rightDragStart, Input(mouseButtons: [UiMouseButton.Left]));
+            Frame(edgeDrop, Input(mouseButtons: [UiMouseButton.Left]));
+            Frame(edgeDrop);
+            Frame(Vector2.Zero);
+
+            Check(
+                "dropping a second window on a dock edge creates a split layout",
+                docking.WindowSpaces.Count == 2 &&
+                left.X < right.X &&
+                left.X >= dockSpace.X - 0.1f &&
+                right.X + right.W <= dockSpace.X + dockSpace.W + 0.1f &&
+                MathF.Abs(left.Y - right.Y) < 0.1f &&
+                MathF.Abs(left.H - right.H) < 0.1f &&
+                left.W > 40f &&
+                right.W > 40f);
+        }
+
+        {
+            var renderer = new TestRenderer();
+            var docking = new DockingState();
+            var ui = new Ui(renderer)
+            {
+                Font = font,
+                DefaultFontSize = 18f,
+                Lcd = false,
+                Docking = docking,
+                RootPadding = 0f
+            };
+
+            var windowState = new WindowState(new Vector2(260, 24));
+            Response dockSpace = default;
+            Response window = default;
+
+            void Frame(Vector2 mouse, UiInputState input = default)
+            {
+                ui.Frame(560, 280, mouse, false, input, frame =>
+                {
+                    dockSpace = frame.DockSpace("main", 220, 150);
+                    window = frame.Window("Tool", windowState, 180, content =>
+                    {
+                        content.Label("Dockable body");
+                    }, id: "detach-tool");
+                });
+            }
+
+            Frame(Vector2.Zero);
+            Frame(Vector2.Zero);
+            Vector2 dragStart = new(window.X + 18f, window.Y + window.H - 10f);
+            Vector2 dropPoint = new(dockSpace.X + dockSpace.W * 0.5f, dockSpace.Y + dockSpace.H * 0.5f);
+            Frame(dragStart, Input(mouseButtons: [UiMouseButton.Left]));
+            Frame(dropPoint, Input(mouseButtons: [UiMouseButton.Left]));
+            Frame(dropPoint);
+            Frame(Vector2.Zero);
+
+            Vector2 tabGrab = new(dockSpace.X + 24f, dockSpace.Y + 12f);
+            Vector2 floatPoint = new(350f, 70f);
+            Frame(tabGrab, Input(mouseButtons: [UiMouseButton.Left]));
+            Frame(floatPoint, Input(mouseButtons: [UiMouseButton.Left]));
+            Frame(floatPoint);
+            Frame(Vector2.Zero);
+
+            Check(
+                "dragging a dock tab out restores a floating window",
+                docking.WindowSpaces.Count == 0 &&
+                window.W > 0f &&
+                window.H > 0f &&
+                MathF.Abs(window.X - dockSpace.X) > 1f);
+
+            Vector2 detachedStart = windowState.Position;
+            Vector2 detachedGrab = new(window.X + 18f, window.Y + 12f);
+            Vector2 detachedDelta = new(38f, 22f);
+            Frame(detachedGrab, Input(mouseButtons: [UiMouseButton.Left]));
+            Frame(detachedGrab + detachedDelta, Input(mouseButtons: [UiMouseButton.Left]));
+            Frame(detachedGrab + detachedDelta);
+
+            Check(
+                "detached dock tab remains draggable",
+                MathF.Abs(windowState.Position.X - (detachedStart.X + detachedDelta.X)) < 0.1f &&
+                MathF.Abs(windowState.Position.Y - (detachedStart.Y + detachedDelta.Y)) < 0.1f);
+        }
+
+        {
+            var renderer = new TestRenderer();
+            var docking = new DockingState();
+            var ui = new Ui(renderer)
+            {
+                Font = font,
+                DefaultFontSize = 18f,
+                Lcd = false,
+                Docking = docking,
+                RootPadding = 0f
+            };
+
+            var floatingState = new WindowState(new Vector2(32, 32));
+            var dockedState = new WindowState(new Vector2(300, 24));
+            Response dockSpace = default;
+            Response floating = default;
+            Response docked = default;
+
+            void Frame(Vector2 mouse, UiInputState input = default)
+            {
+                ui.Frame(640, 320, mouse, false, input, frame =>
+                {
+                    dockSpace = frame.DockSpace("main", 240, 160);
+                    floating = frame.Window("Floating", floatingState, 180, content =>
+                    {
+                        content.Label("Floating body");
+                    }, id: "floating-over-docked-pane");
+                    docked = frame.Window("Docked", dockedState, 180, content =>
+                    {
+                        content.Label("Docked body");
+                    }, id: "docked-under-floating-window");
+                });
+            }
+
+            Frame(Vector2.Zero);
+            Frame(Vector2.Zero);
+            Vector2 dockedDragStart = new(docked.X + 18f, docked.Y + docked.H - 10f);
+            Vector2 dropPoint = new(dockSpace.X + dockSpace.W * 0.5f, dockSpace.Y + dockSpace.H * 0.5f);
+            Frame(dockedDragStart, Input(mouseButtons: [UiMouseButton.Left]));
+            Frame(dropPoint, Input(mouseButtons: [UiMouseButton.Left]));
+            Frame(dropPoint);
+            Frame(Vector2.Zero);
+
+            Vector2 start = floatingState.Position;
+            Vector2 floatingGrab = new(floating.X + 18f, floating.Y + 12f);
+            Vector2 floatingDelta = new(260f, 20f);
+            Frame(floatingGrab, Input(mouseButtons: [UiMouseButton.Left]));
+            Frame(floatingGrab + floatingDelta, Input(mouseButtons: [UiMouseButton.Left]));
+            Frame(floatingGrab + floatingDelta);
+
+            Check(
+                "floating windows keep input priority over docked panes",
+                MathF.Abs(floatingState.Position.X - (start.X + floatingDelta.X)) < 0.1f &&
+                MathF.Abs(floatingState.Position.Y - (start.Y + floatingDelta.Y)) < 0.1f);
         }
 
         {

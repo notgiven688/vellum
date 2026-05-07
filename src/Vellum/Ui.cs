@@ -199,6 +199,8 @@ public enum UiWidgetKind
     ScrollAreaBoth,
     /// <summary>A floating window.</summary>
     Window,
+    /// <summary>A region that hosts docked windows.</summary>
+    DockSpace,
     /// <summary>A popup container.</summary>
     Popup
 }
@@ -339,6 +341,7 @@ public sealed partial class Ui : IDisposable
     private readonly Dictionary<int, WindowRuntimeState> _windowRuntimeStates = new();
     private readonly Dictionary<int, WindowRequest> _windowRequests = new();
     private readonly List<int> _windowOrder = new();
+    private readonly HashSet<int> _visibleWindowIdsScratch = new();
     private readonly HashSet<int> _seenWidgetIds = new();
 
     /// <summary>Mutable theme used by controls rendered after the property is set.</summary>
@@ -689,6 +692,7 @@ public sealed partial class Ui : IDisposable
         _windowRuntimeStates.Clear();
         _windowRequests.Clear();
         _windowOrder.Clear();
+        _visibleWindowIdsScratch.Clear();
         _seenWidgetIds.Clear();
         _layouts.Clear();
         _hitClips.Clear();
