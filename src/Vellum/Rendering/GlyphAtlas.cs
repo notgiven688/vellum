@@ -33,9 +33,14 @@ internal sealed class GlyphAtlas
 {
     private readonly Dictionary<int, GlyphInfo> _glyphs = new();
     private readonly HashSet<int> _codepoints = new();
+    private readonly Dictionary<int, int> _glyphIndices = new();
+    private readonly Dictionary<long, float> _kernAdvances = new();
     private readonly TrueTypeFont _font;
     private readonly float _pixelHeight;
     private readonly float _rasterScale;
+    private readonly float _fontScale;
+    private readonly float _logicalScale;
+    private readonly FontVMetrics _scaledVMetrics;
 
     public int TextureId { get; private set; } = -1;
     public int AtlasWidth { get; private set; }
@@ -47,6 +52,13 @@ internal sealed class GlyphAtlas
         _font = font;
         _pixelHeight = pixelHeight;
         _rasterScale = MathF.Max(1f, rasterScale);
+        _fontScale = _font.ScaleForPixelHeight(_pixelHeight * _rasterScale);
+        _logicalScale = _fontScale / _rasterScale;
+        var vm = _font.GetFontVMetrics();
+        _scaledVMetrics = new FontVMetrics(
+            vm.Ascent * _logicalScale,
+            vm.Descent * _logicalScale,
+            vm.LineGap * _logicalScale);
         IsLcd = lcd;
     }
 
@@ -108,18 +120,15 @@ internal sealed class GlyphAtlas
 
         _glyphs.Clear();
 
-        float rasterPixelHeight = _pixelHeight * _rasterScale;
-        float scale = _font.ScaleForPixelHeight(rasterPixelHeight);
-
         // --- Collect rasterized glyphs ---
         var entries = new List<(int codepoint, byte[] bitmap, int w, int h, int ox, int oy, float advance)>();
         foreach (int cp in _codepoints)
         {
-            int glyphIndex = _font.FindGlyphIndex(cp);
+            int glyphIndex = GetGlyphIndex(cp);
             byte[]? bmp = IsLcd
-                ? _font.RasterizeGlyphLcd(glyphIndex, scale, out int w, out int h, out int ox, out int oy)
-                : _font.RasterizeGlyph(glyphIndex, scale, out w, out h, out ox, out oy);
-            var m = _font.GetScaledGlyphMetrics(glyphIndex, scale);
+                ? _font.RasterizeGlyphLcd(glyphIndex, _fontScale, out int w, out int h, out int ox, out int oy)
+                : _font.RasterizeGlyph(glyphIndex, _fontScale, out w, out h, out ox, out oy);
+            var m = _font.GetScaledGlyphMetrics(glyphIndex, _fontScale);
             if (bmp != null && w > 0 && h > 0)
                 entries.Add((cp, bmp, w, h, ox, oy, m.AdvanceWidth));
             else
@@ -174,20 +183,27 @@ internal sealed class GlyphAtlas
 
     public float GetKernAdvance(int cp1, int cp2)
     {
-        int g1 = _font.FindGlyphIndex(cp1);
-        int g2 = _font.FindGlyphIndex(cp2);
-        float scale = _font.ScaleForPixelHeight(_pixelHeight * _rasterScale);
-        return _font.GetKernAdvance(g1, g2) * scale / _rasterScale;
+        long key = ((long)cp1 << 32) | (uint)cp2;
+        if (_kernAdvances.TryGetValue(key, out float advance))
+            return advance;
+
+        int g1 = GetGlyphIndex(cp1);
+        int g2 = GetGlyphIndex(cp2);
+        advance = g1 == 0 || g2 == 0 ? 0f : _font.GetKernAdvance(g1, g2) * _logicalScale;
+        _kernAdvances[key] = advance;
+        return advance;
     }
 
-    public FontVMetrics GetScaledVMetrics()
+    public FontVMetrics GetScaledVMetrics() => _scaledVMetrics;
+
+    private int GetGlyphIndex(int codepoint)
     {
-        float scale = _font.ScaleForPixelHeight(_pixelHeight * _rasterScale);
-        var vm = _font.GetFontVMetrics();
-        return new FontVMetrics(
-            vm.Ascent * scale / _rasterScale,
-            vm.Descent * scale / _rasterScale,
-            vm.LineGap * scale / _rasterScale);
+        if (_glyphIndices.TryGetValue(codepoint, out int glyphIndex))
+            return glyphIndex;
+
+        glyphIndex = _font.FindGlyphIndex(codepoint);
+        _glyphIndices[codepoint] = glyphIndex;
+        return glyphIndex;
     }
 
     // -------------------------------------------------------------------------

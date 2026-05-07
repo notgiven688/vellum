@@ -1621,6 +1621,13 @@ public sealed partial class Ui : IDisposable
 
     private void DrawTextLayout(TextLayoutResult layout, float x, float y, Color color)
     {
+        if (color.A == 0 || layout.Glyphs.Length == 0)
+            return;
+
+        float visibleWidth = layout.ClipWidth ?? layout.Width;
+        if (!_painter.IntersectsCurrentClip(x, y, visibleWidth, layout.Height))
+            return;
+
         if (layout.ClipWidth.HasValue)
             _painter.PushClip(SnapToDevicePixel(x), SnapToDevicePixel(y), layout.ClipWidth.Value, layout.Height);
 

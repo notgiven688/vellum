@@ -323,6 +323,19 @@ internal static class TextLayout
         float baseline,
         out bool truncated)
     {
+        if (overflow == TextOverflowMode.Visible)
+        {
+            float width = AppendElements(scratch, line.Start, line.Count, atlas, baseline);
+            truncated = forceTruncate || (maxWidth.HasValue && width > MathF.Max(0, maxWidth.Value));
+            return width;
+        }
+
+        if (!maxWidth.HasValue && !forceTruncate)
+        {
+            truncated = false;
+            return AppendElements(scratch, line.Start, line.Count, atlas, baseline);
+        }
+
         float fullWidth = MeasureElements(scratch, line.Start, line.Count, atlas);
         float limit = maxWidth.HasValue ? MathF.Max(0, maxWidth.Value) : 0;
         bool exceedsWidth = maxWidth.HasValue && fullWidth > limit;

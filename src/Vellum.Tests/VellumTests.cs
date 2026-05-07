@@ -239,7 +239,7 @@ public sealed class VellumTests
             var painter = new Painter();
             painter.PushClip(0, 0, 20, 20);
             painter.PushClip(10, 8, 20, 20);
-            painter.FillRect(0, 0, 10, 10, Color.White);
+            painter.FillRect(8, 8, 10, 10, Color.White);
 
             var cmd = painter.RenderList.Commands.Single();
             Check(
@@ -251,7 +251,7 @@ public sealed class VellumTests
             var painter = new Painter();
             painter.FillRect(0, 0, 10, 10, Color.White);
             painter.PushClip(0, 0, 8, 8);
-            painter.FillRect(12, 0, 10, 10, Color.White);
+            painter.FillRect(4, 0, 10, 10, Color.White);
             painter.PopClip();
             painter.FillRect(24, 0, 10, 10, Color.White);
 

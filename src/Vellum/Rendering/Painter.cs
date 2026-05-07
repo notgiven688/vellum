@@ -10,6 +10,9 @@ namespace Vellum.Rendering;
 internal sealed class Painter
 {
     public const int SolidTextureId = RenderTextureIds.Solid;
+    private const int MaxCachedCornerSegments = 12;
+
+    private static readonly Vector2[][] s_cornerArcPoints = BuildCornerArcPoints();
 
     private readonly RenderList _renderList;
     private readonly List<ClipRect> _clipStack = new();
@@ -80,6 +83,23 @@ internal sealed class Painter
         _clipStack.RemoveAt(_clipStack.Count - 1);
     }
 
+    public bool IntersectsCurrentClip(float x, float y, float width, float height)
+    {
+        if (width <= 0 || height <= 0)
+            return false;
+
+        if (_clipStack.Count == 0)
+            return true;
+
+        var clip = _clipStack[^1];
+        return clip.Width > 0 &&
+               clip.Height > 0 &&
+               x < clip.X + clip.Width &&
+               x + width > clip.X &&
+               y < clip.Y + clip.Height &&
+               y + height > clip.Y;
+    }
+
     public void DrawRect(
         float x,
         float y,
@@ -100,6 +120,8 @@ internal sealed class Painter
     public void FillRect(float x, float y, float width, float height, Color color, float radius = 0f)
     {
         if (width <= 0 || height <= 0 || color.A == 0)
+            return;
+        if (!IntersectsCurrentClip(x, y, width, height))
             return;
 
         if (radius <= 0.01f)
@@ -134,6 +156,8 @@ internal sealed class Painter
         {
             return;
         }
+        if (!IntersectsCurrentClip(x, y, width, height))
+            return;
 
         AddQuad(
             new Vector2(x, y),
@@ -151,6 +175,8 @@ internal sealed class Painter
     public void StrokeRect(float x, float y, float width, float height, Color color, float strokeWidth, float radius = 0f)
     {
         if (width <= 0 || height <= 0 || color.A == 0 || strokeWidth <= 0)
+            return;
+        if (!IntersectsCurrentClip(x, y, width, height))
             return;
 
         strokeWidth = MathF.Max(0, strokeWidth);
@@ -187,6 +213,8 @@ internal sealed class Painter
         bool lcd = false)
     {
         if (width <= 0 || height <= 0 || tint.A == 0)
+            return;
+        if (!IntersectsCurrentClip(x, y, width, height))
             return;
 
         AddQuad(
@@ -388,10 +416,10 @@ internal sealed class Painter
         }
 
         int segments = Math.Max(1, forcedSegments ?? GetCornerSegments(clampedRadius));
-        AppendArc(dst, new Vector2(x + width - clampedRadius, y + clampedRadius), clampedRadius, -MathF.PI * 0.5f, 0, segments);
-        AppendArc(dst, new Vector2(x + width - clampedRadius, y + height - clampedRadius), clampedRadius, 0, MathF.PI * 0.5f, segments);
-        AppendArc(dst, new Vector2(x + clampedRadius, y + height - clampedRadius), clampedRadius, MathF.PI * 0.5f, MathF.PI, segments);
-        AppendArc(dst, new Vector2(x + clampedRadius, y + clampedRadius), clampedRadius, MathF.PI, MathF.PI * 1.5f, segments);
+        AppendCornerArc(dst, new Vector2(x + width - clampedRadius, y + clampedRadius), clampedRadius, 0, segments);
+        AppendCornerArc(dst, new Vector2(x + width - clampedRadius, y + height - clampedRadius), clampedRadius, 1, segments);
+        AppendCornerArc(dst, new Vector2(x + clampedRadius, y + height - clampedRadius), clampedRadius, 2, segments);
+        AppendCornerArc(dst, new Vector2(x + clampedRadius, y + clampedRadius), clampedRadius, 3, segments);
     }
 
     private static void AppendSubdividedRect(List<Vector2> dst, float x, float y, float width, float height, int segments)
@@ -421,8 +449,29 @@ internal sealed class Painter
         }
     }
 
-    private static void AppendArc(List<Vector2> dst, Vector2 center, float radius, float startAngle, float endAngle, int segments)
+    private static void AppendCornerArc(List<Vector2> dst, Vector2 center, float radius, int corner, int segments)
     {
+        Vector2[]? points = segments <= MaxCachedCornerSegments
+            ? s_cornerArcPoints[corner * (MaxCachedCornerSegments + 1) + segments]
+            : null;
+
+        if (points is not null)
+        {
+            int start = dst.Count > 0 ? 1 : 0;
+            for (int i = start; i < points.Length; i++)
+                dst.Add(center + points[i] * radius);
+
+            return;
+        }
+
+        float startAngle = corner switch
+        {
+            0 => -MathF.PI * 0.5f,
+            1 => 0f,
+            2 => MathF.PI * 0.5f,
+            _ => MathF.PI
+        };
+        float endAngle = startAngle + MathF.PI * 0.5f;
         for (int i = 0; i <= segments; i++)
         {
             if (dst.Count > 0 && i == 0)
@@ -432,6 +481,37 @@ internal sealed class Painter
             float angle = startAngle + (endAngle - startAngle) * t;
             dst.Add(center + new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * radius);
         }
+    }
+
+    private static Vector2[][] BuildCornerArcPoints()
+    {
+        var arcs = new Vector2[(MaxCachedCornerSegments + 1) * 4][];
+        for (int corner = 0; corner < 4; corner++)
+        {
+            float startAngle = corner switch
+            {
+                0 => -MathF.PI * 0.5f,
+                1 => 0f,
+                2 => MathF.PI * 0.5f,
+                _ => MathF.PI
+            };
+            float endAngle = startAngle + MathF.PI * 0.5f;
+
+            for (int segments = 1; segments <= MaxCachedCornerSegments; segments++)
+            {
+                var points = new Vector2[segments + 1];
+                for (int i = 0; i <= segments; i++)
+                {
+                    float t = (float)i / segments;
+                    float angle = startAngle + (endAngle - startAngle) * t;
+                    points[i] = new Vector2(MathF.Cos(angle), MathF.Sin(angle));
+                }
+
+                arcs[corner * (MaxCachedCornerSegments + 1) + segments] = points;
+            }
+        }
+
+        return arcs;
     }
 
     private static int GetCornerSegments(float radius)

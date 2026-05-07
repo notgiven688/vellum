@@ -140,6 +140,18 @@ The text stack is deliberately small: it supports basic TrueType glyph lookup, r
 dotnet build src/vellum.slnx
 ```
 
+Run the headless performance benchmarks:
+
+```bash
+dotnet run -c Release --project src/Vellum.Benchmarks -- --filter '*'
+```
+
+For a quick benchmark scene smoke test:
+
+```bash
+dotnet run -c Release --project src/Vellum.Benchmarks -- --smoke
+```
+
 Run the default OpenTK demo:
 
 ```bash
