@@ -15,6 +15,7 @@ public sealed class DockingState
     internal readonly List<int> SpaceOrder = new();
 
     internal int DraggingWindowId;
+    internal int Version { get; private set; }
     private int _nextNodeId = 1;
 
     /// <summary>Removes all docked window assignments and dock-space runtime data.</summary>
@@ -27,6 +28,7 @@ public sealed class DockingState
         SpaceOrder.Clear();
         DraggingWindowId = 0;
         _nextNodeId = 1;
+        Version++;
     }
 
     internal DockSpaceRuntime GetSpace(int spaceId, int frameIndex)
@@ -35,11 +37,15 @@ public sealed class DockingState
         {
             space = new DockSpaceRuntime(spaceId, CreateLeaf());
             Spaces[spaceId] = space;
+            Version++;
         }
 
         space.LastSeenFrame = frameIndex;
         if (!SpaceOrder.Contains(spaceId))
+        {
             SpaceOrder.Add(spaceId);
+            Version++;
+        }
 
         return space;
     }
@@ -68,21 +74,27 @@ public sealed class DockingState
         if (target.Side == DockDropSide.Center)
         {
             AddWindowToLeaf(windowId, target.SpaceId, leaf);
+            Version++;
             return;
         }
 
         SplitLeaf(windowId, target.SpaceId, leaf, target.Side);
+        Version++;
     }
 
     internal void RemoveWindow(int windowId)
     {
+        bool changed = false;
         if (WindowSpaces.TryGetValue(windowId, out int oldSpaceId) &&
             Spaces.TryGetValue(oldSpaceId, out var oldSpace) &&
             WindowNodes.TryGetValue(windowId, out var oldLeaf))
         {
             int removedIndex = oldLeaf.WindowIds.IndexOf(windowId);
             if (removedIndex >= 0)
+            {
                 oldLeaf.WindowIds.RemoveAt(removedIndex);
+                changed = true;
+            }
 
             if (oldLeaf.ActiveWindowId == windowId)
                 oldLeaf.ActiveWindowId = oldLeaf.WindowIds.Count == 0
@@ -93,9 +105,11 @@ public sealed class DockingState
                 CollapseEmptyLeaf(oldSpace, oldLeaf);
         }
 
-        WindowSpaces.Remove(windowId);
-        WindowNodes.Remove(windowId);
-        WindowRects.Remove(windowId);
+        changed |= WindowSpaces.Remove(windowId);
+        changed |= WindowNodes.Remove(windowId);
+        changed |= WindowRects.Remove(windowId);
+        if (changed)
+            Version++;
     }
 
     internal bool TryFindDropTarget(Vector2 point, int frameIndex, out DockDropTarget target)
@@ -152,9 +166,11 @@ public sealed class DockingState
                     RemoveSpaceMappings(space.Root);
 
                     Spaces.Remove(spaceId);
+                    Version++;
                 }
 
                 SpaceOrder.RemoveAt(i);
+                Version++;
                 continue;
             }
 
@@ -309,6 +325,7 @@ public sealed class DockingState
                 WindowSpaces.Remove(windowId);
                 WindowNodes.Remove(windowId);
                 WindowRects.Remove(windowId);
+                Version++;
             }
 
             if (node.WindowIds.Count == 0)
@@ -568,8 +585,15 @@ public sealed partial class Ui
             _visibleWindowIdsScratch.Add(windowId);
 
         Docking.PruneMissingWindows(_visibleWindowIdsScratch, _frameIndex);
-        foreach (int spaceId in Docking.SpaceOrder)
+        int dockingVersion = Docking.Version;
+        _dockSpaceOrderScratch.Clear();
+        _dockSpaceOrderScratch.AddRange(Docking.SpaceOrder);
+
+        foreach (int spaceId in _dockSpaceOrderScratch)
         {
+            if (Docking.Version != dockingVersion)
+                return;
+
             if (!Docking.Spaces.TryGetValue(spaceId, out var space) ||
                 space.LastSeenFrame != _frameIndex ||
                 !DockNodeHasWindows(space.Root))
@@ -579,6 +603,8 @@ public sealed partial class Ui
 
             LayoutDockNode(space.Root, space.Rect);
             RenderDockSpace(space);
+            if (Docking.Version != dockingVersion)
+                return;
         }
     }
 
@@ -614,6 +640,8 @@ public sealed partial class Ui
         float h = node.Rect.H;
         if (w <= 0 || h <= 0)
             return;
+        var docking = Docking!;
+        int dockingVersion = docking.Version;
 
         node.WindowIds.RemoveAll(windowId => !_windowRequests.ContainsKey(windowId));
         if (node.WindowIds.Count == 0)
@@ -624,6 +652,9 @@ public sealed partial class Ui
 
         if (!node.WindowIds.Contains(node.ActiveWindowId))
             node.ActiveWindowId = node.WindowIds[0];
+
+        foreach (int windowId in node.WindowIds)
+            _dockedWindowIdsRenderedThisFrame.Add(windowId);
 
         float tabHeight = MathF.Max(24f, LayoutText("Ag", DefaultFontSize).Height + Theme.TabPadding.Vertical);
         float tabX = x + border;
@@ -639,7 +670,7 @@ public sealed partial class Ui
         activeRuntime.Height = h;
         activeRuntime.TitleBarHeight = tabHeight;
         activeRequest.State.Position = activeRuntime.Position;
-        Docking!.WindowRects[activeRequest.WindowId] = new DockRect(x, y, w, h);
+        docking.WindowRects[activeRequest.WindowId] = new DockRect(x, y, w, h);
 
         int topHitWindowId = GetTopHitWindowId();
         bool dockInteractive = topHitWindowId == 0 || node.WindowIds.Contains(topHitWindowId);
@@ -773,7 +804,7 @@ public sealed partial class Ui
             activeRuntime.Height = h;
             activeRuntime.TitleBarHeight = tabHeight;
             activeRequest.State.Position = activeRuntime.Position;
-            Docking!.WindowRects[activeRequest.WindowId] = new DockRect(x, y, w, h);
+            docking.WindowRects[activeRequest.WindowId] = new DockRect(x, y, w, h);
         }
 
         float bodyX = x + border;
@@ -914,6 +945,12 @@ public sealed partial class Ui
         }
 
         Painter contentPainter = RenderDockContentPass(contentW, out float contentHeight);
+        if (docking.Version != dockingVersion)
+        {
+            ReleaseDeferredPainter(contentPainter);
+            return;
+        }
+
         bool measuredBodyScrollable = MathF.Max(0, contentHeight - contentH) > 0.5f;
         bool hasInputEdgeThisFrame = _input.PressedKeys?.Count > 0 ||
                                      _input.TextInput.Length > 0 ||
@@ -941,6 +978,11 @@ public sealed partial class Ui
 #else
             contentPainter = RenderDockContentPass(contentW, out contentHeight);
 #endif
+            if (docking.Version != dockingVersion)
+            {
+                ReleaseDeferredPainter(contentPainter);
+                return;
+            }
         }
 
         activeRuntime.ContentHeight = contentHeight;

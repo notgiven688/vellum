@@ -333,13 +333,14 @@ public sealed partial class Ui
         if (_windowOrder.Count == 0)
             return;
 
+        _dockedWindowIdsRenderedThisFrame.Clear();
         ResolveDockingDrops();
         RenderDockSpaces();
         RenderDockingPreview();
 
         foreach (int windowId in _windowOrder)
         {
-            if (IsWindowDocked(windowId))
+            if (IsWindowDocked(windowId) || _dockedWindowIdsRenderedThisFrame.Contains(windowId))
                 continue;
 
             if (_windowRequests.TryGetValue(windowId, out var request))

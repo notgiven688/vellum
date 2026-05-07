@@ -2023,6 +2023,57 @@ public sealed class VellumTests
             var windowState = new WindowState(new Vector2(260, 24));
             Response dockSpace = default;
             Response window = default;
+            Response resetButton = default;
+
+            void Frame(Vector2 mouse, UiInputState input = default)
+            {
+                ui.Frame(520, 260, mouse, false, input, frame =>
+                {
+                    dockSpace = frame.DockSpace("main", 220, 150);
+                    window = frame.Window("Metrics", windowState, 180, content =>
+                    {
+                        resetButton = content.Button("Reset docking", width: content.AvailableWidth);
+                        if (resetButton.Clicked)
+                            docking.Reset();
+                    }, id: "dock-reset-metrics");
+                });
+            }
+
+            Frame(Vector2.Zero);
+            Frame(Vector2.Zero);
+            Vector2 dragStart = new(window.X + 18f, window.Y + window.H - 10f);
+            Vector2 dropPoint = new(dockSpace.X + dockSpace.W * 0.5f, dockSpace.Y + dockSpace.H * 0.5f);
+            Frame(dragStart, Input(mouseButtons: [UiMouseButton.Left]));
+            Frame(dropPoint, Input(mouseButtons: [UiMouseButton.Left]));
+            Frame(dropPoint);
+            Frame(Vector2.Zero);
+
+            Vector2 resetPoint = new(resetButton.X + resetButton.W * 0.5f, resetButton.Y + resetButton.H * 0.5f);
+            Frame(resetPoint, Input(mouseButtons: [UiMouseButton.Left]));
+            Frame(resetPoint);
+
+            Check(
+                "docking can reset from docked window content",
+                resetButton.Clicked &&
+                docking.WindowSpaces.Count == 0 &&
+                docking.WindowRects.Count == 0);
+        }
+
+        {
+            var renderer = new TestRenderer();
+            var docking = new DockingState();
+            var ui = new Ui(renderer)
+            {
+                Font = font,
+                DefaultFontSize = 18f,
+                Lcd = false,
+                Docking = docking,
+                RootPadding = 0f
+            };
+
+            var windowState = new WindowState(new Vector2(260, 24));
+            Response dockSpace = default;
+            Response window = default;
             Response firstRow = default;
 
             void Frame(Vector2 mouse, UiInputState input = default)
