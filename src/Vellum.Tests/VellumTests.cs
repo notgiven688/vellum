@@ -2264,6 +2264,98 @@ public sealed class VellumTests
             Check("histogram reports the requested width and minimum height", MathF.Abs(histogram.W - 180f) < 0.1f && histogram.H >= 40f);
         }
 
+        {
+            var renderer = new TestRenderer();
+            var ui = new Ui(renderer)
+            {
+                Font = font,
+                DefaultFontSize = 18f,
+                Lcd = false
+            };
+
+            Color color = new(255, 0, 0, 255);
+            Response picker = default;
+
+            void Frame(Vector2 mouse, UiInputState input = default, bool requestHexFocus = false)
+            {
+                ui.Frame(360, 420, mouse, false, input, frame =>
+                {
+                    if (requestHexFocus)
+                    {
+                        using (frame.Id("picker"))
+                            frame.RequestFocus(UiWidgetKind.TextField, "hex");
+                    }
+
+                    picker = frame.ColorPicker(string.Empty, ref color, 180f, id: "picker");
+                });
+            }
+
+            Frame(Vector2.Zero);
+            Check("color picker reports composite bounds", picker.W >= 180f && picker.H > 220f);
+
+            Frame(new Vector2(106f, 72f), Input(mouseButtons: [UiMouseButton.Left]));
+            Check(
+                "color picker saturation-value square edits rgb",
+                picker.Changed &&
+                picker.Pressed &&
+                color != new Color(255, 0, 0, 255) &&
+                color.A == 255);
+
+            Frame(new Vector2(106f, 72f));
+            Frame(new Vector2(106f, 168f), Input(mouseButtons: [UiMouseButton.Left]));
+            Check("color picker alpha strip edits alpha", picker.Changed && Math.Abs(color.A - 128) <= 2);
+
+            Frame(Vector2.Zero);
+            Frame(Vector2.Zero, Input("00FF00AA", ctrl: true, keys: [UiKey.A]), requestHexFocus: true);
+            Check("color picker hex field parses rgba", color == new Color(0, 255, 0, 170) && picker.Changed);
+        }
+
+        {
+            var renderer = new TestRenderer();
+            var ui = new Ui(renderer)
+            {
+                Font = font,
+                DefaultFontSize = 18f,
+                Lcd = false
+            };
+
+            Color color = new(255, 0, 0, 255);
+            Response picker = default;
+
+            void Frame(Vector2 mouse, UiInputState input = default)
+            {
+                ui.Frame(500, 520, mouse, false, input, frame =>
+                {
+                    picker = frame.ColorPickerPopup("Accent", ref color, 180f, pickerWidth: 180f, id: "picker");
+                });
+            }
+
+            Frame(new Vector2(24f, 24f), Input(timeSeconds: 0));
+            Check(
+                "color picker popup opens on hover",
+                picker.Opened && ui.IsChildPopupOpen(UiWidgetKind.ColorPickerPopup, "picker", "popup"));
+
+            bool hasPopupBounds = ui.TryGetChildPopupBounds(
+                UiWidgetKind.ColorPickerPopup,
+                "picker",
+                "popup",
+                out float popupX,
+                out float popupY,
+                out _,
+                out _);
+            Check("color picker popup exposes bounds", hasPopupBounds);
+
+            Vector2 popupSvPoint = new(
+                popupX + ui.Theme.BorderWidth + ui.Theme.PopupPadding.Left + 90f,
+                popupY + ui.Theme.BorderWidth + ui.Theme.PopupPadding.Top + 56f);
+            Frame(popupSvPoint, Input(mouseButtons: [UiMouseButton.Left], timeSeconds: 0.02));
+            Frame(popupSvPoint, Input(timeSeconds: 0.03));
+            Check("color picker popup applies picker edits", picker.Changed && color != new Color(255, 0, 0, 255));
+
+            Frame(new Vector2(470f, 500f), Input(timeSeconds: 0.5));
+            Check("color picker popup closes after hover leaves", !ui.IsChildPopupOpen(UiWidgetKind.ColorPickerPopup, "picker", "popup"));
+        }
+
         Console.WriteLine($"Ui widgets: {passed} passed, {failed} failed\n");
     }
 

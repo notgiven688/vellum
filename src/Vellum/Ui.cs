@@ -173,6 +173,10 @@ public enum UiWidgetKind
     DragFloat,
     /// <summary>An integer drag field.</summary>
     DragInt,
+    /// <summary>A color picker bound to an RGBA color.</summary>
+    ColorPicker,
+    /// <summary>A compact color picker that opens an editor popup on hover.</summary>
+    ColorPickerPopup,
     /// <summary>A collapsing header.</summary>
     CollapsingHeader,
     /// <summary>A single-line text field.</summary>

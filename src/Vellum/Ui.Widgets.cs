@@ -12,6 +12,36 @@ public sealed partial class Ui
         public bool HasPendingSelection;
     }
 
+    private sealed class ColorPickerState
+    {
+        public float Hue;
+        public bool HasHue;
+        public string HexText = string.Empty;
+        public bool HexEditing;
+    }
+
+    private sealed class ColorPickerPopupState
+    {
+        public Color EditorValue;
+        public Color PendingValue;
+        public bool HasPendingValue;
+        public double LastHoverPathSeconds = double.NegativeInfinity;
+    }
+
+    private readonly struct ColorPickerPopupContent
+    {
+        public readonly ColorPickerPopupState State;
+        public readonly bool Alpha;
+        public readonly bool Enabled;
+
+        public ColorPickerPopupContent(ColorPickerPopupState state, bool alpha, bool enabled)
+        {
+            State = state;
+            Alpha = alpha;
+            Enabled = enabled;
+        }
+    }
+
     private readonly struct ComboBoxPopupContent
     {
         public readonly IReadOnlyList<string> Options;
@@ -260,6 +290,660 @@ public sealed partial class Ui
             return Math.Clamp(innerWidth * Theme.SliderBlockWidthFactor, 0, innerWidth);
 
         return MathF.Min(MathF.Max(0, Theme.SliderBlockWidth), innerWidth);
+    }
+
+    private static float NormalizeHue(float hue)
+    {
+        hue %= 1f;
+        if (hue < 0f)
+            hue += 1f;
+        return hue;
+    }
+
+    private static byte ByteFromUnit(float value)
+        => (byte)Math.Clamp((int)MathF.Round(Math.Clamp(value, 0f, 1f) * 255f), 0, 255);
+
+    private static Color ColorFromHsv(float hue, float saturation, float value, byte alpha)
+    {
+        hue = NormalizeHue(hue);
+        saturation = Math.Clamp(saturation, 0f, 1f);
+        value = Math.Clamp(value, 0f, 1f);
+
+        if (saturation <= 0f)
+        {
+            byte channel = ByteFromUnit(value);
+            return new Color(channel, channel, channel, alpha);
+        }
+
+        float scaledHue = hue * 6f;
+        int sector = (int)MathF.Floor(scaledHue);
+        float fraction = scaledHue - sector;
+
+        float p = value * (1f - saturation);
+        float q = value * (1f - saturation * fraction);
+        float t = value * (1f - saturation * (1f - fraction));
+
+        float r;
+        float g;
+        float b;
+        switch (sector % 6)
+        {
+            case 0:
+                r = value;
+                g = t;
+                b = p;
+                break;
+            case 1:
+                r = q;
+                g = value;
+                b = p;
+                break;
+            case 2:
+                r = p;
+                g = value;
+                b = t;
+                break;
+            case 3:
+                r = p;
+                g = q;
+                b = value;
+                break;
+            case 4:
+                r = t;
+                g = p;
+                b = value;
+                break;
+            default:
+                r = value;
+                g = p;
+                b = q;
+                break;
+        }
+
+        return new Color(ByteFromUnit(r), ByteFromUnit(g), ByteFromUnit(b), alpha);
+    }
+
+    private static void RgbToHsv(Color color, out float hue, out float saturation, out float value)
+    {
+        float r = color.R / 255f;
+        float g = color.G / 255f;
+        float b = color.B / 255f;
+
+        float max = MathF.Max(r, MathF.Max(g, b));
+        float min = MathF.Min(r, MathF.Min(g, b));
+        float delta = max - min;
+
+        value = max;
+        saturation = max <= 0f ? 0f : delta / max;
+
+        if (delta <= 0f)
+        {
+            hue = 0f;
+            return;
+        }
+
+        if (MathF.Abs(max - r) < 0.0001f)
+            hue = ((g - b) / delta) % 6f;
+        else if (MathF.Abs(max - g) < 0.0001f)
+            hue = ((b - r) / delta) + 2f;
+        else
+            hue = ((r - g) / delta) + 4f;
+
+        hue /= 6f;
+        if (hue < 0f)
+            hue += 1f;
+    }
+
+    private static string FormatColorHex(Color color, bool includeAlpha)
+        => includeAlpha
+            ? $"#{color.R:X2}{color.G:X2}{color.B:X2}{color.A:X2}"
+            : $"#{color.R:X2}{color.G:X2}{color.B:X2}";
+
+    private static bool TryParseColorHex(string text, bool includeAlpha, byte fallbackAlpha, out Color color)
+    {
+        color = default;
+        string hex = text.Trim();
+        if (hex.StartsWith('#'))
+            hex = hex[1..];
+        if (hex.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+            hex = hex[2..];
+
+        int r;
+        int g;
+        int b;
+        int a = fallbackAlpha;
+
+        if (hex.Length is 3 or 4)
+        {
+            if (!TryParseHexNibble(hex[0], out r) ||
+                !TryParseHexNibble(hex[1], out g) ||
+                !TryParseHexNibble(hex[2], out b))
+            {
+                return false;
+            }
+
+            r *= 17;
+            g *= 17;
+            b *= 17;
+
+            if (hex.Length == 4)
+            {
+                if (!TryParseHexNibble(hex[3], out int parsedAlpha))
+                    return false;
+                if (includeAlpha)
+                    a = parsedAlpha * 17;
+            }
+        }
+        else if (hex.Length is 6 or 8)
+        {
+            if (!TryParseHexByte(hex, 0, out r) ||
+                !TryParseHexByte(hex, 2, out g) ||
+                !TryParseHexByte(hex, 4, out b))
+            {
+                return false;
+            }
+
+            if (hex.Length == 8)
+            {
+                if (!TryParseHexByte(hex, 6, out int parsedAlpha))
+                    return false;
+                if (includeAlpha)
+                    a = parsedAlpha;
+            }
+        }
+        else
+        {
+            return false;
+        }
+
+        color = new Color((byte)r, (byte)g, (byte)b, (byte)a);
+        return true;
+    }
+
+    private static bool TryParseHexByte(string text, int start, out int value)
+    {
+        value = 0;
+        if (start + 1 >= text.Length ||
+            !TryParseHexNibble(text[start], out int high) ||
+            !TryParseHexNibble(text[start + 1], out int low))
+        {
+            return false;
+        }
+
+        value = high * 16 + low;
+        return true;
+    }
+
+    private static bool TryParseHexNibble(char c, out int value)
+    {
+        if (c is >= '0' and <= '9')
+        {
+            value = c - '0';
+            return true;
+        }
+
+        if (c is >= 'a' and <= 'f')
+        {
+            value = c - 'a' + 10;
+            return true;
+        }
+
+        if (c is >= 'A' and <= 'F')
+        {
+            value = c - 'A' + 10;
+            return true;
+        }
+
+        value = 0;
+        return false;
+    }
+
+    private void DrawCheckerboard(float x, float y, float width, float height, float cellSize = 6f)
+    {
+        if (width <= 0 || height <= 0)
+            return;
+
+        float size = MathF.Max(2f, cellSize);
+        Color light = new(210, 210, 210);
+        Color dark = new(150, 150, 150);
+
+        int rows = Math.Max(1, (int)MathF.Ceiling(height / size));
+        int columns = Math.Max(1, (int)MathF.Ceiling(width / size));
+        for (int row = 0; row < rows; row++)
+        {
+            float cy = y + row * size;
+            float ch = MathF.Min(size, y + height - cy);
+            for (int column = 0; column < columns; column++)
+            {
+                float cx = x + column * size;
+                float cw = MathF.Min(size, x + width - cx);
+                Color cell = ((row + column) & 1) == 0 ? light : dark;
+                _painter.DrawRect(cx, cy, cw, ch, cell);
+            }
+        }
+    }
+
+    private Color GetDisabledColorPickerColor(Color color, bool enabled)
+        => enabled ? color : color.WithAlpha((byte)Math.Min(color.A, (byte)120));
+
+    private static float ResolveRoundedFillInset(float radius, float border)
+        => MathF.Max(border, radius > 0f ? MathF.Ceiling(radius * 0.3f) : 0f);
+
+    private static (float X, float Y, float W, float H, float Radius) ResolveRoundedFillRect(
+        float x,
+        float y,
+        float width,
+        float height,
+        float radius,
+        float border)
+    {
+        float inset = ResolveRoundedFillInset(radius, border);
+        float fillW = MathF.Max(0f, width - inset * 2f);
+        float fillH = MathF.Max(0f, height - inset * 2f);
+        return (x + inset, y + inset, fillW, fillH, MathF.Max(0f, radius - inset));
+    }
+
+    private void DrawColorPickerSwatchContents(float x, float y, float width, float height, Color color, bool enabled)
+    {
+        Color baseFill = enabled ? Theme.ButtonBg : Theme.ButtonBg.WithAlpha(140);
+        _painter.DrawRect(x, y, width, height, baseFill, radius: FrameRadius);
+
+        Color fillColor = GetDisabledColorPickerColor(color, enabled);
+        if (color.A < 255)
+        {
+            var fill = ResolveRoundedFillRect(x, y, width, height, FrameRadius, FrameBorderWidth);
+            DrawCheckerboard(fill.X, fill.Y, fill.W, fill.H, 6f);
+        }
+
+        _painter.DrawRect(x, y, width, height, fillColor, radius: FrameRadius);
+
+        Color borderColor = enabled ? Theme.ButtonBorder : Theme.ButtonBorder.WithAlpha(120);
+        _painter.DrawRect(x, y, width, height, default, borderColor, FrameBorderWidth, FrameRadius);
+    }
+
+    private Response ColorPickerSaturationValue(
+        ReadOnlySpan<char> id,
+        ref float hue,
+        ref float saturation,
+        ref float value,
+        float width,
+        float height,
+        bool enabled)
+    {
+        int widgetId = MakeWidgetId(UiWidgetKind.ColorPicker, id);
+        var (x, y) = Place(width, height);
+
+        bool focused = RegisterFocusable(widgetId, enabled);
+        bool hover = enabled && PointIn(x, y, width, height);
+        if (hover) _hotId = widgetId;
+        if (hover || _activeId == widgetId) RequestCursor(UiCursor.PointingHand);
+
+        if (enabled && hover && IsMousePressed(UiMouseButton.Left))
+        {
+            _activeId = widgetId;
+            SetFocus(widgetId);
+            focused = true;
+        }
+
+        bool pressed = enabled && _activeId == widgetId && IsMouseDown(UiMouseButton.Left);
+        bool changed = false;
+
+        if (pressed)
+        {
+            float nextS = width > 0 ? Math.Clamp((_mouse.X - x) / width, 0f, 1f) : 0f;
+            float nextV = height > 0 ? 1f - Math.Clamp((_mouse.Y - y) / height, 0f, 1f) : 0f;
+            if (MathF.Abs(nextS - saturation) > 0.0001f || MathF.Abs(nextV - value) > 0.0001f)
+            {
+                saturation = nextS;
+                value = nextV;
+                changed = true;
+            }
+        }
+
+        if (enabled && focused)
+        {
+            float step = _input.Shift ? 0.05f : 0.01f;
+            float nextS = saturation;
+            float nextV = value;
+
+            if (_input.IsPressed(UiKey.Left)) nextS -= step;
+            if (_input.IsPressed(UiKey.Right)) nextS += step;
+            if (_input.IsPressed(UiKey.Up)) nextV += step;
+            if (_input.IsPressed(UiKey.Down)) nextV -= step;
+            if (_input.IsPressed(UiKey.Home)) nextS = 0f;
+            if (_input.IsPressed(UiKey.End)) nextS = 1f;
+
+            nextS = Math.Clamp(nextS, 0f, 1f);
+            nextV = Math.Clamp(nextV, 0f, 1f);
+            if (MathF.Abs(nextS - saturation) > 0.0001f || MathF.Abs(nextV - value) > 0.0001f)
+            {
+                saturation = nextS;
+                value = nextV;
+                changed = true;
+            }
+        }
+
+        if (width > 0 && height > 0)
+        {
+            _painter.DrawRect(x, y, width, height, enabled ? Theme.SliderBg : Theme.SliderBg.WithAlpha(140), radius: FrameRadius);
+            var fill = ResolveRoundedFillRect(x, y, width, height, FrameRadius, FrameBorderWidth);
+            int columns = Math.Clamp((int)MathF.Ceiling(fill.W / 8f), 16, 80);
+            int rows = Math.Clamp((int)MathF.Ceiling(fill.H / 8f), 12, 56);
+            float cellW = fill.W / columns;
+            float cellH = fill.H / rows;
+
+            for (int row = 0; row < rows; row++)
+            {
+                float vTop = 1f - (float)row / rows;
+                float vBottom = 1f - (float)(row + 1) / rows;
+                for (int column = 0; column < columns; column++)
+                {
+                    float sLeft = (float)column / columns;
+                    float sRight = (float)(column + 1) / columns;
+                    Color topLeft = GetDisabledColorPickerColor(ColorFromHsv(hue, sLeft, vTop, 255), enabled);
+                    Color topRight = GetDisabledColorPickerColor(ColorFromHsv(hue, sRight, vTop, 255), enabled);
+                    Color bottomRight = GetDisabledColorPickerColor(ColorFromHsv(hue, sRight, vBottom, 255), enabled);
+                    Color bottomLeft = GetDisabledColorPickerColor(ColorFromHsv(hue, sLeft, vBottom, 255), enabled);
+                    _painter.FillGradientRect(
+                        fill.X + column * cellW,
+                        fill.Y + row * cellH,
+                        cellW + 0.5f,
+                        cellH + 0.5f,
+                        topLeft,
+                        topRight,
+                        bottomRight,
+                        bottomLeft);
+                }
+            }
+        }
+
+        Color border = !enabled ? Theme.SliderBorder.WithAlpha(120) : focused ? Theme.FocusBorder : Theme.SliderBorder;
+        _painter.DrawRect(x, y, width, height, default, border, FrameBorderWidth, FrameRadius);
+
+        var markerBounds = ResolveRoundedFillRect(x, y, width, height, FrameRadius, FrameBorderWidth);
+        float markerSize = 10f;
+        float markerX = markerBounds.X + saturation * markerBounds.W;
+        float markerY = markerBounds.Y + (1f - value) * markerBounds.H;
+        markerX = Math.Clamp(markerX, markerBounds.X + markerSize * 0.5f, markerBounds.X + markerBounds.W - markerSize * 0.5f);
+        markerY = Math.Clamp(markerY, markerBounds.Y + markerSize * 0.5f, markerBounds.Y + markerBounds.H - markerSize * 0.5f);
+        _painter.DrawRect(
+            markerX - markerSize * 0.5f,
+            markerY - markerSize * 0.5f,
+            markerSize,
+            markerSize,
+            default,
+            Color.Black.WithAlpha(190),
+            2f,
+            markerSize * 0.5f);
+        _painter.DrawRect(
+            markerX - markerSize * 0.5f + 1.5f,
+            markerY - markerSize * 0.5f + 1.5f,
+            markerSize - 3f,
+            markerSize - 3f,
+            default,
+            Color.White.WithAlpha(235),
+            1f,
+            markerSize * 0.5f);
+
+        Advance(width, height);
+        bool clicked = enabled && IsMouseReleased(UiMouseButton.Left) && _activeId == widgetId && hover;
+        return new Response(
+            x,
+            y,
+            width,
+            height,
+            hover,
+            pressed,
+            clicked,
+            focused: focused,
+            changed: changed,
+            disabled: !enabled);
+    }
+
+    private Response ColorPickerHueSlider(ReadOnlySpan<char> id, ref float hue, float width, float height, bool enabled)
+    {
+        int widgetId = MakeWidgetId(UiWidgetKind.ColorPicker, id);
+        var (x, y) = Place(width, height);
+
+        bool focused = RegisterFocusable(widgetId, enabled);
+        bool hover = enabled && PointIn(x, y, width, height);
+        if (hover) _hotId = widgetId;
+        if (hover || _activeId == widgetId) RequestCursor(UiCursor.PointingHand);
+
+        if (enabled && hover && IsMousePressed(UiMouseButton.Left))
+        {
+            _activeId = widgetId;
+            SetFocus(widgetId);
+            focused = true;
+        }
+
+        bool pressed = enabled && _activeId == widgetId && IsMouseDown(UiMouseButton.Left);
+        bool changed = false;
+        if (pressed)
+        {
+            float next = width > 0 ? Math.Clamp((_mouse.X - x) / width, 0f, 1f) : 0f;
+            if (MathF.Abs(next - hue) > 0.0001f)
+            {
+                hue = next;
+                changed = true;
+            }
+        }
+
+        if (enabled && focused)
+        {
+            float step = _input.Shift ? 1f / 24f : 1f / 180f;
+            float next = hue;
+            if (_input.IsPressed(UiKey.Left) || _input.IsPressed(UiKey.Down)) next -= step;
+            if (_input.IsPressed(UiKey.Right) || _input.IsPressed(UiKey.Up)) next += step;
+            if (_input.IsPressed(UiKey.Home)) next = 0f;
+            if (_input.IsPressed(UiKey.End)) next = 1f;
+            next = _input.IsPressed(UiKey.Home) || _input.IsPressed(UiKey.End) ? Math.Clamp(next, 0f, 1f) : NormalizeHue(next);
+
+            if (MathF.Abs(next - hue) > 0.0001f)
+            {
+                hue = next;
+                changed = true;
+            }
+        }
+
+        if (width > 0 && height > 0)
+        {
+            float radius = MathF.Min(FrameRadius, height * 0.5f);
+            _painter.DrawRect(x, y, width, height, enabled ? Theme.SliderBg : Theme.SliderBg.WithAlpha(140), radius: radius);
+            var fill = ResolveRoundedFillRect(x, y, width, height, radius, FrameBorderWidth);
+            int segments = Math.Clamp((int)MathF.Ceiling(fill.W / 14f), 6, 36);
+            float segmentW = fill.W / segments;
+            for (int i = 0; i < segments; i++)
+            {
+                float hueLeft = (float)i / segments;
+                float hueRight = (float)(i + 1) / segments;
+                Color left = GetDisabledColorPickerColor(ColorFromHsv(hueLeft, 1f, 1f, 255), enabled);
+                Color right = GetDisabledColorPickerColor(ColorFromHsv(hueRight, 1f, 1f, 255), enabled);
+                _painter.FillGradientRect(
+                    fill.X + i * segmentW,
+                    fill.Y,
+                    segmentW + 0.5f,
+                    fill.H,
+                    left,
+                    right,
+                    right,
+                    left);
+            }
+        }
+
+        Color border = !enabled ? Theme.SliderBorder.WithAlpha(120) : focused ? Theme.FocusBorder : Theme.SliderBorder;
+        float stripRadius = MathF.Min(FrameRadius, height * 0.5f);
+        _painter.DrawRect(x, y, width, height, default, border, FrameBorderWidth, stripRadius);
+
+        var markerBounds = ResolveRoundedFillRect(x, y, width, height, stripRadius, FrameBorderWidth);
+        DrawColorPickerStripMarker(markerBounds.X, markerBounds.Y, markerBounds.W, markerBounds.H, hue);
+
+        Advance(width, height);
+        bool clicked = enabled && IsMouseReleased(UiMouseButton.Left) && _activeId == widgetId && hover;
+        return new Response(
+            x,
+            y,
+            width,
+            height,
+            hover,
+            pressed,
+            clicked,
+            focused: focused,
+            changed: changed,
+            disabled: !enabled);
+    }
+
+    private Response ColorPickerAlphaSlider(
+        ReadOnlySpan<char> id,
+        Color color,
+        ref float alpha,
+        float width,
+        float height,
+        bool enabled)
+    {
+        int widgetId = MakeWidgetId(UiWidgetKind.ColorPicker, id);
+        var (x, y) = Place(width, height);
+
+        bool focused = RegisterFocusable(widgetId, enabled);
+        bool hover = enabled && PointIn(x, y, width, height);
+        if (hover) _hotId = widgetId;
+        if (hover || _activeId == widgetId) RequestCursor(UiCursor.PointingHand);
+
+        if (enabled && hover && IsMousePressed(UiMouseButton.Left))
+        {
+            _activeId = widgetId;
+            SetFocus(widgetId);
+            focused = true;
+        }
+
+        bool pressed = enabled && _activeId == widgetId && IsMouseDown(UiMouseButton.Left);
+        bool changed = false;
+        if (pressed)
+        {
+            float next = width > 0 ? Math.Clamp((_mouse.X - x) / width, 0f, 1f) : 0f;
+            if (MathF.Abs(next - alpha) > 0.0001f)
+            {
+                alpha = next;
+                changed = true;
+            }
+        }
+
+        if (enabled && focused)
+        {
+            float step = _input.Shift ? 10f / 255f : 1f / 255f;
+            float next = alpha;
+            if (_input.IsPressed(UiKey.Left) || _input.IsPressed(UiKey.Down)) next -= step;
+            if (_input.IsPressed(UiKey.Right) || _input.IsPressed(UiKey.Up)) next += step;
+            if (_input.IsPressed(UiKey.Home)) next = 0f;
+            if (_input.IsPressed(UiKey.End)) next = 1f;
+            next = Math.Clamp(next, 0f, 1f);
+
+            if (MathF.Abs(next - alpha) > 0.0001f)
+            {
+                alpha = next;
+                changed = true;
+            }
+        }
+
+        if (width > 0 && height > 0)
+        {
+            float radius = MathF.Min(FrameRadius, height * 0.5f);
+            _painter.DrawRect(x, y, width, height, enabled ? Theme.SliderBg : Theme.SliderBg.WithAlpha(140), radius: radius);
+            var fill = ResolveRoundedFillRect(x, y, width, height, radius, FrameBorderWidth);
+            DrawCheckerboard(fill.X, fill.Y, fill.W, fill.H, 5f);
+            Color transparent = GetDisabledColorPickerColor(new Color(color.R, color.G, color.B, 0), enabled);
+            Color opaque = GetDisabledColorPickerColor(new Color(color.R, color.G, color.B, 255), enabled);
+            _painter.FillGradientRect(
+                fill.X,
+                fill.Y,
+                fill.W,
+                fill.H,
+                transparent,
+                opaque,
+                opaque,
+                transparent);
+        }
+
+        Color border = !enabled ? Theme.SliderBorder.WithAlpha(120) : focused ? Theme.FocusBorder : Theme.SliderBorder;
+        float stripRadius = MathF.Min(FrameRadius, height * 0.5f);
+        _painter.DrawRect(x, y, width, height, default, border, FrameBorderWidth, stripRadius);
+
+        var markerBounds = ResolveRoundedFillRect(x, y, width, height, stripRadius, FrameBorderWidth);
+        DrawColorPickerStripMarker(markerBounds.X, markerBounds.Y, markerBounds.W, markerBounds.H, alpha);
+
+        Advance(width, height);
+        bool clicked = enabled && IsMouseReleased(UiMouseButton.Left) && _activeId == widgetId && hover;
+        return new Response(
+            x,
+            y,
+            width,
+            height,
+            hover,
+            pressed,
+            clicked,
+            focused: focused,
+            changed: changed,
+            disabled: !enabled);
+    }
+
+    private void DrawColorPickerStripMarker(float x, float y, float width, float height, float value)
+    {
+        float markerX = x + Math.Clamp(value, 0f, 1f) * width;
+        float markerW = 5f;
+        _painter.DrawRect(
+            markerX - markerW * 0.5f,
+            y - 2f,
+            markerW,
+            height + 4f,
+            Color.White.WithAlpha(235),
+            Color.Black.WithAlpha(180),
+            1f,
+            2f);
+    }
+
+    private Response ColorPickerSwatch(Color color, float width, float height, bool enabled)
+    {
+        var (x, y) = Place(width, height);
+        bool hover = enabled && PointIn(x, y, width, height);
+
+        DrawColorPickerSwatchContents(x, y, width, height, color, enabled);
+
+        Advance(width, height);
+        return new Response(x, y, width, height, hover, false, false, disabled: !enabled);
+    }
+
+    private float EstimateColorPickerContentHeight(float pickerWidth, bool alpha, bool hasLabel)
+    {
+        float totalHeight = 0f;
+        int itemCount = 0;
+
+        void AddItem(float height)
+        {
+            if (itemCount > 0)
+                totalHeight += Theme.Gap;
+            totalHeight += height;
+            itemCount++;
+        }
+
+        if (hasLabel)
+            AddItem(LayoutText("Ag", DefaultFontSize).Height);
+
+        AddItem(Math.Clamp(MathF.Round(pickerWidth * 0.62f), 96f, 180f));
+        AddItem(16f);
+        if (alpha)
+            AddItem(16f);
+
+        int channelCount = alpha ? 4 : 3;
+        int columns = pickerWidth >= 360f ? channelCount : pickerWidth >= 220f ? 2 : 1;
+        int channelRows = (int)MathF.Ceiling(channelCount / (float)columns);
+        float channelHeight = LayoutText("R (255)", DefaultFontSize).Height + Theme.ButtonPadding.Vertical;
+        for (int i = 0; i < channelRows; i++)
+            AddItem(channelHeight);
+
+        float textFieldHeight = LayoutText("Ag", DefaultFontSize).Height + Theme.TextFieldPadding.Vertical + FrameBorderWidth * 2f;
+        AddItem(MathF.Max(30f, textFieldHeight));
+
+        return totalHeight;
     }
 
     private static void ResolveHistogramScale(ReadOnlySpan<float> values, float? scaleMin, float? scaleMax,
@@ -2101,6 +2785,400 @@ public sealed partial class Ui
             focused: response.Focused,
             changed: changed,
             disabled: response.Disabled);
+    }
+
+    /// <summary>Draws a compact color swatch that opens the full color picker in a hover popup.</summary>
+    public Response ColorPickerPopup(
+        string label,
+        ref Color value,
+        float width,
+        float pickerWidth = 300f,
+        float maxPopupHeight = 440f,
+        bool alpha = true,
+        bool enabled = true,
+        UiId? id = null)
+    {
+        enabled = ResolveEnabled(enabled);
+        float resolvedWidth = MathF.Max(64f, width);
+        float resolvedPickerWidth = MathF.Max(140f, pickerWidth);
+        UiId resolvedId = ResolveWidgetId(id, label);
+        int widgetId = MakeWidgetId(UiWidgetKind.ColorPickerPopup, resolvedId);
+        int popupWidgetId = MakeChildId(widgetId, "popup");
+        var popupState = GetState<ColorPickerPopupState>(widgetId);
+
+        bool changed = false;
+        if (popupState.HasPendingValue)
+        {
+            if (value != popupState.PendingValue)
+            {
+                value = popupState.PendingValue;
+                changed = true;
+            }
+
+            popupState.HasPendingValue = false;
+        }
+
+        bool popupOpen = IsPopupOpen(popupWidgetId);
+        if (!popupOpen)
+            popupState.EditorValue = value;
+
+        float s = DefaultFontSize;
+        var pad = Theme.ButtonPadding;
+        string hexText = FormatColorHex(value, alpha);
+        string displayText = string.IsNullOrWhiteSpace(label) ? hexText : $"{label} {hexText}";
+        float swatchSize = MathF.Max(16f, MathF.Ceiling(s));
+        float textMaxWidth = MathF.Max(0f, resolvedWidth - pad.Horizontal - swatchSize - Theme.Gap);
+        var layout = LayoutText(displayText, s, maxWidth: textMaxWidth, overflow: TextOverflowMode.Ellipsis);
+        float h = MathF.Max(layout.Height, swatchSize) + pad.Vertical;
+        var (x, y) = Place(resolvedWidth, h);
+
+        bool focused = RegisterFocusable(widgetId, enabled);
+        bool hover = enabled && (popupOpen ? PointInMenuAnchor(x, y, resolvedWidth, h) : PointIn(x, y, resolvedWidth, h));
+        if (hover) _hotId = widgetId;
+        if (hover || popupOpen) RequestCursor(UiCursor.PointingHand);
+
+        if (enabled && _hotId == widgetId && IsMousePressed(UiMouseButton.Left))
+        {
+            _activeId = widgetId;
+            SetFocus(widgetId);
+            focused = true;
+        }
+
+        bool pressed = enabled && _activeId == widgetId && IsMouseDown(UiMouseButton.Left);
+        bool clicked = enabled && IsMouseReleased(UiMouseButton.Left) && _activeId == widgetId && _hotId == widgetId;
+        bool openedThisFrame = false;
+        bool closedThisFrame = false;
+
+        if (enabled && hover && !popupOpen)
+        {
+            popupState.EditorValue = value;
+            OpenPopupById(popupWidgetId);
+            popupOpen = true;
+            openedThisFrame = true;
+        }
+
+        if (enabled && focused && (_input.IsPressed(UiKey.Enter) || _input.IsPressed(UiKey.Space)))
+        {
+            if (popupOpen)
+            {
+                ClosePopupById(popupWidgetId);
+                popupOpen = false;
+                closedThisFrame = true;
+            }
+            else
+            {
+                popupState.EditorValue = value;
+                OpenPopupById(popupWidgetId);
+                popupOpen = true;
+                openedThisFrame = true;
+            }
+        }
+
+        if (enabled && focused && popupOpen && _input.IsPressed(UiKey.Escape))
+        {
+            ClosePopupById(popupWidgetId);
+            popupOpen = false;
+            closedThisFrame = true;
+        }
+
+        bool popupTransitionHovered = popupOpen && IsMenuPopupBridgeHovered(x, y, resolvedWidth, h, popupWidgetId);
+        bool popupPathHovered = popupOpen && IsPopupHierarchyHoveredOrBridged(popupWidgetId);
+        bool popupHoverPathActive = popupOpen && (hover || popupTransitionHovered || popupPathHovered);
+        double nowSeconds = GetMenuTimeSeconds();
+        if (popupOpen && (openedThisFrame || popupHoverPathActive))
+            popupState.LastHoverPathSeconds = nowSeconds;
+
+        double hoverGraceSeconds = Math.Max(0, MenuHoverGraceSeconds);
+        bool popupHoverGraceActive =
+            popupOpen &&
+            hoverGraceSeconds > 0 &&
+            !openedThisFrame &&
+            !popupHoverPathActive &&
+            nowSeconds - popupState.LastHoverPathSeconds < hoverGraceSeconds;
+
+        if (popupOpen &&
+            !openedThisFrame &&
+            !hover &&
+            !popupTransitionHovered &&
+            !popupPathHovered &&
+            !popupHoverGraceActive)
+        {
+            ClosePopupById(popupWidgetId);
+            popupOpen = false;
+            closedThisFrame = true;
+        }
+
+        var visuals = GetComboBoxVisuals(enabled, hover, pressed, popupOpen, focused);
+        DrawFrameRect(x, y, resolvedWidth, h, visuals.Fill, visuals.Border);
+
+        float swatchX = x + pad.Left;
+        float swatchY = y + MathF.Max(0f, (h - swatchSize) * 0.5f);
+        DrawColorPickerSwatchContents(swatchX, swatchY, swatchSize, swatchSize, value, enabled);
+
+        float textX = swatchX + swatchSize + Theme.Gap;
+        float textY = y + MathF.Max(0f, (h - layout.Height) * 0.5f);
+        DrawTextLayout(layout, textX, textY, visuals.Foreground);
+
+        Advance(resolvedWidth, h);
+
+        if (popupOpen)
+        {
+            bool shouldRenderPopup = openedThisFrame || hover || popupTransitionHovered || popupPathHovered || popupHoverGraceActive;
+            if (shouldRenderPopup)
+            {
+                float popupOuterWidth = MathF.Min(
+                    MathF.Max(0f, resolvedPickerWidth + FrameBorderWidth * 2f + Theme.PopupPadding.Horizontal),
+                    _vpW);
+                GetState<PopupState>(popupWidgetId).ContentHeight = EstimateColorPickerContentHeight(resolvedPickerWidth, alpha, hasLabel: false);
+                Popup(
+                    popupWidgetId,
+                    x,
+                    y + h + 4f,
+                    popupOuterWidth,
+                    maxPopupHeight,
+                    new ColorPickerPopupContent(popupState, alpha, enabled),
+                    static (popup, content) => popup.RenderColorPickerPopupContent(content),
+                    enabled);
+            }
+        }
+
+        return new Response(
+            x,
+            y,
+            resolvedWidth,
+            h,
+            hover,
+            pressed,
+            clicked,
+            focused: focused,
+            changed: changed,
+            disabled: !enabled,
+            opened: openedThisFrame,
+            closed: closedThisFrame);
+    }
+
+    private void RenderColorPickerPopupContent(ColorPickerPopupContent content)
+    {
+        Color editorValue = content.State.EditorValue;
+        Response response = ColorPicker(string.Empty, ref editorValue, AvailableWidth, content.Alpha, content.Enabled, id: "picker");
+        content.State.EditorValue = editorValue;
+        if (response.Changed)
+        {
+            content.State.PendingValue = editorValue;
+            content.State.HasPendingValue = true;
+        }
+    }
+
+    /// <summary>Draws a color picker bound to an RGBA color.</summary>
+    public Response ColorPicker(
+        string label,
+        ref Color value,
+        float width,
+        bool alpha = true,
+        bool enabled = true,
+        UiId? id = null)
+    {
+        enabled = ResolveEnabled(enabled);
+        float pickerWidth = MathF.Max(140f, width);
+        UiId resolvedId = ResolveWidgetId(id, label);
+        int widgetId = MakeWidgetId(UiWidgetKind.ColorPicker, resolvedId);
+        var state = GetState<ColorPickerState>(widgetId);
+
+        Color original = value;
+        RgbToHsv(value, out float colorHue, out float saturation, out float brightness);
+        if (!state.HasHue || (saturation > 0.0001f && brightness > 0.0001f))
+        {
+            state.Hue = colorHue;
+            state.HasHue = true;
+        }
+
+        float hue = state.Hue;
+        float alphaValue = value.A / 255f;
+        bool hovered = false;
+        bool pressed = false;
+        bool clicked = false;
+        bool focused = false;
+        bool submitted = false;
+        bool cancelled = false;
+        bool hasBounds = false;
+        float minX = 0f;
+        float minY = 0f;
+        float maxX = 0f;
+        float maxY = 0f;
+
+        void Include(Response response)
+        {
+            if (!hasBounds)
+            {
+                minX = response.X;
+                minY = response.Y;
+                maxX = response.X + response.W;
+                maxY = response.Y + response.H;
+                hasBounds = true;
+            }
+            else
+            {
+                minX = MathF.Min(minX, response.X);
+                minY = MathF.Min(minY, response.Y);
+                maxX = MathF.Max(maxX, response.X + response.W);
+                maxY = MathF.Max(maxY, response.Y + response.H);
+            }
+
+            hovered |= response.Hovered;
+            pressed |= response.Pressed;
+            clicked |= response.Clicked;
+            focused |= response.Focused;
+            submitted |= response.Submitted;
+            cancelled |= response.Cancelled;
+        }
+
+        EnterIdScope(resolvedId);
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(label))
+            {
+                Include(Label(
+                    label,
+                    color: enabled ? Theme.TextSecondary : Theme.TextSecondary.WithAlpha(140),
+                    maxWidth: pickerWidth,
+                    overflow: TextOverflowMode.Ellipsis,
+                    width: pickerWidth));
+            }
+
+            float squareHeight = Math.Clamp(MathF.Round(pickerWidth * 0.62f), 96f, 180f);
+            Response sv = ColorPickerSaturationValue("sv", ref hue, ref saturation, ref brightness, pickerWidth, squareHeight, enabled);
+            Include(sv);
+            if (sv.Changed)
+            {
+                value = ColorFromHsv(hue, saturation, brightness, value.A);
+                state.Hue = hue;
+                state.HasHue = true;
+            }
+
+            Response hueSlider = ColorPickerHueSlider("hue", ref hue, pickerWidth, 16f, enabled);
+            Include(hueSlider);
+            if (hueSlider.Changed)
+            {
+                value = ColorFromHsv(hue, saturation, brightness, value.A);
+                state.Hue = hue;
+                state.HasHue = true;
+            }
+
+            if (alpha)
+            {
+                Response alphaSlider = ColorPickerAlphaSlider("alpha", value.WithAlpha(255), ref alphaValue, pickerWidth, 16f, enabled);
+                Include(alphaSlider);
+                if (alphaSlider.Changed)
+                    value = value.WithAlpha(ByteFromUnit(alphaValue));
+            }
+
+            int red = value.R;
+            int green = value.G;
+            int blue = value.B;
+            int alphaChannel = value.A;
+            bool channelChanged = false;
+            int channelCount = alpha ? 4 : 3;
+            int columns = pickerWidth >= 360f ? channelCount : pickerWidth >= 220f ? 2 : 1;
+            float channelWidth = MathF.Max(58f, MathF.Floor((pickerWidth - Theme.Gap * (columns - 1)) / columns));
+            int channelIndex = 0;
+
+            Response DrawChannel(string channelLabel, ref int channel)
+            {
+                int before = channel;
+                Response response = DragInt(
+                    channelLabel,
+                    ref channel,
+                    speed: 1f,
+                    min: 0,
+                    max: 255,
+                    width: channelWidth,
+                    enabled: enabled,
+                    id: channelLabel);
+                channelChanged |= channel != before;
+                return response;
+            }
+
+            while (channelIndex < channelCount)
+            {
+                int rowCount = Math.Min(columns, channelCount - channelIndex);
+                using (Row())
+                {
+                    for (int i = 0; i < rowCount; i++)
+                    {
+                        Response channelResponse = channelIndex switch
+                        {
+                            0 => DrawChannel("R", ref red),
+                            1 => DrawChannel("G", ref green),
+                            2 => DrawChannel("B", ref blue),
+                            _ => DrawChannel("A", ref alphaChannel)
+                        };
+                        Include(channelResponse);
+                        channelIndex++;
+                    }
+                }
+            }
+
+            if (channelChanged)
+            {
+                value = new Color((byte)red, (byte)green, (byte)blue, alpha ? (byte)alphaChannel : value.A);
+                RgbToHsv(value, out float channelHue, out saturation, out brightness);
+                if (saturation > 0.0001f && brightness > 0.0001f)
+                    hue = channelHue;
+                state.Hue = hue;
+                state.HasHue = true;
+            }
+
+            string currentHex = FormatColorHex(value, alpha);
+            if (!state.HexEditing)
+                state.HexText = currentHex;
+
+            using (Row())
+            {
+                float swatchWidth = Math.Clamp(pickerWidth * 0.22f, 44f, 64f);
+                float footerHeight = MathF.Max(30f, DefaultFontSize + Theme.TextFieldPadding.Vertical + FrameBorderWidth * 2);
+                Include(ColorPickerSwatch(value, swatchWidth, footerHeight, enabled));
+
+                float hexWidth = MathF.Max(0f, pickerWidth - swatchWidth - Theme.Gap);
+                Response hexResponse = TextField("Hex", ref state.HexText, hexWidth, enabled: enabled, id: "hex");
+                Include(hexResponse);
+
+                if ((hexResponse.Changed || hexResponse.Submitted) &&
+                    TryParseColorHex(state.HexText, alpha, value.A, out Color parsedColor))
+                {
+                    value = parsedColor;
+                    RgbToHsv(value, out float hexHue, out saturation, out brightness);
+                    if (saturation > 0.0001f && brightness > 0.0001f)
+                        hue = hexHue;
+                    state.Hue = hue;
+                    state.HasHue = true;
+                }
+
+                state.HexEditing = hexResponse.Focused && !hexResponse.Submitted && !hexResponse.Cancelled;
+                if (!state.HexEditing)
+                    state.HexText = FormatColorHex(value, alpha);
+            }
+        }
+        finally
+        {
+            ExitIdScope();
+        }
+
+        if (!hasBounds)
+            return new Response(0, 0, 0, 0, false, false, false, disabled: !enabled);
+
+        return new Response(
+            minX,
+            minY,
+            maxX - minX,
+            maxY - minY,
+            hovered,
+            pressed,
+            clicked,
+            focused: focused,
+            changed: value != original,
+            submitted: submitted,
+            cancelled: cancelled,
+            disabled: !enabled);
     }
 
     /// <summary>Draws a header that toggles an open/collapsed state.</summary>

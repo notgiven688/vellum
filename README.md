@@ -83,7 +83,7 @@ sealed class AppState
 The current library already includes:
 
 - labels, panels, buttons, toggles, and switches
-- selectables, combo boxes, sliders, histograms, progress bars, and spinners
+- selectables, combo boxes, sliders, color pickers, histograms, progress bars, and spinners
 - text fields and multiline text areas
 - menu bars, cascading menus, shortcut gutters, popups, and modal popups
 - vertical and both-axis scroll areas

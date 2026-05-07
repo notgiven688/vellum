@@ -269,7 +269,7 @@ internal static class DemoScene
         {
             DemoState state = context.State;
 
-            PanelTitle(panel, "Controls", "Toggles, selection widgets, and a small texture preview.");
+            PanelTitle(panel, "Controls", "Toggles, selection widgets, color editing, and a small texture preview.");
             panel.Checkbox("Enable notifications", ref state.NotificationsEnabled, width: panel.AvailableWidth);
             panel.Checkbox("Enable analytics", ref state.AnalyticsEnabled, width: panel.AvailableWidth);
             panel.Separator();
@@ -299,6 +299,8 @@ internal static class DemoScene
             panel.Label("Theme", color: panel.Theme.TextSecondary);
             Response themeCombo = panel.ComboBox("theme", DemoState.ThemeOptions, ref state.SelectedTheme, panel.AvailableWidth, maxPopupHeight: 140f);
             panel.Tooltip(themeCombo, "Switch between the built-in dark and light theme presets.");
+            panel.Separator();
+            panel.ColorPickerPopup("Accent", ref state.AccentColor, panel.AvailableWidth, id: "accentColor");
             panel.Separator();
             panel.Label("Image preview", color: panel.Theme.TextSecondary);
             panel.Image(context.CheckerTexture, panel.AvailableWidth, 88);
@@ -837,6 +839,7 @@ internal sealed class DemoState
     public float Sensitivity = 1.5f;
     public int MaxRetries = 3;
     public int SelectedTheme;
+    public Color AccentColor = new(86, 122, 178, 220);
     public bool MenuOpenedThisFrame;
     public bool DetailsOpen;
     public string? SelectedTreeItem;

@@ -62,6 +62,18 @@ internal static class WidgetExamples
             ui.ComboBox("theme", ["Dark", "Light", "System"], ref selected, 220f);
         }),
 
+        new("color-picker", "ColorPicker", "Controls", 380, 430, (ui, _) =>
+        {
+            Color color = new(86, 122, 178, 220);
+            ui.ColorPicker("Accent", ref color, 300f, id: "accent");
+        }),
+
+        new("color-picker-popup", "ColorPickerPopup", "Controls", 420, 500, (ui, _) =>
+        {
+            Color color = new(86, 122, 178, 220);
+            ui.ColorPickerPopup("Accent", ref color, 240f, pickerWidth: 300f, id: "accent-popup");
+        }, Mouse: new Vector2(36f, 28f), Input: new UiInputState(timeSeconds: 0)),
+
         new("slider", "Slider", "Controls", 360, 96, (ui, _) =>
         {
             float volume = 65f;

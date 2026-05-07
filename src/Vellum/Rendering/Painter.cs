@@ -119,6 +119,35 @@ internal sealed class Painter
         AddConvexPolygon(_outerPoints, color, SolidTextureId, lcd: false);
     }
 
+    public void FillGradientRect(
+        float x,
+        float y,
+        float width,
+        float height,
+        Color topLeft,
+        Color topRight,
+        Color bottomRight,
+        Color bottomLeft)
+    {
+        if (width <= 0 || height <= 0 ||
+            (topLeft.A == 0 && topRight.A == 0 && bottomRight.A == 0 && bottomLeft.A == 0))
+        {
+            return;
+        }
+
+        AddQuad(
+            new Vector2(x, y),
+            new Vector2(x + width, y),
+            new Vector2(x + width, y + height),
+            new Vector2(x, y + height),
+            topLeft,
+            topRight,
+            bottomRight,
+            bottomLeft,
+            SolidTextureId,
+            lcd: false);
+    }
+
     public void StrokeRect(float x, float y, float width, float height, Color color, float strokeWidth, float radius = 0f)
     {
         if (width <= 0 || height <= 0 || color.A == 0 || strokeWidth <= 0)
@@ -206,6 +235,40 @@ internal sealed class Painter
         _renderList.Vertices.Add(new DrawVertex(topRight, uvTopRight ?? Vector2.Zero, color));
         _renderList.Vertices.Add(new DrawVertex(bottomRight, uvBottomRight ?? Vector2.Zero, color));
         _renderList.Vertices.Add(new DrawVertex(bottomLeft, uvBottomLeft ?? Vector2.Zero, color));
+
+        _renderList.Indices.Add(vertexBase);
+        _renderList.Indices.Add(vertexBase + 3);
+        _renderList.Indices.Add(vertexBase + 2);
+        _renderList.Indices.Add(vertexBase);
+        _renderList.Indices.Add(vertexBase + 2);
+        _renderList.Indices.Add(vertexBase + 1);
+
+        AppendCommand(textureId, lcd, indexOffset, 6);
+    }
+
+    private void AddQuad(
+        Vector2 topLeft,
+        Vector2 topRight,
+        Vector2 bottomRight,
+        Vector2 bottomLeft,
+        Color topLeftColor,
+        Color topRightColor,
+        Color bottomRightColor,
+        Color bottomLeftColor,
+        int textureId,
+        bool lcd,
+        Vector2? uvTopLeft = null,
+        Vector2? uvTopRight = null,
+        Vector2? uvBottomRight = null,
+        Vector2? uvBottomLeft = null)
+    {
+        int indexOffset = _renderList.Indices.Count;
+        uint vertexBase = (uint)_renderList.Vertices.Count;
+
+        _renderList.Vertices.Add(new DrawVertex(topLeft, uvTopLeft ?? Vector2.Zero, topLeftColor));
+        _renderList.Vertices.Add(new DrawVertex(topRight, uvTopRight ?? Vector2.Zero, topRightColor));
+        _renderList.Vertices.Add(new DrawVertex(bottomRight, uvBottomRight ?? Vector2.Zero, bottomRightColor));
+        _renderList.Vertices.Add(new DrawVertex(bottomLeft, uvBottomLeft ?? Vector2.Zero, bottomLeftColor));
 
         _renderList.Indices.Add(vertexBase);
         _renderList.Indices.Add(vertexBase + 3);

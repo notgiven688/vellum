@@ -36,6 +36,18 @@ This page is generated from curated widget examples in `other/Vellum.WidgetGalle
 | --- | --- |
 | ![Checkbox - Dark](images/widgets/checkbox-dark.png) | ![Checkbox - Light](images/widgets/checkbox-light.png) |
 
+### ColorPicker
+
+| Dark | Light |
+| --- | --- |
+| ![ColorPicker - Dark](images/widgets/color-picker-dark.png) | ![ColorPicker - Light](images/widgets/color-picker-light.png) |
+
+### ColorPickerPopup
+
+| Dark | Light |
+| --- | --- |
+| ![ColorPickerPopup - Dark](images/widgets/color-picker-popup-dark.png) | ![ColorPickerPopup - Light](images/widgets/color-picker-popup-light.png) |
+
 ### Combo Box
 
 | Dark | Light |
