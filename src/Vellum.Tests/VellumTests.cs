@@ -3209,6 +3209,27 @@ public sealed class VellumTests
                 DefaultFontSize = 18f,
                 Lcd = false
             };
+            ui.Theme.SliderFillText = new Color(14, 20, 28);
+
+            float value = 50;
+            ui.Frame(320, 180, Vector2.Zero, false, frame =>
+            {
+                frame.Slider("Contrast", ref value, 0, 100, 180, id: "contrast");
+            });
+
+            Check(
+                "slider redraws value text clipped over filled block",
+                HasClippedVertexColor(renderer.LastRenderList, ui.Theme.SliderFillText));
+        }
+
+        {
+            var renderer = new TestRenderer();
+            var ui = new Ui(renderer)
+            {
+                Font = font,
+                DefaultFontSize = 18f,
+                Lcd = false
+            };
 
             float value = 40;
             Response slider = default;
@@ -3905,6 +3926,28 @@ public sealed class VellumTests
 
     static bool HasVertexColor(RenderList? renderList, Color color)
         => renderList != null && renderList.Vertices.Any(vertex => vertex.Color.Equals(color));
+
+    static bool HasClippedVertexColor(RenderList? renderList, Color color)
+    {
+        if (renderList == null)
+            return false;
+
+        foreach (DrawCommand command in renderList.Commands)
+        {
+            if (!command.HasClip)
+                continue;
+
+            int end = command.IndexOffset + command.IndexCount;
+            for (int i = command.IndexOffset; i < end; i++)
+            {
+                DrawVertex vertex = renderList.Vertices[(int)renderList.Indices[i]];
+                if (vertex.Color.Equals(color))
+                    return true;
+            }
+        }
+
+        return false;
+    }
 
     static bool AllTrianglesFrontFacing(RenderList renderList)
     {

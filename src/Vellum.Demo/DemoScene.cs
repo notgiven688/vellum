@@ -914,6 +914,7 @@ internal static class DemoScene
         ThemeColor(window, "Slider active", ref theme.SliderBgActive, "slider-active");
         ThemeColor(window, "Slider fill", ref theme.SliderFill, "slider-fill");
         ThemeColor(window, "Slider fill active", ref theme.SliderFillActive, "slider-fill-active");
+        ThemeColor(window, "Slider fill text", ref theme.SliderFillText, "slider-fill-text");
         ThemeColor(window, "Slider border", ref theme.SliderBorder, "slider-border");
     }
 

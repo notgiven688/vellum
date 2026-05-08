@@ -92,6 +92,7 @@ public static class ThemePresets
             SliderBgActive = new Color(220, 226, 233),
             SliderFill = new Color(210, 138, 36),
             SliderFillActive = new Color(223, 154, 60),
+            SliderFillText = new Color(36, 30, 20),
             SliderBorder = new Color(190, 197, 206)
         };
     }

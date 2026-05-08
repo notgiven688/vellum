@@ -2658,6 +2658,14 @@ public sealed partial class Ui
         float textY = y + MathF.Max(0, (h - layout.Height) * 0.5f);
         DrawTextLayout(layout, textX, textY, textColor);
 
+        Color fillTextColor = enabled ? Theme.SliderFillText : Theme.SliderFillText.WithAlpha(140);
+        if (blockW > 0 && innerH > 0 && fillTextColor.A > 0)
+        {
+            _painter.PushClip(blockX, innerY, blockW, innerH);
+            DrawTextLayout(layout, textX, textY, fillTextColor);
+            _painter.PopClip();
+        }
+
         Advance(width, h);
         return new Response(
             x,

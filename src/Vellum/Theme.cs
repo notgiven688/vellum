@@ -169,6 +169,8 @@ public sealed class Theme
     public Color SliderFill             = new(255, 200, 90);
     /// <summary>Slider filled block color while active.</summary>
     public Color SliderFillActive       = new(255, 214, 128);
+    /// <summary>Text color drawn over the slider filled block.</summary>
+    public Color SliderFillText         = new(36, 30, 20);
     /// <summary>Slider border color.</summary>
     public Color SliderBorder           = new(82, 82, 82);
 

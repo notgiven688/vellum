@@ -340,6 +340,7 @@ public class SceneBenchmarks
         ThemeEditorColor(window, "Slider active", ref theme.SliderBgActive, "slider-active");
         ThemeEditorColor(window, "Slider fill", ref theme.SliderFill, "slider-fill");
         ThemeEditorColor(window, "Slider fill active", ref theme.SliderFillActive, "slider-fill-active");
+        ThemeEditorColor(window, "Slider fill text", ref theme.SliderFillText, "slider-fill-text");
         ThemeEditorColor(window, "Slider border", ref theme.SliderBorder, "slider-border");
     }
 
