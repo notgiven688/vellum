@@ -46,6 +46,7 @@ internal sealed class GlyphAtlas
     public int AtlasWidth { get; private set; }
     public int AtlasHeight { get; private set; }
     public bool IsLcd { get; private set; }
+    public int Version { get; private set; }
 
     public GlyphAtlas(TrueTypeFont font, float pixelHeight, float rasterScale = 1f, bool lcd = true)
     {
@@ -109,6 +110,8 @@ internal sealed class GlyphAtlas
 
     private void Rebuild(IRenderer renderer)
     {
+        Version++;
+
         if (TextureId >= 0)
         {
             renderer.DestroyTexture(TextureId);

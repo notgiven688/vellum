@@ -31,11 +31,13 @@ public enum TextOverflowMode
 internal readonly struct TextGlyphPlacement
 {
     public readonly int Codepoint;
+    public readonly GlyphInfo Glyph;
     public readonly float X, Y;
 
-    public TextGlyphPlacement(int codepoint, float x, float y)
+    public TextGlyphPlacement(int codepoint, GlyphInfo glyph, float x, float y)
     {
         Codepoint = codepoint;
+        Glyph = glyph;
         X = x;
         Y = y;
     }
@@ -44,6 +46,7 @@ internal readonly struct TextGlyphPlacement
 internal readonly struct TextLayoutResult
 {
     private readonly TextLayoutScratch? _scratch;
+    private readonly TextGlyphPlacement[]? _cachedGlyphs;
     private readonly int _glyphStart;
     private readonly int _glyphCount;
 
@@ -53,7 +56,8 @@ internal readonly struct TextLayoutResult
     public float? ClipWidth { get; }
     public bool Truncated { get; }
     public ReadOnlySpan<TextGlyphPlacement> Glyphs
-        => _scratch is null ? default : _scratch.Glyphs.AsSpan(_glyphStart, _glyphCount);
+        => _cachedGlyphs is not null ? _cachedGlyphs.AsSpan() :
+           _scratch is null ? default : _scratch.Glyphs.AsSpan(_glyphStart, _glyphCount);
 
     public TextLayoutResult(
         GlyphAtlas atlas,
@@ -71,8 +75,28 @@ internal readonly struct TextLayoutResult
         ClipWidth = clipWidth;
         Truncated = truncated;
         _scratch = scratch;
+        _cachedGlyphs = null;
         _glyphStart = glyphStart;
         _glyphCount = glyphCount;
+    }
+
+    public TextLayoutResult(
+        GlyphAtlas atlas,
+        float width,
+        float height,
+        float? clipWidth,
+        bool truncated,
+        TextGlyphPlacement[] cachedGlyphs)
+    {
+        Atlas = atlas;
+        Width = width;
+        Height = height;
+        ClipWidth = clipWidth;
+        Truncated = truncated;
+        _scratch = null;
+        _cachedGlyphs = cachedGlyphs;
+        _glyphStart = 0;
+        _glyphCount = cachedGlyphs.Length;
     }
 }
 
@@ -204,14 +228,16 @@ internal static class TextLayout
         public readonly int Length;
         public readonly float Width;
         public readonly int Codepoint;
+        public readonly GlyphInfo Glyph;
         public readonly bool IsWhitespace;
 
-        public TextElementInfo(int start, int length, float width, int codepoint, bool isWhitespace)
+        public TextElementInfo(int start, int length, float width, int codepoint, GlyphInfo glyph, bool isWhitespace)
         {
             Start = start;
             Length = length;
             Width = width;
             Codepoint = codepoint;
+            Glyph = glyph;
             IsWhitespace = isWhitespace;
         }
     }
@@ -236,6 +262,18 @@ internal static class TextLayout
         float constrainedWidth = maxWidth.HasValue ? MathF.Max(0, maxWidth.Value) : 0;
 
         int glyphStart = scratch.GlyphsUsed;
+        if (wrap == TextWrapMode.NoWrap &&
+            overflow == TextOverflowMode.Visible &&
+            maxLines == int.MaxValue &&
+            text.AsSpan().IndexOfAny('\r', '\n') < 0)
+        {
+            int elementsStart = scratch.ElementsUsed;
+            int elementsCount = BuildTextElements(scratch, text, atlas);
+            float width = AppendElements(scratch, elementsStart, elementsCount, atlas, vm.Ascent);
+            bool fastPathTruncated = maxWidth.HasValue && width > constrainedWidth;
+            return new TextLayoutResult(atlas, width, lineHeight, null, fastPathTruncated, scratch, glyphStart, scratch.GlyphsUsed - glyphStart);
+        }
+
         scratch.Lines.Clear();
         BuildLineSlices(scratch, text, atlas, maxWidth, wrap);
         int visibleLineCount = Math.Min(visibleLineLimit, scratch.Lines.Count);
@@ -477,19 +515,35 @@ internal static class TextLayout
         while (charIndex < text.Length)
         {
             int runeStart = charIndex;
-            OperationStatus status = Rune.DecodeFromUtf16(span.Slice(charIndex), out Rune rune, out int consumed);
-            if (status != OperationStatus.Done)
+            char ch = text[charIndex];
+            int codepoint;
+            int consumed;
+            bool isWhitespace;
+
+            if (!char.IsSurrogate(ch))
             {
-                rune = Rune.ReplacementChar;
+                codepoint = ch;
                 consumed = 1;
+                isWhitespace = char.IsWhiteSpace(ch);
+            }
+            else
+            {
+                OperationStatus status = Rune.DecodeFromUtf16(span.Slice(charIndex), out Rune rune, out consumed);
+                if (status != OperationStatus.Done)
+                {
+                    rune = Rune.ReplacementChar;
+                    consumed = 1;
+                }
+
+                codepoint = rune.Value;
+                isWhitespace = Rune.IsWhiteSpace(rune);
             }
 
-            int codepoint = rune.Value;
             float width = 0;
-            if (atlas.TryGetGlyph(codepoint, out var glyph)) width += glyph.AdvanceWidth;
-            bool isWhitespace = Rune.IsWhiteSpace(rune);
+            GlyphInfo glyph = default;
+            if (atlas.TryGetGlyph(codepoint, out glyph)) width += glyph.AdvanceWidth;
 
-            scratch.AppendElement(new TextElementInfo(runeStart, consumed, width, codepoint, isWhitespace));
+            scratch.AppendElement(new TextElementInfo(runeStart, consumed, width, codepoint, glyph, isWhitespace));
             charIndex += consumed;
         }
 
@@ -573,16 +627,14 @@ internal static class TextLayout
         {
             var element = scratch.Elements[start + i];
             int codepoint = element.Codepoint;
-            if (prevCodepoint != 0) penX += atlas.GetKernAdvance(prevCodepoint, codepoint);
+            if (prevCodepoint != 0 && codepoint != 0)
+                penX += atlas.GetKernAdvance(prevCodepoint, codepoint);
 
-            if (atlas.TryGetGlyph(codepoint, out var glyph))
-            {
-                if (glyph.Width > 0)
-                    scratch.AppendGlyph(new TextGlyphPlacement(codepoint, penX + glyph.OffsetX, baseline + glyph.OffsetY));
+            var glyph = element.Glyph;
+            if (glyph.Width > 0 && glyph.Height > 0)
+                scratch.AppendGlyph(new TextGlyphPlacement(codepoint, glyph, penX + glyph.OffsetX, baseline + glyph.OffsetY));
 
-                penX += glyph.AdvanceWidth;
-            }
-
+            penX += element.Width;
             prevCodepoint = codepoint;
         }
 

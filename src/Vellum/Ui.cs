@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Numerics;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Diagnostics;
 using System.Text;
@@ -396,9 +397,13 @@ public sealed partial class Ui : IDisposable
     private bool _hasMouseFrame;
 
     // Layout stack (root is always at index 0)
+    private const int MaxTextLayoutCacheEntries = 2048;
+    private const int MaxTextLayoutCacheCandidateEntries = 4096;
     private readonly List<LayoutScope> _layouts = new();
     private readonly List<ClipRect> _hitClips = new();
     private readonly TextLayoutScratch _textScratch = new();
+    private readonly Dictionary<TextLayoutCacheKey, TextLayoutCacheEntry> _textLayoutCache = new(TextLayoutCacheKeyComparer.Instance);
+    private readonly Dictionary<string, int> _textLayoutCacheCandidates = new(TextReferenceComparer.Instance);
     private readonly List<Painter> _deferredPainterPool = new();
     private int _deferredPainterPoolDepth;
     private int[] _graphemeIndexScratch = new int[64];
@@ -1565,6 +1570,110 @@ public sealed partial class Ui : IDisposable
     // Text
     // -------------------------------------------------------------------------
 
+    private readonly struct TextLayoutCacheKey
+    {
+        public readonly string Text;
+        public readonly GlyphAtlas Atlas;
+        public readonly int AtlasVersion;
+        public readonly float Size;
+        public readonly bool HasMaxWidth;
+        public readonly float MaxWidth;
+        public readonly TextWrapMode Wrap;
+        public readonly TextOverflowMode Overflow;
+        public readonly int MaxLines;
+        public readonly string EllipsisText;
+
+        public TextLayoutCacheKey(
+            string text,
+            GlyphAtlas atlas,
+            int atlasVersion,
+            float size,
+            float? maxWidth,
+            TextWrapMode wrap,
+            TextOverflowMode overflow,
+            int maxLines,
+            string ellipsisText)
+        {
+            Text = text;
+            Atlas = atlas;
+            AtlasVersion = atlasVersion;
+            Size = size;
+            HasMaxWidth = maxWidth.HasValue;
+            MaxWidth = maxWidth.GetValueOrDefault();
+            Wrap = wrap;
+            Overflow = overflow;
+            MaxLines = maxLines;
+            EllipsisText = ellipsisText;
+        }
+    }
+
+    private sealed class TextLayoutCacheKeyComparer : IEqualityComparer<TextLayoutCacheKey>
+    {
+        public static readonly TextLayoutCacheKeyComparer Instance = new();
+
+        public bool Equals(TextLayoutCacheKey x, TextLayoutCacheKey y)
+            => ReferenceEquals(x.Text, y.Text) &&
+               ReferenceEquals(x.Atlas, y.Atlas) &&
+               x.AtlasVersion == y.AtlasVersion &&
+               x.Size.Equals(y.Size) &&
+               x.HasMaxWidth == y.HasMaxWidth &&
+               x.MaxWidth.Equals(y.MaxWidth) &&
+               x.Wrap == y.Wrap &&
+               x.Overflow == y.Overflow &&
+               x.MaxLines == y.MaxLines &&
+               ReferenceEquals(x.EllipsisText, y.EllipsisText);
+
+        public int GetHashCode(TextLayoutCacheKey obj)
+        {
+            var hash = new HashCode();
+            hash.Add(RuntimeHelpers.GetHashCode(obj.Text));
+            hash.Add(RuntimeHelpers.GetHashCode(obj.Atlas));
+            hash.Add(obj.AtlasVersion);
+            hash.Add(obj.Size);
+            hash.Add(obj.HasMaxWidth);
+            hash.Add(obj.MaxWidth);
+            hash.Add(obj.Wrap);
+            hash.Add(obj.Overflow);
+            hash.Add(obj.MaxLines);
+            hash.Add(RuntimeHelpers.GetHashCode(obj.EllipsisText));
+            return hash.ToHashCode();
+        }
+    }
+
+    private sealed class TextReferenceComparer : IEqualityComparer<string>
+    {
+        public static readonly TextReferenceComparer Instance = new();
+
+        public bool Equals(string? x, string? y) => ReferenceEquals(x, y);
+
+        public int GetHashCode(string obj) => RuntimeHelpers.GetHashCode(obj);
+    }
+
+    private readonly struct TextLayoutCacheEntry
+    {
+        private readonly TextGlyphPlacement[] _glyphs;
+
+        public readonly float Width;
+        public readonly float Height;
+        public readonly float? ClipWidth;
+        public readonly bool Truncated;
+
+        private TextLayoutCacheEntry(TextLayoutResult layout, TextGlyphPlacement[] glyphs)
+        {
+            Width = layout.Width;
+            Height = layout.Height;
+            ClipWidth = layout.ClipWidth;
+            Truncated = layout.Truncated;
+            _glyphs = glyphs;
+        }
+
+        public static TextLayoutCacheEntry From(TextLayoutResult layout)
+            => new(layout, layout.Glyphs.ToArray());
+
+        public TextLayoutResult ToResult(GlyphAtlas atlas)
+            => new(atlas, Width, Height, ClipWidth, Truncated, _glyphs);
+    }
+
     private TrueTypeFont ResolvedFont => Font ?? UiFonts.DefaultSans;
 
     private GlyphAtlas GetAtlas(float size)
@@ -1592,12 +1701,39 @@ public sealed partial class Ui : IDisposable
         int maxLines = int.MaxValue)
     {
         var atlas = GetAtlas(size);
+        string ellipsisText = overflow == TextOverflowMode.Ellipsis ? GetEllipsisText() : "...";
+
+        var key = new TextLayoutCacheKey(text, atlas, atlas.Version, size, maxWidth, wrap, overflow, maxLines, ellipsisText);
+        if (_textLayoutCache.TryGetValue(key, out var cached))
+            return cached.ToResult(atlas);
+
         atlas.EnsureGlyphsForText(_renderer, text);
-        string ellipsisText = GetEllipsisText();
         if (overflow == TextOverflowMode.Ellipsis)
             atlas.EnsureGlyphsForText(_renderer, ellipsisText);
 
-        return TextLayout.Layout(_textScratch, text, atlas, maxWidth, wrap, overflow, maxLines, ellipsisText);
+        key = new TextLayoutCacheKey(text, atlas, atlas.Version, size, maxWidth, wrap, overflow, maxLines, ellipsisText);
+        if (_textLayoutCache.TryGetValue(key, out cached))
+            return cached.ToResult(atlas);
+
+        var layout = TextLayout.Layout(_textScratch, text, atlas, maxWidth, wrap, overflow, maxLines, ellipsisText);
+        bool mayCache = _textLayoutCacheCandidates.TryGetValue(text, out int firstSeenFrame) && firstSeenFrame != _frameIndex;
+        if (!mayCache)
+        {
+            if (_textLayoutCacheCandidates.Count >= MaxTextLayoutCacheCandidateEntries)
+                _textLayoutCacheCandidates.Clear();
+
+            _textLayoutCacheCandidates[text] = _frameIndex;
+            return layout;
+        }
+
+        if (_textLayoutCache.Count >= MaxTextLayoutCacheEntries)
+        {
+            _textLayoutCache.Clear();
+            _textLayoutCacheCandidates.Clear();
+        }
+
+        _textLayoutCache[key] = TextLayoutCacheEntry.From(layout);
+        return layout;
     }
 
     private TextLineMetrics MeasureTextLine(string text, float size)
@@ -1631,26 +1767,14 @@ public sealed partial class Ui : IDisposable
         if (layout.ClipWidth.HasValue)
             _painter.PushClip(SnapToDevicePixel(x), SnapToDevicePixel(y), layout.ClipWidth.Value, layout.Height);
 
-        foreach (var placement in layout.Glyphs)
-        {
-            if (layout.Atlas.TryGetGlyph(placement.Codepoint, out var glyph) && glyph.Width > 0)
-            {
-                float glyphX = SnapToDevicePixel(x + placement.X);
-                float glyphY = SnapToDevicePixel(y + placement.Y);
-                _painter.AddTexturedQuad(
-                    glyphX,
-                    glyphY,
-                    glyph.Width,
-                    glyph.Height,
-                    layout.Atlas.TextureId,
-                    glyph.U0,
-                    glyph.V0,
-                    glyph.U1,
-                    glyph.V1,
-                    color,
-                    layout.Atlas.IsLcd);
-            }
-        }
+        _painter.AddTexturedGlyphRun(
+            layout.Glyphs,
+            x,
+            y,
+            layout.Atlas.TextureId,
+            color,
+            layout.Atlas.IsLcd,
+            MathF.Max(1f, TextRasterScale));
 
         if (layout.ClipWidth.HasValue)
             _painter.PopClip();

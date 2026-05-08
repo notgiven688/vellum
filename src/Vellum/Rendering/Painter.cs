@@ -1,4 +1,6 @@
 using System.Numerics;
+using System.Runtime.InteropServices;
+using Vellum;
 
 namespace Vellum.Rendering;
 
@@ -46,9 +48,18 @@ internal sealed class Painter
         uint vertexBase = (uint)_renderList.Vertices.Count;
         int indexBase = _renderList.Indices.Count;
 
+        _renderList.Vertices.EnsureCapacity(_renderList.Vertices.Count + other.Vertices.Count);
+        _renderList.Indices.EnsureCapacity(_renderList.Indices.Count + other.Indices.Count);
+        _renderList.Commands.EnsureCapacity(_renderList.Commands.Count + other.Commands.Count);
+
         _renderList.Vertices.AddRange(other.Vertices);
-        for (int i = 0; i < other.Indices.Count; i++)
-            _renderList.Indices.Add(other.Indices[i] + vertexBase);
+        _renderList.Indices.AddRange(other.Indices);
+        if (vertexBase != 0)
+        {
+            var indices = CollectionsMarshal.AsSpan(_renderList.Indices).Slice(indexBase, other.Indices.Count);
+            for (int i = 0; i < indices.Length; i++)
+                indices[i] += vertexBase;
+        }
 
         for (int i = 0; i < other.Commands.Count; i++)
         {
@@ -91,13 +102,7 @@ internal sealed class Painter
         if (_clipStack.Count == 0)
             return true;
 
-        var clip = _clipStack[^1];
-        return clip.Width > 0 &&
-               clip.Height > 0 &&
-               x < clip.X + clip.Width &&
-               x + width > clip.X &&
-               y < clip.Y + clip.Height &&
-               y + height > clip.Y;
+        return Intersects(_clipStack[^1], x, y, width, height);
     }
 
     public void DrawRect(
@@ -231,6 +236,56 @@ internal sealed class Painter
             new Vector2(u0, v1));
     }
 
+    public void AddTexturedGlyphRun(
+        ReadOnlySpan<TextGlyphPlacement> glyphs,
+        float x,
+        float y,
+        int textureId,
+        Color tint,
+        bool lcd,
+        float snapScale)
+    {
+        if (glyphs.Length == 0 || tint.A == 0)
+            return;
+
+        bool hasClip = _clipStack.Count > 0;
+        ClipRect clip = hasClip ? _clipStack[^1] : default;
+        if (hasClip && (clip.Width <= 0 || clip.Height <= 0))
+            return;
+
+        snapScale = MathF.Max(1f, snapScale);
+        int indexOffset = _renderList.Indices.Count;
+        int indexCount = 0;
+
+        for (int i = 0; i < glyphs.Length; i++)
+        {
+            var placement = glyphs[i];
+            var glyph = placement.Glyph;
+            if (glyph.Width <= 0 || glyph.Height <= 0)
+                continue;
+
+            float glyphX = SnapToDevicePixel(x + placement.X, snapScale);
+            float glyphY = SnapToDevicePixel(y + placement.Y, snapScale);
+            if (hasClip && !Intersects(clip, glyphX, glyphY, glyph.Width, glyph.Height))
+                continue;
+
+            AddTexturedQuadGeometry(
+                glyphX,
+                glyphY,
+                glyph.Width,
+                glyph.Height,
+                glyph.U0,
+                glyph.V0,
+                glyph.U1,
+                glyph.V1,
+                tint);
+            indexCount += 6;
+        }
+
+        if (indexCount > 0)
+            AppendExistingCommand(new DrawCommand(textureId, indexOffset, indexCount, clip, hasClip, lcd));
+    }
+
     public void FillTriangle(Vector2 a, Vector2 b, Vector2 c, Color color, int textureId = SolidTextureId, bool lcd = false)
     {
         if (color.A == 0)
@@ -259,19 +314,49 @@ internal sealed class Painter
         int indexOffset = _renderList.Indices.Count;
         uint vertexBase = (uint)_renderList.Vertices.Count;
 
-        _renderList.Vertices.Add(new DrawVertex(topLeft, uvTopLeft ?? Vector2.Zero, color));
-        _renderList.Vertices.Add(new DrawVertex(topRight, uvTopRight ?? Vector2.Zero, color));
-        _renderList.Vertices.Add(new DrawVertex(bottomRight, uvBottomRight ?? Vector2.Zero, color));
-        _renderList.Vertices.Add(new DrawVertex(bottomLeft, uvBottomLeft ?? Vector2.Zero, color));
+        var vertices = AddUninitialized(_renderList.Vertices, 4);
+        vertices[0] = new DrawVertex(topLeft, uvTopLeft ?? Vector2.Zero, color);
+        vertices[1] = new DrawVertex(topRight, uvTopRight ?? Vector2.Zero, color);
+        vertices[2] = new DrawVertex(bottomRight, uvBottomRight ?? Vector2.Zero, color);
+        vertices[3] = new DrawVertex(bottomLeft, uvBottomLeft ?? Vector2.Zero, color);
 
-        _renderList.Indices.Add(vertexBase);
-        _renderList.Indices.Add(vertexBase + 3);
-        _renderList.Indices.Add(vertexBase + 2);
-        _renderList.Indices.Add(vertexBase);
-        _renderList.Indices.Add(vertexBase + 2);
-        _renderList.Indices.Add(vertexBase + 1);
+        var indices = AddUninitialized(_renderList.Indices, 6);
+        indices[0] = vertexBase;
+        indices[1] = vertexBase + 3;
+        indices[2] = vertexBase + 2;
+        indices[3] = vertexBase;
+        indices[4] = vertexBase + 2;
+        indices[5] = vertexBase + 1;
 
         AppendCommand(textureId, lcd, indexOffset, 6);
+    }
+
+    private void AddTexturedQuadGeometry(
+        float x,
+        float y,
+        float width,
+        float height,
+        float u0,
+        float v0,
+        float u1,
+        float v1,
+        Color tint)
+    {
+        uint vertexBase = (uint)_renderList.Vertices.Count;
+
+        var vertices = AddUninitialized(_renderList.Vertices, 4);
+        vertices[0] = new DrawVertex(new Vector2(x, y), new Vector2(u0, v0), tint);
+        vertices[1] = new DrawVertex(new Vector2(x + width, y), new Vector2(u1, v0), tint);
+        vertices[2] = new DrawVertex(new Vector2(x + width, y + height), new Vector2(u1, v1), tint);
+        vertices[3] = new DrawVertex(new Vector2(x, y + height), new Vector2(u0, v1), tint);
+
+        var indices = AddUninitialized(_renderList.Indices, 6);
+        indices[0] = vertexBase;
+        indices[1] = vertexBase + 3;
+        indices[2] = vertexBase + 2;
+        indices[3] = vertexBase;
+        indices[4] = vertexBase + 2;
+        indices[5] = vertexBase + 1;
     }
 
     private void AddQuad(
@@ -293,17 +378,19 @@ internal sealed class Painter
         int indexOffset = _renderList.Indices.Count;
         uint vertexBase = (uint)_renderList.Vertices.Count;
 
-        _renderList.Vertices.Add(new DrawVertex(topLeft, uvTopLeft ?? Vector2.Zero, topLeftColor));
-        _renderList.Vertices.Add(new DrawVertex(topRight, uvTopRight ?? Vector2.Zero, topRightColor));
-        _renderList.Vertices.Add(new DrawVertex(bottomRight, uvBottomRight ?? Vector2.Zero, bottomRightColor));
-        _renderList.Vertices.Add(new DrawVertex(bottomLeft, uvBottomLeft ?? Vector2.Zero, bottomLeftColor));
+        var vertices = AddUninitialized(_renderList.Vertices, 4);
+        vertices[0] = new DrawVertex(topLeft, uvTopLeft ?? Vector2.Zero, topLeftColor);
+        vertices[1] = new DrawVertex(topRight, uvTopRight ?? Vector2.Zero, topRightColor);
+        vertices[2] = new DrawVertex(bottomRight, uvBottomRight ?? Vector2.Zero, bottomRightColor);
+        vertices[3] = new DrawVertex(bottomLeft, uvBottomLeft ?? Vector2.Zero, bottomLeftColor);
 
-        _renderList.Indices.Add(vertexBase);
-        _renderList.Indices.Add(vertexBase + 3);
-        _renderList.Indices.Add(vertexBase + 2);
-        _renderList.Indices.Add(vertexBase);
-        _renderList.Indices.Add(vertexBase + 2);
-        _renderList.Indices.Add(vertexBase + 1);
+        var indices = AddUninitialized(_renderList.Indices, 6);
+        indices[0] = vertexBase;
+        indices[1] = vertexBase + 3;
+        indices[2] = vertexBase + 2;
+        indices[3] = vertexBase;
+        indices[4] = vertexBase + 2;
+        indices[5] = vertexBase + 1;
 
         AppendCommand(textureId, lcd, indexOffset, 6);
     }
@@ -320,17 +407,20 @@ internal sealed class Painter
             center += points[i];
         center /= points.Count;
 
-        _renderList.Vertices.Add(new DrawVertex(center, Vector2.Zero, color));
+        var vertices = AddUninitialized(_renderList.Vertices, points.Count + 1);
+        vertices[0] = new DrawVertex(center, Vector2.Zero, color);
         for (int i = 0; i < points.Count; i++)
-            _renderList.Vertices.Add(new DrawVertex(points[i], Vector2.Zero, color));
+            vertices[i + 1] = new DrawVertex(points[i], Vector2.Zero, color);
 
+        var indices = AddUninitialized(_renderList.Indices, points.Count * 3);
+        int index = 0;
         for (int i = 0; i < points.Count; i++)
         {
             uint current = vertexBase + 1u + (uint)i;
             uint next = vertexBase + 1u + (uint)((i + 1) % points.Count);
-            _renderList.Indices.Add(vertexBase);
-            _renderList.Indices.Add(next);
-            _renderList.Indices.Add(current);
+            indices[index++] = vertexBase;
+            indices[index++] = next;
+            indices[index++] = current;
         }
 
         AppendCommand(textureId, lcd, indexOffset, points.Count * 3);
@@ -344,11 +434,14 @@ internal sealed class Painter
         int indexOffset = _renderList.Indices.Count;
         uint vertexBase = (uint)_renderList.Vertices.Count;
 
+        var vertices = AddUninitialized(_renderList.Vertices, outer.Count * 2);
         for (int i = 0; i < outer.Count; i++)
-            _renderList.Vertices.Add(new DrawVertex(outer[i], Vector2.Zero, color));
+            vertices[i] = new DrawVertex(outer[i], Vector2.Zero, color);
         for (int i = 0; i < inner.Count; i++)
-            _renderList.Vertices.Add(new DrawVertex(inner[i], Vector2.Zero, color));
+            vertices[outer.Count + i] = new DrawVertex(inner[i], Vector2.Zero, color);
 
+        var indices = AddUninitialized(_renderList.Indices, outer.Count * 6);
+        int index = 0;
         for (int i = 0; i < outer.Count; i++)
         {
             uint outer0 = vertexBase + (uint)i;
@@ -356,12 +449,12 @@ internal sealed class Painter
             uint inner0 = vertexBase + (uint)outer.Count + (uint)i;
             uint inner1 = vertexBase + (uint)outer.Count + (uint)((i + 1) % inner.Count);
 
-            _renderList.Indices.Add(outer0);
-            _renderList.Indices.Add(inner1);
-            _renderList.Indices.Add(outer1);
-            _renderList.Indices.Add(outer0);
-            _renderList.Indices.Add(inner0);
-            _renderList.Indices.Add(inner1);
+            indices[index++] = outer0;
+            indices[index++] = inner1;
+            indices[index++] = outer1;
+            indices[index++] = outer0;
+            indices[index++] = inner0;
+            indices[index++] = inner1;
         }
 
         AppendCommand(textureId, lcd, indexOffset, outer.Count * 6);
@@ -516,4 +609,23 @@ internal sealed class Painter
 
     private static int GetCornerSegments(float radius)
         => Math.Clamp((int)MathF.Ceiling(radius), 4, 12);
+
+    private static bool Intersects(ClipRect clip, float x, float y, float width, float height)
+        => clip.Width > 0 &&
+           clip.Height > 0 &&
+           x < clip.X + clip.Width &&
+           x + width > clip.X &&
+           y < clip.Y + clip.Height &&
+           y + height > clip.Y;
+
+    private static float SnapToDevicePixel(float value, float scale)
+        => MathF.Floor(value * scale + 0.5f) / scale;
+
+    private static Span<T> AddUninitialized<T>(List<T> list, int count)
+    {
+        int start = list.Count;
+        list.EnsureCapacity(start + count);
+        CollectionsMarshal.SetCount(list, start + count);
+        return CollectionsMarshal.AsSpan(list).Slice(start, count);
+    }
 }
