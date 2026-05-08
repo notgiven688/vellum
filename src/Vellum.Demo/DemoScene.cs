@@ -6,6 +6,7 @@ namespace Vellum.Demo;
 internal static class DemoScene
 {
     private const float TargetFrameBudgetMs = 1000f / 60f;
+    private const float BodyContentInset = 12f;
     private static readonly TableColumn[] s_metricsColumns =
     [
         new("Metric"),
@@ -264,15 +265,19 @@ internal static class DemoScene
 
     private static void DrawBody(Ui body, DemoState state, bool wideLayout, int checkerTexture)
     {
+        body.Spacing(BodyContentInset);
+
         if (wideLayout)
         {
             using (body.Row())
             {
-                float sidebarWidth = MathF.Min(280f, MathF.Max(236f, body.AvailableWidth * 0.32f));
+                body.Spacing(BodyContentInset);
+                float rowWidth = MathF.Max(0, body.AvailableWidth - BodyContentInset);
+                float sidebarWidth = MathF.Min(280f, MathF.Max(236f, rowWidth * 0.32f));
 
                 using (body.FixedWidth(sidebarWidth))
                     DrawSettingsPanel(body, state, checkerTexture);
-                using (body.FixedWidth(body.AvailableWidth))
+                using (body.FixedWidth(MathF.Max(0, body.AvailableWidth - BodyContentInset)))
                 {
                     DrawWorkspacePanel(body, state);
                     DrawActivityPanel(body, state);
@@ -281,9 +286,16 @@ internal static class DemoScene
         }
         else
         {
-            DrawSettingsPanel(body, state, checkerTexture);
-            DrawWorkspacePanel(body, state);
-            DrawActivityPanel(body, state);
+            using (body.Row())
+            {
+                body.Spacing(BodyContentInset);
+                using (body.FixedWidth(MathF.Max(0, body.AvailableWidth - BodyContentInset)))
+                {
+                    DrawSettingsPanel(body, state, checkerTexture);
+                    DrawWorkspacePanel(body, state);
+                    DrawActivityPanel(body, state);
+                }
+            }
         }
     }
 
@@ -370,7 +382,7 @@ internal static class DemoScene
             Response themeCombo = panel.ComboBox("theme", DemoState.ThemeOptions, ref state.SelectedTheme, panel.AvailableWidth, maxPopupHeight: 140f);
             panel.Tooltip(themeCombo, "Switch between the built-in dark and light theme presets.");
             panel.Separator();
-            panel.ColorPickerPopup("Accent", ref state.AccentColor, panel.AvailableWidth, id: "accentColor");
+            panel.ColorPickerPopup("Accent", ref state.AccentColor, panel.AvailableWidth, id: "accentColor", openOnHover: false);
             panel.Separator();
             panel.Label("Image preview", color: panel.Theme.TextSecondary);
             panel.Image(context.CheckerTexture, panel.AvailableWidth, 88);
@@ -543,10 +555,20 @@ internal static class DemoScene
 
     private static void DrawActionButtons(Ui actions, DemoState state)
     {
-        for (int i = 1; i <= 18; i++)
+        const float ActionButtonInset = 6f;
+
+        actions.Spacing(ActionButtonInset);
+        using (actions.Row())
         {
-            if (actions.Button($"Action {i}", width: actions.AvailableWidth).Clicked)
-                state.SelectedAction = i;
+            actions.Spacing(ActionButtonInset);
+            using (actions.FixedWidth(MathF.Max(0, actions.AvailableWidth - ActionButtonInset)))
+            {
+                for (int i = 1; i <= 18; i++)
+                {
+                    if (actions.Button($"Action {i}", width: actions.AvailableWidth).Clicked)
+                        state.SelectedAction = i;
+                }
+            }
         }
     }
 
