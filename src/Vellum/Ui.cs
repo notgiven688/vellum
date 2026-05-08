@@ -343,6 +343,7 @@ public sealed partial class Ui : IDisposable
     private readonly HashSet<int> _menuPopupIds = new();
     private readonly Dictionary<int, WindowRuntimeState> _windowRuntimeStates = new();
     private readonly Dictionary<int, WindowRequest> _windowRequests = new();
+    private readonly Dictionary<int, WindowRequest> _windowRequestPool = new();
     private readonly List<int> _windowOrder = new();
     private readonly List<int> _dockSpaceOrderScratch = new();
     private readonly HashSet<int> _dockedWindowIdsRenderedThisFrame = new();
@@ -700,6 +701,7 @@ public sealed partial class Ui : IDisposable
         _menuPopupIds.Clear();
         _windowRuntimeStates.Clear();
         _windowRequests.Clear();
+        _windowRequestPool.Clear();
         _windowOrder.Clear();
         _dockSpaceOrderScratch.Clear();
         _dockedWindowIdsRenderedThisFrame.Clear();

@@ -18,6 +18,10 @@ public sealed partial class Ui
         public bool HasHue;
         public string HexText = string.Empty;
         public bool HexEditing;
+        public Color CachedHexColor;
+        public bool CachedHexAlpha;
+        public bool HasCachedHex;
+        public string CachedHexText = string.Empty;
     }
 
     private sealed class ColorPickerPopupState
@@ -26,6 +30,20 @@ public sealed partial class Ui
         public Color PendingValue;
         public bool HasPendingValue;
         public double LastHoverPathSeconds = double.NegativeInfinity;
+        public Color CachedDisplayColor;
+        public bool CachedDisplayAlpha;
+        public string? CachedDisplayLabel;
+        public bool HasCachedDisplay;
+        public string CachedDisplayText = string.Empty;
+    }
+
+    private sealed class ValueDisplayState
+    {
+        public float Value;
+        public string? Label;
+        public string? Format;
+        public bool HasValue;
+        public string DisplayText = string.Empty;
     }
 
     private readonly struct ColorPickerPopupContent
@@ -276,20 +294,27 @@ public sealed partial class Ui
         return SnapSliderValue(value, min, max, step);
     }
 
-    private static string FormatSliderValue(float value, string? format)
-    {
-        string fmt = format ?? "{0:0.###}";
-        return string.Format(System.Globalization.CultureInfo.InvariantCulture, fmt, value);
-    }
-
-    private static string FormatSliderValue(int value, string? format)
-    {
-        string fmt = format ?? "{0:0}";
-        return string.Format(System.Globalization.CultureInfo.InvariantCulture, fmt, value);
-    }
-
     private static string BuildValueDisplay(string? label, string valueText)
         => string.IsNullOrWhiteSpace(label) ? valueText : $"{label} ({valueText})";
+
+    private string GetValueDisplayText(int widgetId, string label, float value, string format)
+    {
+        var state = GetState<ValueDisplayState>(MakeChildId(widgetId, "display"));
+        if (!state.HasValue ||
+            state.Value != value ||
+            !string.Equals(state.Label, label, StringComparison.Ordinal) ||
+            !string.Equals(state.Format, format, StringComparison.Ordinal))
+        {
+            state.Value = value;
+            state.Label = label;
+            state.Format = format;
+            state.HasValue = true;
+            string valueText = string.Format(System.Globalization.CultureInfo.InvariantCulture, format, value);
+            state.DisplayText = BuildValueDisplay(label, valueText);
+        }
+
+        return state.DisplayText;
+    }
 
     private float ResolveSliderBlockWidth(float innerWidth)
     {
@@ -408,6 +433,38 @@ public sealed partial class Ui
         => includeAlpha
             ? $"#{color.R:X2}{color.G:X2}{color.B:X2}{color.A:X2}"
             : $"#{color.R:X2}{color.G:X2}{color.B:X2}";
+
+    private static string GetColorPickerHexText(ColorPickerState state, Color color, bool includeAlpha)
+    {
+        if (!state.HasCachedHex || state.CachedHexColor != color || state.CachedHexAlpha != includeAlpha)
+        {
+            state.CachedHexColor = color;
+            state.CachedHexAlpha = includeAlpha;
+            state.HasCachedHex = true;
+            state.CachedHexText = FormatColorHex(color, includeAlpha);
+        }
+
+        return state.CachedHexText;
+    }
+
+    private static string GetColorPickerPopupDisplayText(ColorPickerPopupState state, string label, Color color, bool includeAlpha)
+    {
+        if (!state.HasCachedDisplay ||
+            state.CachedDisplayColor != color ||
+            state.CachedDisplayAlpha != includeAlpha ||
+            !string.Equals(state.CachedDisplayLabel, label, StringComparison.Ordinal))
+        {
+            state.CachedDisplayColor = color;
+            state.CachedDisplayAlpha = includeAlpha;
+            state.CachedDisplayLabel = label;
+            state.HasCachedDisplay = true;
+
+            string hexText = FormatColorHex(color, includeAlpha);
+            state.CachedDisplayText = string.IsNullOrWhiteSpace(label) ? hexText : $"{label} {hexText}";
+        }
+
+        return state.CachedDisplayText;
+    }
 
     private static bool TryParseColorHex(string text, bool includeAlpha, byte fallbackAlpha, out Color color)
     {
@@ -2509,7 +2566,8 @@ public sealed partial class Ui
 
         UiId resolvedId = ResolveWidgetId(id, label);
         int widgetId = MakeWidgetId(widgetKind, resolvedId);
-        string display = BuildValueDisplay(label, FormatSliderValue(value, format));
+        string fmt = format ?? "{0:0.###}";
+        string display = GetValueDisplayText(widgetId, label, value, fmt);
         float textMaxWidth = MathF.Max(0, width - FrameBorderWidth * 2 - 8f);
         var layout = LayoutText(display, DefaultFontSize, maxWidth: textMaxWidth, overflow: TextOverflowMode.Ellipsis);
         float h = MathF.Max(Theme.SliderHeight, layout.Height + FrameBorderWidth * 2 + 6f);
@@ -2591,7 +2649,7 @@ public sealed partial class Ui
 
         if (changed)
         {
-            display = BuildValueDisplay(label, FormatSliderValue(value, format));
+            display = GetValueDisplayText(widgetId, label, value, fmt);
             layout = LayoutText(display, DefaultFontSize, maxWidth: textMaxWidth, overflow: TextOverflowMode.Ellipsis);
         }
 
@@ -2671,8 +2729,7 @@ public sealed partial class Ui
         int widgetId = MakeWidgetId(widgetKind, resolvedId);
         string fmt = format ?? "{0:0.00}";
 
-        string valueText = string.Format(System.Globalization.CultureInfo.InvariantCulture, fmt, value);
-        string display = BuildValueDisplay(label, valueText);
+        string display = GetValueDisplayText(widgetId, label, value, fmt);
         var layout = LayoutText(display, s);
         float intrinsicW = layout.Width + pad.Horizontal;
         float w = width ?? MathF.Max(96f, intrinsicW);
@@ -2731,8 +2788,7 @@ public sealed partial class Ui
 
         if (changed)
         {
-            valueText = string.Format(System.Globalization.CultureInfo.InvariantCulture, fmt, value);
-            display = BuildValueDisplay(label, valueText);
+            display = GetValueDisplayText(widgetId, label, value, fmt);
             layout = LayoutText(display, s, maxWidth: textMaxWidth, overflow: TextOverflowMode.Ellipsis);
         }
 
@@ -2840,8 +2896,7 @@ public sealed partial class Ui
 
         float s = DefaultFontSize;
         var pad = Theme.ButtonPadding;
-        string hexText = FormatColorHex(value, alpha);
-        string displayText = string.IsNullOrWhiteSpace(label) ? hexText : $"{label} {hexText}";
+        string displayText = GetColorPickerPopupDisplayText(popupState, label, value, alpha);
         float swatchSize = MathF.Max(16f, MathF.Ceiling(s));
         float textMaxWidth = MathF.Max(0f, resolvedWidth - pad.Horizontal - swatchSize - Theme.Gap);
         var layout = LayoutText(displayText, s, maxWidth: textMaxWidth, overflow: TextOverflowMode.Ellipsis);
@@ -3174,7 +3229,7 @@ public sealed partial class Ui
                 state.HasHue = true;
             }
 
-            string currentHex = FormatColorHex(value, alpha);
+            string currentHex = GetColorPickerHexText(state, value, alpha);
             if (!state.HexEditing)
                 state.HexText = currentHex;
 
@@ -3201,7 +3256,7 @@ public sealed partial class Ui
 
                 state.HexEditing = hexResponse.Focused && !hexResponse.Submitted && !hexResponse.Cancelled;
                 if (!state.HexEditing)
-                    state.HexText = FormatColorHex(value, alpha);
+                    state.HexText = GetColorPickerHexText(state, value, alpha);
             }
         }
         finally

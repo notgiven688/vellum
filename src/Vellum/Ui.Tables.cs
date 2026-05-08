@@ -39,20 +39,26 @@ public sealed partial class Ui
         }
     }
 
+    private sealed class TableState
+    {
+        public readonly TableLayout Layout = new();
+        public readonly TableBuilder Builder = new();
+    }
+
     internal sealed class TableLayout
     {
-        public readonly int WidgetId;
-        public readonly float X;
-        public readonly float Y;
-        public readonly float Width;
-        public readonly float Border;
-        public readonly EdgeInsets CellPadding;
-        public readonly TableColumnLayout[] Columns;
+        public int WidgetId;
+        public float X;
+        public float Y;
+        public float Width;
+        public float Border;
+        public EdgeInsets CellPadding;
+        public TableColumnLayout[] Columns = [];
         public float CursorY;
         public int RenderedRowCount;
         public int DataRowCount;
 
-        public TableLayout(int widgetId, float x, float y, float width, float border, EdgeInsets cellPadding, TableColumnLayout[] columns)
+        public void Reset(int widgetId, float x, float y, float width, float border, EdgeInsets cellPadding)
         {
             WidgetId = widgetId;
             X = x;
@@ -60,19 +66,33 @@ public sealed partial class Ui
             Width = width;
             Border = border;
             CellPadding = cellPadding;
-            Columns = columns;
             CursorY = y + border;
+            RenderedRowCount = 0;
+            DataRowCount = 0;
+        }
+
+        public TableColumnLayout[] EnsureColumnCapacity(int columnCount)
+        {
+            if (Columns.Length != columnCount)
+                Columns = new TableColumnLayout[columnCount];
+
+            return Columns;
         }
     }
 
     /// <summary>Builder passed to a table callback.</summary>
     public sealed class TableBuilder
     {
-        private readonly Ui _ui;
-        private readonly TableLayout _layout;
-        private readonly bool _stripedRows;
+        private readonly TableRowBuilder _row = new();
+        private Ui _ui = null!;
+        private TableLayout _layout = null!;
+        private bool _stripedRows;
 
-        internal TableBuilder(Ui ui, TableLayout layout, bool stripedRows)
+        internal TableBuilder()
+        {
+        }
+
+        internal void Reset(Ui ui, TableLayout layout, bool stripedRows)
         {
             _ui = ui;
             _layout = layout;
@@ -114,11 +134,11 @@ public sealed partial class Ui
             var rowPainter = _ui.AcquireDeferredPainter();
             _ui._painter = rowPainter;
 
-            var row = new TableRowBuilder(_ui, _layout, rowSeed, rowY, header);
+            _row.Reset(_ui, _layout, rowSeed, rowY, header);
             bool completed = false;
             try
             {
-                content(row, state);
+                content(_row, state);
                 completed = true;
             }
             finally
@@ -128,7 +148,7 @@ public sealed partial class Ui
                     _ui.ReleaseDeferredPainter(rowPainter);
             }
 
-            float rowHeight = row.ResolveHeight();
+            float rowHeight = _row.ResolveHeight();
             bool rowHovered = _ui.PointIn(_layout.X + _layout.Border, rowY, MathF.Max(0f, _layout.Width - _layout.Border * 2f), rowHeight);
             DrawRowChrome(rowY, rowHeight, header, rowHovered, _layout.DataRowCount);
             _ui._painter.Append(rowPainter.RenderList);
@@ -175,21 +195,27 @@ public sealed partial class Ui
     /// <summary>Builder passed to a table row callback.</summary>
     public sealed class TableRowBuilder
     {
-        private readonly Ui _ui;
-        private readonly TableLayout _layout;
-        private readonly int _rowSeed;
-        private readonly float _rowY;
-        private readonly bool _header;
+        private Ui _ui = null!;
+        private TableLayout _layout = null!;
+        private int _rowSeed;
+        private float _rowY;
+        private bool _header;
         private int _columnIndex;
         private float _maxContentHeight;
 
-        internal TableRowBuilder(Ui ui, TableLayout layout, int rowSeed, float rowY, bool header)
+        internal TableRowBuilder()
+        {
+        }
+
+        internal void Reset(Ui ui, TableLayout layout, int rowSeed, float rowY, bool header)
         {
             _ui = ui;
             _layout = layout;
             _rowSeed = rowSeed;
             _rowY = rowY;
             _header = header;
+            _columnIndex = 0;
+            _maxContentHeight = 0;
         }
 
         internal Ui Ui => _ui;
@@ -351,8 +377,14 @@ public sealed partial class Ui
         RegisterWidgetId(widgetId, "Table");
         var (x, y) = Place(resolvedWidth, 0f);
         float border = FrameBorderWidth;
-        var columnLayouts = ResolveTableColumns(columns, x + border, MathF.Max(0f, resolvedWidth - border * 2f));
-        var layout = new TableLayout(widgetId, x, y, resolvedWidth, border, cellPadding ?? Theme.MenuItemPadding, columnLayouts);
+        var tableState = GetState<TableState>(widgetId);
+        var layout = tableState.Layout;
+        layout.Reset(widgetId, x, y, resolvedWidth, border, cellPadding ?? Theme.MenuItemPadding);
+        ResolveTableColumns(
+            columns,
+            x + border,
+            MathF.Max(0f, resolvedWidth - border * 2f),
+            layout.EnsureColumnCapacity(columns.Count));
 
         var parentPainter = _painter;
         var tablePainter = AcquireDeferredPainter();
@@ -362,7 +394,8 @@ public sealed partial class Ui
         bool completed = false;
         try
         {
-            var table = new TableBuilder(this, layout, stripedRows);
+            var table = tableState.Builder;
+            table.Reset(this, layout, stripedRows);
             if (header && HasTableHeader(columns))
                 table.Header();
 
@@ -399,9 +432,8 @@ public sealed partial class Ui
         return false;
     }
 
-    private static TableColumnLayout[] ResolveTableColumns(IReadOnlyList<TableColumn> columns, float x, float width)
+    private static void ResolveTableColumns(IReadOnlyList<TableColumn> columns, float x, float width, TableColumnLayout[] result)
     {
-        var result = new TableColumnLayout[columns.Count];
         float fixedWidth = 0f;
         int stretchCount = 0;
         for (int i = 0; i < columns.Count; i++)
@@ -425,7 +457,5 @@ public sealed partial class Ui
             result[i] = new TableColumnLayout(columns[i], cursorX, columnWidth);
             cursorX += columnWidth;
         }
-
-        return result;
     }
 }

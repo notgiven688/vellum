@@ -27,13 +27,33 @@ public sealed partial class Ui
     private sealed class WindowRequest
     {
         public int WindowId;
-        public required string Title;
-        public required WindowState State;
+        public string Title = string.Empty;
+        public WindowState State = null!;
         public float Width;
         public bool Resizable;
         public bool Closable;
         public bool Header;
         public DeferredUiContent Content;
+
+        public void Reset(
+            int windowId,
+            string title,
+            WindowState state,
+            float width,
+            bool resizable,
+            bool closable,
+            bool header,
+            DeferredUiContent content)
+        {
+            WindowId = windowId;
+            Title = title;
+            State = state;
+            Width = width;
+            Resizable = resizable;
+            Closable = closable;
+            Header = header;
+            Content = content;
+        }
     }
 
     private enum WindowTitleIcon { Collapse, Expand, Close, Undock }
@@ -187,17 +207,14 @@ public sealed partial class Ui
         bool header,
         DeferredUiContent content)
     {
-        _windowRequests[windowId] = new WindowRequest
+        if (!_windowRequestPool.TryGetValue(windowId, out var request))
         {
-            WindowId = windowId,
-            Title = title,
-            State = state,
-            Width = effectiveWidth,
-            Resizable = resizable,
-            Closable = closable,
-            Header = header,
-            Content = content
-        };
+            request = new WindowRequest();
+            _windowRequestPool[windowId] = request;
+        }
+
+        request.Reset(windowId, title, state, effectiveWidth, resizable, closable, header, content);
+        _windowRequests[windowId] = request;
     }
 
     private static Vector2 ClampWindowSize(Vector2 size, WindowState state)
@@ -273,6 +290,7 @@ public sealed partial class Ui
 
             _windowOrder.RemoveAt(i);
             _windowRuntimeStates.Remove(windowId);
+            _windowRequestPool.Remove(windowId);
         }
     }
 

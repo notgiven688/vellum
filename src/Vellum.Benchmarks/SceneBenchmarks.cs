@@ -167,6 +167,21 @@ public class SceneBenchmarks
         }
     };
 
+    private static readonly Action<Ui, BenchmarkState> s_themeEditorScene = static (ui, state) =>
+    {
+        ui.Theme = state.Theme;
+        ui.FillViewport(state.Theme.SurfaceBg);
+        ui.Window(
+            "Theme Editor",
+            state.ThemeEditorWindow,
+            320f,
+            state,
+            static (window, state) => DrawThemeEditorBenchmark(window, state),
+            resizable: true,
+            closable: false,
+            id: "theme-editor-bench");
+    };
+
     private static readonly Action<Ui, BenchmarkState> s_windowsDockScene = static (ui, state) =>
     {
         ui.Theme = state.Theme;
@@ -218,6 +233,134 @@ public class SceneBenchmarks
         }, resizable: true, closable: false);
     };
 
+    private static void DrawThemeEditorBenchmark(Ui window, BenchmarkState state)
+    {
+        Theme theme = state.Theme;
+
+        window.Label("Live theme editor", color: theme.Accent);
+        window.Checkbox("LCD text", ref theme.UseLcdText, width: window.AvailableWidth);
+        window.Slider("Corner radius", ref theme.BorderRadius, 0f, 14f, window.AvailableWidth, format: "{0:0.0}", id: "border-radius");
+        window.Slider("Border width", ref theme.BorderWidth, 0f, 3f, window.AvailableWidth, format: "{0:0.0}", id: "border-width");
+        NormalizeThemeShape(theme);
+        window.Slider("Gap", ref theme.Gap, 0f, 20f, window.AvailableWidth, format: "{0:0.0}", id: "gap");
+        window.Slider("Scrollbar width", ref theme.ScrollbarWidth, 6f, 20f, window.AvailableWidth, format: "{0:0.0}", id: "scrollbar-width");
+        window.Slider("Slider height", ref theme.SliderHeight, 14f, 36f, window.AvailableWidth, format: "{0:0.0}", id: "slider-height");
+        window.Separator();
+
+        ThemeEditorSection(window, "Surfaces");
+        ThemeEditorColor(window, "Surface", ref theme.SurfaceBg, "surface-bg");
+        ThemeEditorColor(window, "Panel", ref theme.PanelBg, "panel-bg");
+        ThemeEditorColor(window, "Panel border", ref theme.PanelBorder, "panel-border");
+        ThemeEditorColor(window, "Scroll area", ref theme.ScrollAreaBg, "scroll-area-bg");
+        ThemeEditorColor(window, "Scroll border", ref theme.ScrollAreaBorder, "scroll-area-border");
+
+        ThemeEditorSection(window, "Text");
+        ThemeEditorColor(window, "Primary", ref theme.TextPrimary, "text-primary");
+        ThemeEditorColor(window, "Secondary", ref theme.TextSecondary, "text-secondary");
+        ThemeEditorColor(window, "Muted", ref theme.TextMuted, "text-muted");
+        ThemeEditorColor(window, "Window title", ref theme.WindowTitleText, "window-title-text");
+        ThemeEditorColor(window, "Title fill", ref theme.WindowTitleBg, "window-title-bg");
+        ThemeEditorColor(window, "Title hover", ref theme.WindowTitleBgHover, "window-title-hover");
+
+        ThemeEditorSection(window, "Accent");
+        ThemeEditorColor(window, "Accent", ref theme.Accent, "accent");
+        ThemeEditorColor(window, "Focus border", ref theme.FocusBorder, "focus-border");
+
+        ThemeEditorSection(window, "Buttons");
+        ThemeEditorColor(window, "Button", ref theme.ButtonBg, "button-bg");
+        ThemeEditorColor(window, "Button hover", ref theme.ButtonBgHover, "button-hover");
+        ThemeEditorColor(window, "Button pressed", ref theme.ButtonBgPressed, "button-pressed");
+        ThemeEditorColor(window, "Button border", ref theme.ButtonBorder, "button-border");
+        ThemeEditorColor(window, "Button border hover", ref theme.ButtonBorderHover, "button-border-hover");
+        ThemeEditorColor(window, "Button border pressed", ref theme.ButtonBorderPressed, "button-border-pressed");
+
+        ThemeEditorSection(window, "Inputs");
+        ThemeEditorColor(window, "Text field", ref theme.TextFieldBg, "text-field-bg");
+        ThemeEditorColor(window, "Text field hover", ref theme.TextFieldBgHover, "text-field-hover");
+        ThemeEditorColor(window, "Text field focus", ref theme.TextFieldBgFocused, "text-field-focus");
+        ThemeEditorColor(window, "Field border", ref theme.TextFieldBorder, "text-field-border");
+        ThemeEditorColor(window, "Field border focus", ref theme.TextFieldBorderFocused, "text-field-border-focus");
+        ThemeEditorColor(window, "Selection", ref theme.TextFieldSelectionBg, "text-selection");
+        ThemeEditorColor(window, "Caret", ref theme.TextFieldCaret, "text-field-caret");
+        ThemeEditorColor(window, "Placeholder", ref theme.TextFieldPlaceholder, "text-field-placeholder");
+
+        ThemeEditorSection(window, "Selection");
+        ThemeEditorColor(window, "Selectable", ref theme.SelectableBg, "selectable-bg");
+        ThemeEditorColor(window, "Selectable hover", ref theme.SelectableBgHover, "selectable-hover");
+        ThemeEditorColor(window, "Selectable pressed", ref theme.SelectableBgPressed, "selectable-pressed");
+        ThemeEditorColor(window, "Selected", ref theme.SelectableBgSelected, "selectable-selected");
+        ThemeEditorColor(window, "Border", ref theme.SelectableBorder, "selectable-border");
+        ThemeEditorColor(window, "Border hover", ref theme.SelectableBorderHover, "selectable-border-hover");
+        ThemeEditorColor(window, "Border pressed", ref theme.SelectableBorderPressed, "selectable-border-pressed");
+        ThemeEditorColor(window, "Border selected", ref theme.SelectableBorderSelected, "selectable-border-selected");
+        ThemeEditorColor(window, "Indicator", ref theme.SelectableIndicator, "selectable-indicator");
+
+        ThemeEditorSection(window, "Toggles");
+        ThemeEditorColor(window, "Toggle", ref theme.ToggleBg, "toggle-bg");
+        ThemeEditorColor(window, "Toggle hover", ref theme.ToggleBgHover, "toggle-hover");
+        ThemeEditorColor(window, "Toggle pressed", ref theme.ToggleBgPressed, "toggle-pressed");
+        ThemeEditorColor(window, "Toggle active", ref theme.ToggleBgActive, "toggle-active");
+        ThemeEditorColor(window, "Toggle border", ref theme.ToggleBorder, "toggle-border");
+        ThemeEditorColor(window, "Toggle border hover", ref theme.ToggleBorderHover, "toggle-border-hover");
+        ThemeEditorColor(window, "Toggle border pressed", ref theme.ToggleBorderPressed, "toggle-border-pressed");
+        ThemeEditorColor(window, "Toggle border active", ref theme.ToggleBorderActive, "toggle-border-active");
+        ThemeEditorColor(window, "Toggle indicator", ref theme.ToggleIndicator, "toggle-indicator");
+
+        ThemeEditorSection(window, "Scrollbars");
+        ThemeEditorColor(window, "Track", ref theme.ScrollbarTrack, "scrollbar-track");
+        ThemeEditorColor(window, "Thumb", ref theme.ScrollbarThumb, "scrollbar-thumb");
+        ThemeEditorColor(window, "Thumb hover", ref theme.ScrollbarThumbHover, "scrollbar-hover");
+        ThemeEditorColor(window, "Thumb active", ref theme.ScrollbarThumbActive, "scrollbar-active");
+
+        ThemeEditorSection(window, "Popups");
+        ThemeEditorColor(window, "Popup", ref theme.PopupBg, "popup-bg");
+        ThemeEditorColor(window, "Popup border", ref theme.PopupBorder, "popup-border");
+        ThemeEditorColor(window, "Modal backdrop", ref theme.ModalBackdrop, "modal-backdrop");
+        ThemeEditorColor(window, "Tooltip", ref theme.TooltipBg, "tooltip-bg");
+        ThemeEditorColor(window, "Tooltip border", ref theme.TooltipBorder, "tooltip-border");
+
+        ThemeEditorSection(window, "Progress And Plots");
+        ThemeEditorColor(window, "Progress bg", ref theme.ProgressBarBg, "progress-bg");
+        ThemeEditorColor(window, "Progress border", ref theme.ProgressBarBorder, "progress-border");
+        ThemeEditorColor(window, "Progress", ref theme.ProgressBarFill, "progress-fill");
+        ThemeEditorColor(window, "Plot bg", ref theme.PlotBg, "plot-bg");
+        ThemeEditorColor(window, "Plot border", ref theme.PlotBorder, "plot-border");
+        ThemeEditorColor(window, "Plot fill", ref theme.PlotFill, "plot-fill");
+        ThemeEditorColor(window, "Separator", ref theme.Separator, "separator");
+
+        ThemeEditorSection(window, "Headers");
+        ThemeEditorColor(window, "Header", ref theme.CollapsingHeaderBg, "header-bg");
+        ThemeEditorColor(window, "Header hover", ref theme.CollapsingHeaderBgHover, "header-hover");
+        ThemeEditorColor(window, "Header pressed", ref theme.CollapsingHeaderBgPressed, "header-pressed");
+        ThemeEditorColor(window, "Header open", ref theme.CollapsingHeaderBgOpen, "header-open");
+
+        ThemeEditorSection(window, "Sliders");
+        ThemeEditorColor(window, "Slider", ref theme.SliderBg, "slider-bg");
+        ThemeEditorColor(window, "Slider hover", ref theme.SliderBgHover, "slider-hover");
+        ThemeEditorColor(window, "Slider active", ref theme.SliderBgActive, "slider-active");
+        ThemeEditorColor(window, "Slider fill", ref theme.SliderFill, "slider-fill");
+        ThemeEditorColor(window, "Slider fill active", ref theme.SliderFillActive, "slider-fill-active");
+        ThemeEditorColor(window, "Slider border", ref theme.SliderBorder, "slider-border");
+    }
+
+    private static void ThemeEditorSection(Ui window, string label)
+    {
+        window.Spacing(6f);
+        window.Label(label, color: window.Theme.Accent);
+    }
+
+    private static void ThemeEditorColor(Ui window, string label, ref Color color, string id)
+        => window.ColorPickerPopup(label, ref color, window.AvailableWidth, pickerWidth: 280f, id: id, openOnHover: false);
+
+    private static void NormalizeThemeShape(Theme theme)
+    {
+        theme.BorderWidth = MathF.Max(0f, theme.BorderWidth);
+        theme.BorderRadius = MathF.Max(0f, theme.BorderRadius);
+        float minPositiveRadius = theme.BorderWidth > 0f ? theme.BorderWidth + 1f : 0f;
+        if (theme.BorderRadius > 0f && theme.BorderRadius < minPositiveRadius)
+            theme.BorderRadius = minPositiveRadius;
+    }
+
     private readonly record struct NamedScene(string Name, Action<Ui, BenchmarkState> Draw);
 
     private static readonly NamedScene[] s_scenes =
@@ -230,6 +373,7 @@ public class SceneBenchmarks
         new("TableRows", s_tableScene),
         new("PlotsAndImage", s_plotScene),
         new("ColorPicker", s_colorPickerScene),
+        new("ThemeEditor", s_themeEditorScene),
         new("WindowsAndDocking", s_windowsDockScene)
     ];
 
@@ -287,6 +431,9 @@ public class SceneBenchmarks
 
     [Benchmark]
     public int ColorPicker() => RunFrame(s_colorPickerScene);
+
+    [Benchmark]
+    public int ThemeEditor() => RunFrame(s_themeEditorScene);
 
     [Benchmark]
     public int WindowsAndDocking() => RunFrame(s_windowsDockScene);
@@ -368,6 +515,7 @@ public class SceneBenchmarks
         public readonly WindowState InspectorWindow = new(new Vector2(40f, 58f), new Vector2(320f, 320f)) { MinSize = new Vector2(220f, 150f) };
         public readonly WindowState MetricsWindow = new(new Vector2(382f, 82f), new Vector2(300f, 260f)) { MinSize = new Vector2(220f, 120f) };
         public readonly WindowState ThemeWindow = new(new Vector2(704f, 72f), new Vector2(300f, 270f)) { MinSize = new Vector2(220f, 140f) };
+        public readonly WindowState ThemeEditorWindow = new(new Vector2(40f, 58f), new Vector2(320f, 560f)) { MinSize = new Vector2(220f, 140f) };
 
         public readonly string[] Labels = new string[100];
         public readonly string[] WrappedLabels = new string[18];
