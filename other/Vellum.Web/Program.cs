@@ -195,8 +195,10 @@ static void DrawRoot(Ui root, DemoFrameContext context)
 
         root.Spacing(SectionGap);
         float bodyRegionHeight = MathF.Max(260f, context.ScreenHeight - root.RootPadding * 2f - menuBar.H - headerPanel.H - SectionGap * 3f);
-        float dockHeight = Math.Clamp(bodyRegionHeight * 0.32f, 110f, 160f);
+        float maxDockHeight = MathF.Max(110f, bodyRegionHeight - 140f);
+        float dockHeight = MathF.Min(Math.Clamp(bodyRegionHeight * 0.64f, 220f, 320f), maxDockHeight);
         root.DockSpace("mainDock", root.AvailableWidth, dockHeight);
+        ApplyDefaultDocking(root, state);
 
         root.Spacing(SectionGap);
         float bodyHeight = MathF.Max(140f, bodyRegionHeight - dockHeight);
@@ -247,6 +249,16 @@ static void DrawRoot(Ui root, DemoFrameContext context)
     }
 
 
+}
+
+static void ApplyDefaultDocking(Ui root, DemoState state)
+{
+    if (state.DefaultDockingApplied)
+        return;
+
+    bool metricsDocked = root.DockWindow("mainDock", "metrics", DockPlacement.Center);
+    bool themeDocked = root.DockWindow("mainDock", "theme-editor", DockPlacement.Right);
+    state.DefaultDockingApplied = metricsDocked && themeDocked;
 }
 
 static Response DrawDemoMenuBar(Ui host, DemoState state)
@@ -1407,6 +1419,7 @@ sealed class DemoState
     public bool ProfileLocked;
     public bool GarbageCollectionOpen = true;
     public DockingState Docking = new();
+    public bool DefaultDockingApplied;
     public WindowState InspectorWindow = new(new System.Numerics.Vector2(720, 76));
     public WindowState MetricsWindow = new(new System.Numerics.Vector2(690, 310));
     public WindowState ThemeWindow = new(new System.Numerics.Vector2(650, 420), new System.Numerics.Vector2(320, 420));
@@ -1444,6 +1457,7 @@ sealed class DemoState
     public void ResetDockingWindows()
     {
         Docking.Reset();
+        DefaultDockingApplied = false;
         InspectorWindow.Position = new System.Numerics.Vector2(720, 76);
         MetricsWindow.Position = new System.Numerics.Vector2(690, 310);
         ThemeWindow.Position = new System.Numerics.Vector2(650, 420);

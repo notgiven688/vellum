@@ -3,6 +3,21 @@ using Vellum.Rendering;
 
 namespace Vellum;
 
+/// <summary>Programmatic placement for a window docked into a dock space.</summary>
+public enum DockPlacement
+{
+    /// <summary>Add the window to the active dock leaf.</summary>
+    Center,
+    /// <summary>Split the target dock leaf and place the window on the left.</summary>
+    Left,
+    /// <summary>Split the target dock leaf and place the window on the right.</summary>
+    Right,
+    /// <summary>Split the target dock leaf and place the window on top.</summary>
+    Top,
+    /// <summary>Split the target dock leaf and place the window on the bottom.</summary>
+    Bottom
+}
+
 /// <summary>
 /// Retained state for dockable Vellum windows.
 /// </summary>
@@ -80,6 +95,22 @@ public sealed class DockingState
 
         SplitLeaf(windowId, target.SpaceId, leaf, target.Side);
         Version++;
+    }
+
+    internal bool TryDockWindow(int windowId, int spaceId, DockDropSide side)
+    {
+        if (!Spaces.TryGetValue(spaceId, out var space))
+            return false;
+
+        if (WindowSpaces.TryGetValue(windowId, out int currentSpaceId) &&
+            currentSpaceId == spaceId &&
+            IsWindowDocked(windowId))
+        {
+            return true;
+        }
+
+        DockWindow(windowId, new DockDropTarget(spaceId, space.Root, side, default));
+        return true;
     }
 
     internal void RemoveWindow(int windowId)
@@ -534,8 +565,38 @@ public sealed partial class Ui
         return new Response(x, y, resolvedWidth, resolvedHeight, hover, false, false, disabled: !enabled);
     }
 
+    /// <summary>
+    /// Programmatically docks a window into a dock space declared in the current ID scope.
+    /// </summary>
+    /// <remarks>
+    /// Call this after declaring the matching <see cref="DockSpace(UiId, float?, float?, bool)"/>.
+    /// <paramref name="windowId"/> must match the window's explicit <c>id:</c>, or its title when no
+    /// explicit window ID is used.
+    /// </remarks>
+    public bool DockWindow(UiId dockSpaceId, UiId windowId, DockPlacement placement = DockPlacement.Center)
+    {
+        if (Docking == null)
+            return false;
+
+        UiId resolvedDockSpaceId = RequireSpecifiedId(dockSpaceId, nameof(dockSpaceId));
+        UiId resolvedWindowId = RequireSpecifiedId(windowId, nameof(windowId));
+        int dockSpaceWidgetId = MakeWidgetId(UiWidgetKind.DockSpace, resolvedDockSpaceId);
+        int windowWidgetId = MakeWidgetId(UiWidgetKind.Window, resolvedWindowId);
+        return Docking.TryDockWindow(windowWidgetId, dockSpaceWidgetId, ToDockDropSide(placement));
+    }
+
     private bool IsWindowDocked(int windowId)
         => Docking?.IsWindowDocked(windowId) == true;
+
+    private static DockDropSide ToDockDropSide(DockPlacement placement)
+        => placement switch
+        {
+            DockPlacement.Left => DockDropSide.Left,
+            DockPlacement.Right => DockDropSide.Right,
+            DockPlacement.Top => DockDropSide.Top,
+            DockPlacement.Bottom => DockDropSide.Bottom,
+            _ => DockDropSide.Center
+        };
 
     private bool TryGetDockedWindowRect(int windowId, out ClipRect rect)
     {

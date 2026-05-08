@@ -323,6 +323,7 @@ public sealed class VellumTests
         string[] expected =
         [
             "Vellum.EdgeInsets",
+            "Vellum.DockPlacement",
             "Vellum.DockingState",
             "Vellum.FontVMetrics",
             "Vellum.GlyphMetrics",
@@ -2374,6 +2375,63 @@ public sealed class VellumTests
 
             Check(
                 "dropping a second window on a dock edge creates a split layout",
+                docking.WindowSpaces.Count == 2 &&
+                left.X < right.X &&
+                left.X >= dockSpace.X - 0.1f &&
+                right.X + right.W <= dockSpace.X + dockSpace.W + 0.1f &&
+                MathF.Abs(left.Y - right.Y) < 0.1f &&
+                MathF.Abs(left.H - right.H) < 0.1f &&
+                left.W > 40f &&
+                right.W > 40f);
+        }
+
+        {
+            var renderer = new TestRenderer();
+            var docking = new DockingState();
+            var ui = new Ui(renderer)
+            {
+                Font = font,
+                DefaultFontSize = 18f,
+                Lcd = false,
+                Docking = docking,
+                RootPadding = 0f
+            };
+
+            var leftState = new WindowState(new Vector2(280, 24));
+            var rightState = new WindowState(new Vector2(300, 92));
+            Response dockSpace = default;
+            Response left = default;
+            Response right = default;
+            bool seedDocking = true;
+
+            void Frame(Vector2 mouse, UiInputState input = default)
+            {
+                ui.Frame(620, 320, mouse, false, input, frame =>
+                {
+                    dockSpace = frame.DockSpace("main", 260, 170);
+                    if (seedDocking)
+                    {
+                        bool leftDocked = frame.DockWindow("main", "seed-left", DockPlacement.Center);
+                        bool rightDocked = frame.DockWindow("main", "seed-right", DockPlacement.Right);
+                        seedDocking = !(leftDocked && rightDocked);
+                    }
+
+                    left = frame.Window("Left", leftState, 180, content =>
+                    {
+                        content.Label("Left body");
+                    }, id: "seed-left");
+                    right = frame.Window("Right", rightState, 180, content =>
+                    {
+                        content.Label("Right body");
+                    }, id: "seed-right");
+                });
+            }
+
+            Frame(Vector2.Zero);
+            Frame(Vector2.Zero);
+
+            Check(
+                "programmatic docking can seed a split layout",
                 docking.WindowSpaces.Count == 2 &&
                 left.X < right.X &&
                 left.X >= dockSpace.X - 0.1f &&

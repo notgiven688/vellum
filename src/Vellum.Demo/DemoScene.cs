@@ -32,8 +32,10 @@ internal static class DemoScene
 
             root.Spacing(SectionGap);
             float bodyRegionHeight = MathF.Max(260f, context.ScreenHeight - root.RootPadding * 2f - menuBar.H - headerPanel.H - SectionGap * 3f);
-            float dockHeight = Math.Clamp(bodyRegionHeight * 0.32f, 110f, 160f);
+            float maxDockHeight = MathF.Max(110f, bodyRegionHeight - 140f);
+            float dockHeight = MathF.Min(Math.Clamp(bodyRegionHeight * 0.64f, 220f, 320f), maxDockHeight);
             root.DockSpace("mainDock", root.AvailableWidth, dockHeight);
+            ApplyDefaultDocking(root, state);
 
             root.Spacing(SectionGap);
             float bodyHeight = MathF.Max(140f, bodyRegionHeight - dockHeight);
@@ -82,6 +84,16 @@ internal static class DemoScene
 
             root.Popup("quickMenu", state.QuickMenuButton, 220, 180, popup => DrawQuickMenu(popup, state));
         }
+    }
+
+    private static void ApplyDefaultDocking(Ui root, DemoState state)
+    {
+        if (state.DefaultDockingApplied)
+            return;
+
+        bool metricsDocked = root.DockWindow("mainDock", "metrics", DockPlacement.Center);
+        bool themeDocked = root.DockWindow("mainDock", "theme-editor", DockPlacement.Right);
+        state.DefaultDockingApplied = metricsDocked && themeDocked;
     }
 
     public static byte[] CreateCheckerRgba()
@@ -1087,6 +1099,7 @@ internal sealed class DemoState
     public bool GarbageCollectionOpen = true;
     public float ActivityActionsWidth;
     public DockingState Docking = new();
+    public bool DefaultDockingApplied;
     public WindowState InspectorWindow = new(new Vector2(720, 76));
     public WindowState MetricsWindow = new(new Vector2(690, 310));
     public WindowState ThemeWindow = new(new Vector2(650, 420), new Vector2(320, 420));
@@ -1124,6 +1137,7 @@ internal sealed class DemoState
     public void ResetDockingWindows()
     {
         Docking.Reset();
+        DefaultDockingApplied = false;
         InspectorWindow.Position = new Vector2(720, 76);
         MetricsWindow.Position = new Vector2(690, 310);
         ThemeWindow.Position = new Vector2(650, 420);
