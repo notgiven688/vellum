@@ -751,15 +751,17 @@ public sealed partial class Ui
             bool active = windowId == activeWindowId;
             const float TabButtonInset = 2f;
             const float TabButtonGap = 4f;
+            const float TabTextFitTolerance = 1f;
             float tabButtonSize = MathF.Min(16f, MathF.Max(14f, tabHeight - TabButtonInset * 2f));
             int tabButtonCount = 1 + (request.Closable ? 1 : 0);
+            float tabButtonStackWidth = tabButtonSize * tabButtonCount +
+                                        TabButtonGap * Math.Max(0, tabButtonCount - 1);
             float activeButtonReserve = active
-                ? tabButtonSize * tabButtonCount +
-                  TabButtonGap * Math.Max(0, tabButtonCount - 1) +
-                  TabButtonInset
+                ? tabButtonStackWidth + TabButtonGap
                 : 0f;
             float desiredW = label.Width + Theme.TabPadding.Horizontal + activeButtonReserve;
-            float tabW = Math.Clamp(desiredW, 58f, MathF.Max(58f, tabMaxRight - tabX));
+            float maxTabW = MathF.Max(58f, tabMaxRight - tabX);
+            float tabW = Math.Clamp(MathF.Ceiling(desiredW), 58f, maxTabW);
             if (tabX + tabW > tabMaxRight + 0.1f)
                 break;
 
@@ -847,7 +849,9 @@ public sealed partial class Ui
             float labelX = tabX + Theme.TabPadding.Left;
             float labelY = tabY + MathF.Max(0, (tabHeight - label.Height) * 0.5f);
             float labelMaxW = MathF.Max(0, (showButtons ? undockButtonRect.X - TabButtonGap : tabX + tabW - Theme.TabPadding.Right) - labelX);
-            TextLayoutResult clippedLabel = LayoutText(request.Title, DefaultFontSize, maxWidth: labelMaxW, overflow: TextOverflowMode.Ellipsis);
+            TextLayoutResult clippedLabel = label.Width <= labelMaxW + TabTextFitTolerance
+                ? label
+                : LayoutText(request.Title, DefaultFontSize, maxWidth: labelMaxW, overflow: TextOverflowMode.Ellipsis);
             DrawTextLayout(clippedLabel, labelX, labelY, active ? Theme.TextPrimary : Theme.TextSecondary);
 
             if (showButtons)
