@@ -10,6 +10,8 @@ namespace Vellum.Demo;
 
 internal static class Program
 {
+    private static readonly Vector2i InitialWindowSize = new(1280, 820);
+
     private static void Main()
     {
         ConfigureGlfwDpiHints();
@@ -18,7 +20,7 @@ internal static class Program
         gameSettings.UpdateFrequency = 60.0;
 
         var settings = NativeWindowSettings.Default;
-        settings.ClientSize = new Vector2i(960, 680);
+        settings.ClientSize = InitialWindowSize;
         settings.Title = "Vellum Demo";
         settings.APIVersion = new Version(3, 3);
         settings.Profile = ContextProfile.Core;

@@ -733,21 +733,6 @@ internal static class DemoScene
             window.Label($"GC pause total: {state.GcPauseTotalMs:0.###} ms", color: window.Theme.TextSecondary);
             window.Label($"Pause time percentage: {state.GcPausePercentage:0.##}%", color: window.Theme.TextSecondary);
         }
-        window.Spacing(4);
-
-        if (window.Button("Increment clicks", width: window.AvailableWidth).Clicked)
-            state.ClickCount++;
-
-        if (window.Button("Open settings dialog", width: window.AvailableWidth).Clicked)
-            window.OpenPopup("settingsDialog");
-
-        if (window.Button("Toggle details", width: window.AvailableWidth).Clicked)
-            state.DetailsOpen = !state.DetailsOpen;
-
-        if (window.Button("Reset action", width: window.AvailableWidth).Clicked)
-            state.SelectedAction = -1;
-
-        window.ModalPopup("settingsDialog", 380, 320, state, static (modal, state) => DrawSettingsDialog(modal, state));
     }
 
     private static void DrawMetricsWindow(Ui window, DemoState state)

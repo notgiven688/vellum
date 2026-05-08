@@ -11,6 +11,8 @@ namespace Vellum.Web;
 
 public partial class Application
 {
+    private const int InitialWindowWidth = 1280;
+    private const int InitialWindowHeight = 820;
     private const float TargetFrameBudgetMs = 1000f / 60f;
     private static readonly TableColumn[] s_metricsColumns =
     [
@@ -25,7 +27,7 @@ public partial class Application
     private static System.Numerics.Vector2 s_browserMousePosition;
     private static int s_browserMouseButtons;
     private static float s_browserWheelY;
-    private static RenderFrameInfo s_browserFrame = new(800, 600);
+    private static RenderFrameInfo s_browserFrame = new(InitialWindowWidth, InitialWindowHeight);
     private static double s_previousBrowserFrameTimestampMs = double.NaN;
 
     public static void Main(string[] args)
@@ -59,7 +61,7 @@ public partial class Application
         if (!OperatingSystem.IsBrowser())
             flags |= ConfigFlags.Msaa4xHint;
         Raylib.SetConfigFlags(flags);
-        Raylib.InitWindow(800, 600, "Vellum Web");
+        Raylib.InitWindow(InitialWindowWidth, InitialWindowHeight, "Vellum Web");
 
         s_renderer = new RaylibRenderer();
         s_checkerTexture = s_renderer.CreateTexture(CreateCheckerRgba(), 16, 16);
@@ -869,21 +871,6 @@ static void DrawInspector(Ui window, DemoState state)
         window.Label($"GC pause total: {state.GcPauseTotalMs:0.###} ms", color: window.Theme.TextSecondary);
         window.Label($"Pause time percentage: {state.GcPausePercentage:0.##}%", color: window.Theme.TextSecondary);
     }
-    window.Spacing(4);
-
-    if (window.Button("Increment clicks", width: window.AvailableWidth).Clicked)
-        state.ClickCount++;
-
-    if (window.Button("Open settings dialog", width: window.AvailableWidth).Clicked)
-        window.OpenPopup("settingsDialog");
-
-    if (window.Button("Toggle details", width: window.AvailableWidth).Clicked)
-        state.DetailsOpen = !state.DetailsOpen;
-
-    if (window.Button("Reset action", width: window.AvailableWidth).Clicked)
-        state.SelectedAction = -1;
-
-    window.ModalPopup("settingsDialog", 380, 320, state, static (modal, state) => DrawSettingsDialog(modal, state));
 }
 
 static void DrawMetricsWindow(Ui window, DemoState state)
