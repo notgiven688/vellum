@@ -64,6 +64,7 @@ public static class ThemePresets
             ModalBackdrop = new Color(30, 34, 40, 96),
             TooltipBg = new Color(249, 250, 252, 242),
             TooltipBorder = new Color(180, 188, 197, 220),
+            TooltipText = new Color(28, 32, 37),
 
             ToggleBg = new Color(244, 246, 249),
             ToggleBgHover = new Color(235, 238, 242),

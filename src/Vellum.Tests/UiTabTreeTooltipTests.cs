@@ -102,6 +102,7 @@ public sealed class UiTabTreeTooltipTests
         var ui = UiTestSupport.CreateUi(renderer);
         ui.Theme.TooltipBg = new Color(9, 23, 41, 244);
         ui.Theme.TooltipBorder = new Color(91, 13, 7, 250);
+        ui.Theme.TooltipText = new Color(217, 239, 111, 255);
 
         Response anchor = default;
         bool shown = false;
@@ -127,6 +128,7 @@ public sealed class UiTabTreeTooltipTests
         Assert.True(shown);
         Assert.True(UiTestSupport.HasVertexColor(renderer.LastRenderList, ui.Theme.TooltipBg));
         Assert.True(UiTestSupport.HasVertexColor(renderer.LastRenderList, ui.Theme.TooltipBorder));
+        Assert.True(UiTestSupport.HasVertexColor(renderer.LastRenderList, ui.Theme.TooltipText));
 
         Frame(anchorPoint, "   ");
         Assert.False(shown);

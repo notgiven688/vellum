@@ -77,7 +77,7 @@ public sealed partial class Ui
         float contentW = MathF.Max(0, outerW - border * 2 - pad.Horizontal);
         float contentH = MathF.Max(0, outerH - border * 2 - pad.Vertical);
         _painter.PushClip(contentX, contentY, contentW, contentH);
-        DrawTextLayout(layout, contentX, contentY, Theme.TextPrimary);
+        DrawTextLayout(layout, contentX, contentY, Theme.TooltipText);
         _painter.PopClip();
     }
 }

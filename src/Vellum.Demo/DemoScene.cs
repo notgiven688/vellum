@@ -905,6 +905,7 @@ internal static class DemoScene
         ThemeColor(window, "Modal backdrop", ref theme.ModalBackdrop, "modal-backdrop", alpha: true);
         ThemeColor(window, "Tooltip", ref theme.TooltipBg, "tooltip-bg", alpha: true);
         ThemeColor(window, "Tooltip border", ref theme.TooltipBorder, "tooltip-border", alpha: true);
+        ThemeColor(window, "Tooltip text", ref theme.TooltipText, "tooltip-text");
 
         ThemeSection(window, "Progress And Plots");
         ThemeColor(window, "Progress bg", ref theme.ProgressBarBg, "progress-bg");

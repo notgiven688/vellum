@@ -113,6 +113,8 @@ public sealed class Theme
     public Color TooltipBg              = new(24, 24, 24, 236);
     /// <summary>Tooltip border color.</summary>
     public Color TooltipBorder          = new(104, 104, 104, 220);
+    /// <summary>Tooltip text color.</summary>
+    public Color TooltipText            = new(220, 220, 220);
 
     // Toggle controls
     /// <summary>Checkbox, radio, and switch fill color.</summary>
