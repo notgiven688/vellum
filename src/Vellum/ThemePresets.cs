@@ -42,6 +42,8 @@ public static class ThemePresets
             SelectableBorderPressed = new Color(150, 159, 169),
             SelectableBorderSelected = new Color(210, 138, 36),
             SelectableIndicator = new Color(210, 138, 36),
+            MenuItemText = new Color(28, 32, 37),
+            MenuItemShortcutText = new Color(78, 88, 98),
 
             TextFieldBg = new Color(255, 255, 255),
             TextFieldBgHover = new Color(250, 251, 253),

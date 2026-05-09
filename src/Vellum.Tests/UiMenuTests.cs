@@ -1,4 +1,5 @@
 using System.Numerics;
+using Vellum.Rendering;
 using Xunit;
 
 namespace Vellum.Tests;
@@ -144,6 +145,8 @@ public sealed class UiMenuTests
     {
         var renderer = new UiTestRenderer();
         var ui = UiTestSupport.CreateUi(renderer);
+        ui.Theme.MenuItemText = new Color(17, 211, 89, 255);
+        ui.Theme.MenuItemShortcutText = new Color(241, 87, 193, 255);
 
         Response appMenu = default;
         Response item = default;
@@ -175,10 +178,10 @@ public sealed class UiMenuTests
         Assert.True(ui.TryGetChildPopupBounds(UiWidgetKind.Menu, "App", "menu", out _, out _, out float popupW, out _));
         Assert.InRange(popupW, 179.4f, 180.6f);
 
-        var labelVertices = UiTestSupport.VerticesWithColor(renderer.LastRenderList, ui.Theme.TextPrimary)
+        var labelVertices = UiTestSupport.VerticesWithColor(renderer.LastRenderList, ui.Theme.MenuItemText)
             .Where(vertex => vertex.Pos.Y >= item.Y && vertex.Pos.Y <= item.Y + item.H)
             .ToArray();
-        var shortcutVertices = UiTestSupport.VerticesWithColor(renderer.LastRenderList, ui.Theme.TextSecondary)
+        var shortcutVertices = UiTestSupport.VerticesWithColor(renderer.LastRenderList, ui.Theme.MenuItemShortcutText)
             .Where(vertex => vertex.Pos.Y >= item.Y && vertex.Pos.Y <= item.Y + item.H)
             .ToArray();
 

@@ -69,6 +69,10 @@ public sealed class Theme
     public Color SelectableBorderSelected = new(255, 200, 90);
     /// <summary>Indicator color for selected rows and menu items.</summary>
     public Color SelectableIndicator   = new(255, 200, 90);
+    /// <summary>Menu item label text color.</summary>
+    public Color MenuItemText          = new(220, 220, 220);
+    /// <summary>Menu item shortcut text color.</summary>
+    public Color MenuItemShortcutText  = new(170, 170, 170);
 
     // Text field
     /// <summary>Text field fill color.</summary>

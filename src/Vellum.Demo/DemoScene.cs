@@ -881,6 +881,8 @@ internal static class DemoScene
         ThemeColor(window, "Border pressed", ref theme.SelectableBorderPressed, "selectable-border-pressed");
         ThemeColor(window, "Border selected", ref theme.SelectableBorderSelected, "selectable-border-selected");
         ThemeColor(window, "Indicator", ref theme.SelectableIndicator, "selectable-indicator");
+        ThemeColor(window, "Menu text", ref theme.MenuItemText, "menu-item-text");
+        ThemeColor(window, "Menu shortcut", ref theme.MenuItemShortcutText, "menu-shortcut-text");
 
         ThemeSection(window, "Toggles");
         ThemeColor(window, "Toggle", ref theme.ToggleBg, "toggle-bg");

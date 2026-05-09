@@ -174,6 +174,12 @@ public sealed partial class Ui
             : Theme.TextSecondary;
     }
 
+    private Color GetMenuItemTextColor(bool enabled)
+        => enabled ? Theme.MenuItemText : Theme.MenuItemText.WithAlpha(140);
+
+    private Color GetMenuItemShortcutTextColor(bool enabled)
+        => enabled ? Theme.MenuItemShortcutText : Theme.MenuItemShortcutText.WithAlpha(140);
+
     private ControlVisuals GetSelectableVisuals(bool enabled, bool hover, bool pressed, bool selected, bool focused)
     {
         Color fill = !enabled ? Theme.SelectableBg.WithAlpha(140)
@@ -2180,13 +2186,13 @@ public sealed partial class Ui
         if (hasShortcut)
         {
             float shortcutX = textRight - shortcutWidth2;
-            DrawTextLayout(shortcutLayout!.Value, shortcutX, textY2, Theme.TextSecondary);
+            DrawTextLayout(shortcutLayout!.Value, shortcutX, textY2, GetMenuItemShortcutTextColor(enabled));
             textRight = shortcutX - shortcutGap2;
         }
 
         float labelMaxW = MathF.Max(0, textRight - contentX2);
         TextLayoutResult displayLabelLayout = LayoutText(label, s2, maxWidth: labelMaxW, overflow: TextOverflowMode.Ellipsis);
-        DrawTextLayout(displayLabelLayout, contentX2, textY2, visuals2.Foreground);
+        DrawTextLayout(displayLabelLayout, contentX2, textY2, GetMenuItemTextColor(enabled));
 
         Advance(resolvedWidth2, resolvedHeight2);
         var response = new Response(x2, y2, resolvedWidth2, resolvedHeight2, hover2, pressed2, clicked2, focused: focused2, changed: clicked2, disabled: !enabled);
@@ -2282,7 +2288,7 @@ public sealed partial class Ui
         if (hasShortcut)
         {
             float shortcutX = x + resolvedWidth - pad.Right - (shortcutLayout?.Width ?? 0f);
-            DrawTextLayout(shortcutLayout!.Value, shortcutX, contentY, Theme.TextSecondary);
+            DrawTextLayout(shortcutLayout!.Value, shortcutX, contentY, GetMenuItemShortcutTextColor(enabled));
         }
 
         EnterIdScope(resolvedId);

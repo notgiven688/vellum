@@ -307,17 +307,18 @@ public sealed partial class Ui
         else
         {
             var visuals = GetSelectableVisuals(enabled, hover, pressed, popupOpen, focused);
+            var foreground = GetMenuItemTextColor(enabled);
             float strokeWidth = focused && visuals.Border.A > 0 ? FrameBorderWidth : 0f;
             _painter.DrawRect(x, y, resolvedWidth, resolvedHeight, visuals.Fill, focused ? visuals.Border : default, strokeWidth, FrameRadius);
 
             float textX = x + pad.Left;
-            DrawTextLayout(displayLabelLayout, textX, y + pad.Top, visuals.Foreground);
+            DrawTextLayout(displayLabelLayout, textX, y + pad.Top, foreground);
             DrawChevron(
                 x + resolvedWidth - pad.Right - arrowSize,
                 y + (resolvedHeight - arrowSize) * 0.5f,
                 arrowSize,
                 down: false,
-                visuals.Foreground);
+                foreground);
         }
 
         Advance(resolvedWidth, resolvedHeight);
