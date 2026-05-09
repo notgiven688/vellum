@@ -122,7 +122,7 @@ ui.Frame(width, height, mouse, input, root =>
 
 Vellum brings its own lightweight text renderer, TrueType loader, glyph rasterizer, and glyph atlas management. Backends receive text as normal textured geometry through `IRenderer`; they do not call platform text APIs or shape text themselves.
 
-Custom TrueType fonts can be loaded directly:
+Custom TrueType fonts can be loaded directly as a single UI font:
 
 ```csharp
 ui.Font = TrueTypeFont.FromFile("MyFont.ttf");
@@ -130,9 +130,19 @@ ui.Font = TrueTypeFont.FromFile("MyFont.ttf");
 
 If `ui.Font` is not set, `Vellum` uses an embedded default font shipped inside the library. The default is exposed as `UiFonts.DefaultSans` and comes from the embedded `JetBrainsMono-Regular.ttf` resource in the core project.
 
+For fallback or icon fonts, set `ui.FontStack`. Earlier sources win when multiple fonts contain the same codepoint. Vellum ships Google Material Symbols Outlined as both `UiFonts.MaterialSymbols` and `MaterialSymbols.Font`, with generated glyph string constants such as `MaterialSymbols.Home`.
+
+```csharp
+ui.FontStack = UiFont.Merge(
+    UiFont.Source(UiFonts.DefaultSans),
+    UiFont.Source(MaterialSymbols.Font, offsetY: 4f));
+
+root.Button($"{MaterialSymbols.Home} Home");
+```
+
 Backends running on HiDPI displays should pass `RenderFrameInfo` with both logical and framebuffer sizes. By default, `ui.AutoTextRasterScale` updates `ui.TextRasterScale` from that frame scale so text atlases are rasterized at the correct density.
 
-The text stack is deliberately small: it supports basic TrueType glyph lookup, rasterization, wrapping, clipping, ellipsis, text fields, and text areas, but it is not a full shaping engine. See [Text and Fonts](docs/docs/guides/text-and-fonts.md) for the exact supported and unsupported cases.
+The text stack is deliberately small: it supports basic TrueType glyph lookup, merged codepoint fallback, rasterization, wrapping, clipping, ellipsis, text fields, and text areas, but it is not a full shaping engine. Material Symbols ligature names are not shaped; use the constants/codepoints. See [Text and Fonts](docs/docs/guides/text-and-fonts.md) for the exact supported and unsupported cases.
 
 ## Build
 

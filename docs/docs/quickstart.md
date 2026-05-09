@@ -194,6 +194,19 @@ ui.Frame(width, height, mouse, input, root =>
 });
 ```
 
+If you need codepoint fallback or icon glyphs, use a merged font stack. Vellum bundles Google Material Symbols Outlined and generated glyph constants:
+
+```csharp
+ui.FontStack = UiFont.Merge(
+    UiFont.Source(UiFonts.DefaultSans),
+    UiFont.Source(MaterialSymbols.Font, offsetY: 4f));
+
+ui.Frame(width, height, mouse, input, root =>
+{
+    root.Button($"{MaterialSymbols.Settings} Settings");
+});
+```
+
 For HiDPI rendering, pass a `RenderFrameInfo` with logical and framebuffer sizes. Vellum will rasterize text at the framebuffer scale by default.
 
 ```csharp

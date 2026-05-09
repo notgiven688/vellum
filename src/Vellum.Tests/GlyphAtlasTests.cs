@@ -82,6 +82,45 @@ public sealed class GlyphAtlasTests
     }
 
     [Fact]
+    public void Build_WithMergedFont_RasterizesFallbackGlyph()
+    {
+        var renderer = new UiTestRenderer();
+        var atlas = new GlyphAtlas(UiFont.Merge(UiFonts.DefaultSans, UiFonts.MaterialSymbols), 18f, lcd: false);
+        int home = MaterialSymbols.Home[0];
+
+        atlas.Build(renderer, [(int)'A', home]);
+
+        Assert.True(atlas.TryGetGlyph('A', out GlyphInfo a));
+        Assert.True(a.Width > 0f);
+        Assert.True(atlas.TryGetGlyph(home, out GlyphInfo homeGlyph));
+        Assert.True(homeGlyph.Width > 0f);
+        Assert.True(homeGlyph.AdvanceWidth > 0f);
+    }
+
+    [Fact]
+    public void Build_WithAdjustedFontSource_AppliesGlyphOffset()
+    {
+        var defaultRenderer = new UiTestRenderer();
+        var adjustedRenderer = new UiTestRenderer();
+        var defaultAtlas = new GlyphAtlas(UiFont.Merge(UiFonts.DefaultSans, UiFonts.MaterialSymbols), 18f, lcd: false);
+        var adjustedAtlas = new GlyphAtlas(
+            UiFont.Merge(
+                UiFont.Source(UiFonts.DefaultSans),
+                UiFont.Source(UiFonts.MaterialSymbols, offsetY: 2f)),
+            18f,
+            lcd: false);
+        int home = MaterialSymbols.Home[0];
+
+        defaultAtlas.Build(defaultRenderer, [home]);
+        adjustedAtlas.Build(adjustedRenderer, [home]);
+
+        Assert.True(defaultAtlas.TryGetGlyph(home, out GlyphInfo defaultHome));
+        Assert.True(adjustedAtlas.TryGetGlyph(home, out GlyphInfo adjustedHome));
+        Assert.InRange(adjustedHome.OffsetY, defaultHome.OffsetY + 1.999f, defaultHome.OffsetY + 2.001f);
+        Assert.InRange(adjustedHome.AdvanceWidth, defaultHome.AdvanceWidth - 0.001f, defaultHome.AdvanceWidth + 0.001f);
+    }
+
+    [Fact]
     public void Destroy_Clears_Metadata_And_Is_Idempotent()
     {
         var renderer = new UiTestRenderer();

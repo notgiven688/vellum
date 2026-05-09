@@ -229,7 +229,7 @@ internal static class DemoScene
         {
             DemoState state = context.State;
 
-            header.Heading("Vellum Demo");
+            header.Heading($"{MaterialSymbols.Dashboard} Vellum Demo");
             header.Label(
                 "A compact immediate-mode dashboard with framed sections, popups, keyboard navigation, and custom painting.",
                 color: header.Theme.TextSecondary,
@@ -307,25 +307,25 @@ internal static class DemoScene
         {
             using (panel.Row())
             {
-                if (panel.Button("Click me", width: rowWidth).Clicked) state.ClickCount++;
-                if (panel.Button("Reset", width: rowWidth).Clicked) state.ClickCount = 0;
+                if (panel.Button($"{MaterialSymbols.Bolt} Click me", width: rowWidth).Clicked) state.ClickCount++;
+                if (panel.Button($"{MaterialSymbols.Refresh} Reset", width: rowWidth).Clicked) state.ClickCount = 0;
             }
 
             using (panel.Row())
             {
-                if (panel.Button("Focus name", width: rowWidth).Clicked)
+                if (panel.Button($"{MaterialSymbols.Person} Focus name", width: rowWidth).Clicked)
                     panel.RequestFocus(UiWidgetKind.TextField, "name");
 
-                state.QuickMenuButton = panel.Button("Quick menu", width: rowWidth);
+                state.QuickMenuButton = panel.Button($"{MaterialSymbols.Menu} Quick menu", width: rowWidth);
             }
         }
         else
         {
-            if (panel.Button("Click me", width: panel.AvailableWidth).Clicked) state.ClickCount++;
-            if (panel.Button("Reset", width: panel.AvailableWidth).Clicked) state.ClickCount = 0;
-            if (panel.Button("Focus name", width: panel.AvailableWidth).Clicked)
+            if (panel.Button($"{MaterialSymbols.Bolt} Click me", width: panel.AvailableWidth).Clicked) state.ClickCount++;
+            if (panel.Button($"{MaterialSymbols.Refresh} Reset", width: panel.AvailableWidth).Clicked) state.ClickCount = 0;
+            if (panel.Button($"{MaterialSymbols.Person} Focus name", width: panel.AvailableWidth).Clicked)
                 panel.RequestFocus(UiWidgetKind.TextField, "name");
-            state.QuickMenuButton = panel.Button("Quick menu", width: panel.AvailableWidth);
+            state.QuickMenuButton = panel.Button($"{MaterialSymbols.Menu} Quick menu", width: panel.AvailableWidth);
         }
 
         if (state.QuickMenuButton.Clicked)
@@ -345,6 +345,17 @@ internal static class DemoScene
         }
     }
 
+    private static void DrawIconFontPreview(Ui panel)
+    {
+        panel.Label("Merged icon font", color: panel.Theme.TextSecondary);
+        panel.Label(
+            $"{MaterialSymbols.Home}  {MaterialSymbols.Search}  {MaterialSymbols.Settings}  {MaterialSymbols.Favorite}  {MaterialSymbols.Add}",
+            size: panel.DefaultFontSize * 1.35f,
+            color: panel.Theme.Accent,
+            maxWidth: panel.AvailableWidth,
+            wrap: TextWrapMode.NoWrap);
+    }
+
     private static void DrawSettingsPanel(Ui host, DemoState state, int checkerTexture)
     {
         host.Panel(host.AvailableWidth, (State: state, CheckerTexture: checkerTexture), static (panel, context) =>
@@ -352,6 +363,8 @@ internal static class DemoScene
             DemoState state = context.State;
 
             PanelTitle(panel, "Controls", "Toggles, selection widgets, color editing, and a small texture preview.");
+            DrawIconFontPreview(panel);
+            panel.Separator();
             panel.Checkbox("Enable notifications", ref state.NotificationsEnabled, width: panel.AvailableWidth);
             panel.Checkbox("Enable analytics", ref state.AnalyticsEnabled, width: panel.AvailableWidth);
             panel.Separator();

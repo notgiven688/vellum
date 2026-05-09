@@ -332,7 +332,9 @@ public sealed partial class Ui : IDisposable
     private readonly IRenderer _renderer;
     private readonly Painter _framePainter = new();
     private Painter _painter;
-    private readonly Dictionary<(TrueTypeFont font, float size, float rasterScale, bool lcd), GlyphAtlas> _atlases = new();
+    private readonly Dictionary<(UiFont font, float size, float rasterScale, bool lcd), GlyphAtlas> _atlases = new();
+    private TrueTypeFont? _cachedSingleFontSource;
+    private UiFont? _cachedSingleFont;
     private readonly Dictionary<int, WidgetStateEntry> _widgetStates = new();
     private readonly Dictionary<int, PopupRequest> _popupRequestsByDepth = new();
     private readonly List<int> _openPopupIds = new();
@@ -356,6 +358,10 @@ public sealed partial class Ui : IDisposable
     public IUiPlatform Platform { get; set; } = NullUiPlatform.Instance;
     /// <summary>Font used for UI text. When null, Vellum uses <see cref="UiFonts.DefaultSans"/>.</summary>
     public TrueTypeFont? Font { get; set; }
+    /// <summary>
+    /// Logical font stack used for UI text. When set, it overrides <see cref="Font"/> and resolves glyphs from merged font sources.
+    /// </summary>
+    public UiFont? FontStack { get; set; }
     /// <summary>Default text size in logical pixels.</summary>
     public float DefaultFontSize { get; set; } = 16f;
     /// <summary>Whether LCD/subpixel text rendering may be used when the theme allows it.</summary>
@@ -1676,7 +1682,23 @@ public sealed partial class Ui : IDisposable
             => new(atlas, Width, Height, ClipWidth, Truncated, _glyphs);
     }
 
-    private TrueTypeFont ResolvedFont => Font ?? UiFonts.DefaultSans;
+    private UiFont ResolvedFont
+    {
+        get
+        {
+            if (FontStack is not null)
+                return FontStack;
+
+            TrueTypeFont font = Font ?? UiFonts.DefaultSans;
+            if (!ReferenceEquals(_cachedSingleFontSource, font))
+            {
+                _cachedSingleFontSource = font;
+                _cachedSingleFont = UiFont.From(font);
+            }
+
+            return _cachedSingleFont!;
+        }
+    }
 
     private GlyphAtlas GetAtlas(float size)
     {

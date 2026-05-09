@@ -33,13 +33,11 @@ internal sealed class GlyphAtlas
 {
     private readonly Dictionary<int, GlyphInfo> _glyphs = new();
     private readonly HashSet<int> _codepoints = new();
-    private readonly Dictionary<int, int> _glyphIndices = new();
+    private readonly Dictionary<int, ResolvedGlyph> _glyphIndices = new();
     private readonly Dictionary<long, float> _kernAdvances = new();
-    private readonly TrueTypeFont _font;
+    private readonly FontSource[] _sources;
     private readonly float _pixelHeight;
     private readonly float _rasterScale;
-    private readonly float _fontScale;
-    private readonly float _logicalScale;
     private readonly FontVMetrics _scaledVMetrics;
 
     public int TextureId { get; private set; } = -1;
@@ -49,17 +47,28 @@ internal sealed class GlyphAtlas
     public int Version { get; private set; }
 
     public GlyphAtlas(TrueTypeFont font, float pixelHeight, float rasterScale = 1f, bool lcd = true)
+        : this(UiFont.From(font), pixelHeight, rasterScale, lcd)
     {
-        _font = font;
+    }
+
+    public GlyphAtlas(UiFont font, float pixelHeight, float rasterScale = 1f, bool lcd = true)
+    {
+        ArgumentNullException.ThrowIfNull(font);
         _pixelHeight = pixelHeight;
         _rasterScale = MathF.Max(1f, rasterScale);
-        _fontScale = _font.ScaleForPixelHeight(_pixelHeight * _rasterScale);
-        _logicalScale = _fontScale / _rasterScale;
-        var vm = _font.GetFontVMetrics();
+        _sources = new FontSource[font.Sources.Length];
+        for (int i = 0; i < _sources.Length; i++)
+        {
+            UiFontSource source = font.Sources[i];
+            float fontScale = source.Font.ScaleForPixelHeight(_pixelHeight * _rasterScale * source.Scale);
+            _sources[i] = new FontSource(source.Font, fontScale, fontScale / _rasterScale, source.OffsetX, source.OffsetY);
+        }
+
+        var vm = _sources[0].Font.GetFontVMetrics();
         _scaledVMetrics = new FontVMetrics(
-            vm.Ascent * _logicalScale,
-            vm.Descent * _logicalScale,
-            vm.LineGap * _logicalScale);
+            vm.Ascent * _sources[0].LogicalScale,
+            vm.Descent * _sources[0].LogicalScale,
+            vm.LineGap * _sources[0].LogicalScale);
         IsLcd = lcd;
     }
 
@@ -124,18 +133,21 @@ internal sealed class GlyphAtlas
         _glyphs.Clear();
 
         // --- Collect rasterized glyphs ---
-        var entries = new List<(int codepoint, byte[] bitmap, int w, int h, int ox, int oy, float advance)>();
+        var entries = new List<(int codepoint, byte[] bitmap, int w, int h, int ox, int oy, float offsetX, float offsetY, float advance)>();
         foreach (int cp in _codepoints)
         {
-            int glyphIndex = GetGlyphIndex(cp);
+            ResolvedGlyph glyph = GetGlyphIndex(cp);
+            FontSource source = _sources[glyph.SourceIndex];
             byte[]? bmp = IsLcd
-                ? _font.RasterizeGlyphLcd(glyphIndex, _fontScale, out int w, out int h, out int ox, out int oy)
-                : _font.RasterizeGlyph(glyphIndex, _fontScale, out w, out h, out ox, out oy);
-            var m = _font.GetScaledGlyphMetrics(glyphIndex, _fontScale);
+                ? source.Font.RasterizeGlyphLcd(glyph.GlyphIndex, source.FontScale, out int w, out int h, out int ox, out int oy)
+                : source.Font.RasterizeGlyph(glyph.GlyphIndex, source.FontScale, out w, out h, out ox, out oy);
+            var m = source.Font.GetScaledGlyphMetrics(glyph.GlyphIndex, source.FontScale);
             if (bmp != null && w > 0 && h > 0)
-                entries.Add((cp, bmp, w, h, ox, oy, m.AdvanceWidth));
+                entries.Add((cp, bmp, w, h, ox, oy, source.OffsetX, source.OffsetY, m.AdvanceWidth));
             else
-                _glyphs[cp] = new GlyphInfo(0, 0, 0, 0, 0, 0, ox / _rasterScale, oy / _rasterScale,
+                _glyphs[cp] = new GlyphInfo(0, 0, 0, 0, 0, 0,
+                    ox / _rasterScale + source.OffsetX,
+                    oy / _rasterScale + source.OffsetY,
                     m.AdvanceWidth / _rasterScale);
         }
 
@@ -157,7 +169,7 @@ internal sealed class GlyphAtlas
             if (atlas != null)
             {
                 // Build glyph info from placements
-                foreach (var (cp, _, w, h, ox, oy, advance, px, py) in placements!)
+                foreach (var (cp, _, w, h, ox, oy, offsetX, offsetY, advance, px, py) in placements!)
                 {
                     float u0 = (float)px / atlasW;
                     float v0 = (float)py / atlasH;
@@ -167,8 +179,8 @@ internal sealed class GlyphAtlas
                         u0, v0, u1, v1,
                         w / _rasterScale,
                         h / _rasterScale,
-                        ox / _rasterScale,
-                        oy / _rasterScale,
+                        ox / _rasterScale + offsetX,
+                        oy / _rasterScale + offsetY,
                         advance / _rasterScale);
                 }
                 break;
@@ -190,23 +202,66 @@ internal sealed class GlyphAtlas
         if (_kernAdvances.TryGetValue(key, out float advance))
             return advance;
 
-        int g1 = GetGlyphIndex(cp1);
-        int g2 = GetGlyphIndex(cp2);
-        advance = g1 == 0 || g2 == 0 ? 0f : _font.GetKernAdvance(g1, g2) * _logicalScale;
+        ResolvedGlyph g1 = GetGlyphIndex(cp1);
+        ResolvedGlyph g2 = GetGlyphIndex(cp2);
+        advance = g1.GlyphIndex == 0 || g2.GlyphIndex == 0 || g1.SourceIndex != g2.SourceIndex
+            ? 0f
+            : _sources[g1.SourceIndex].Font.GetKernAdvance(g1.GlyphIndex, g2.GlyphIndex) * _sources[g1.SourceIndex].LogicalScale;
         _kernAdvances[key] = advance;
         return advance;
     }
 
     public FontVMetrics GetScaledVMetrics() => _scaledVMetrics;
 
-    private int GetGlyphIndex(int codepoint)
+    private ResolvedGlyph GetGlyphIndex(int codepoint)
     {
-        if (_glyphIndices.TryGetValue(codepoint, out int glyphIndex))
-            return glyphIndex;
+        if (_glyphIndices.TryGetValue(codepoint, out ResolvedGlyph glyph))
+            return glyph;
 
-        glyphIndex = _font.FindGlyphIndex(codepoint);
-        _glyphIndices[codepoint] = glyphIndex;
-        return glyphIndex;
+        for (int i = 0; i < _sources.Length; i++)
+        {
+            int glyphIndex = _sources[i].Font.FindGlyphIndex(codepoint);
+            if (glyphIndex != 0)
+            {
+                glyph = new ResolvedGlyph(i, glyphIndex);
+                _glyphIndices[codepoint] = glyph;
+                return glyph;
+            }
+        }
+
+        glyph = new ResolvedGlyph(0, 0);
+        _glyphIndices[codepoint] = glyph;
+        return glyph;
+    }
+
+    private readonly struct FontSource
+    {
+        public readonly TrueTypeFont Font;
+        public readonly float FontScale;
+        public readonly float LogicalScale;
+        public readonly float OffsetX;
+        public readonly float OffsetY;
+
+        public FontSource(TrueTypeFont font, float fontScale, float logicalScale, float offsetX, float offsetY)
+        {
+            Font = font;
+            FontScale = fontScale;
+            LogicalScale = logicalScale;
+            OffsetX = offsetX;
+            OffsetY = offsetY;
+        }
+    }
+
+    private readonly struct ResolvedGlyph
+    {
+        public readonly int SourceIndex;
+        public readonly int GlyphIndex;
+
+        public ResolvedGlyph(int sourceIndex, int glyphIndex)
+        {
+            SourceIndex = sourceIndex;
+            GlyphIndex = glyphIndex;
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -214,10 +269,10 @@ internal sealed class GlyphAtlas
     // -------------------------------------------------------------------------
 
     private static byte[]? TryPack(
-        List<(int cp, byte[] bmp, int w, int h, int ox, int oy, float advance)> entries,
+        List<(int cp, byte[] bmp, int w, int h, int ox, int oy, float offsetX, float offsetY, float advance)> entries,
         int atlasW, int padding, bool lcd,
         out int atlasH,
-        out List<(int cp, byte[] bmp, int w, int h, int ox, int oy, float advance, int px, int py)>? placements)
+        out List<(int cp, byte[] bmp, int w, int h, int ox, int oy, float offsetX, float offsetY, float advance, int px, int py)>? placements)
     {
         placements = new();
         int curX = padding, curY = padding, rowH = 0;
@@ -231,7 +286,7 @@ internal sealed class GlyphAtlas
                 rowH = 0;
             }
             if (e.h > rowH) rowH = e.h;
-            placements.Add((e.cp, e.bmp, e.w, e.h, e.ox, e.oy, e.advance, curX, curY));
+            placements.Add((e.cp, e.bmp, e.w, e.h, e.ox, e.oy, e.offsetX, e.offsetY, e.advance, curX, curY));
             curX += e.w + padding;
         }
 
@@ -244,7 +299,7 @@ internal sealed class GlyphAtlas
         }
 
         byte[] rgba = new byte[atlasW * atlasH * 4];
-        foreach (var (_, bmp, w, h, _, _, _, px, py) in placements)
+        foreach (var (_, bmp, w, h, _, _, _, _, _, px, py) in placements)
         {
             for (int y = 0; y < h; y++)
             for (int x = 0; x < w; x++)

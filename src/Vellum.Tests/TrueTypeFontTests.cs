@@ -23,6 +23,40 @@ public sealed class TrueTypeFontTests
     }
 
     [Fact]
+    public void MaterialSymbols_Resolves_Known_Icon_Codepoint()
+    {
+        Assert.NotEqual(0, UiFonts.MaterialSymbols.FindGlyphIndex(MaterialSymbols.Home[0]));
+        Assert.NotEqual(0, UiFonts.MaterialSymbols.FindGlyphIndex(MaterialSymbols.AvgTime[0]));
+    }
+
+    [Fact]
+    public void MaterialSymbols_Constants_Resolve_In_Bundled_Font()
+    {
+        var constants = typeof(MaterialSymbols)
+            .GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)
+            .Where(field => field.IsLiteral && field.FieldType == typeof(string))
+            .ToArray();
+
+        Assert.Same(UiFonts.MaterialSymbols, MaterialSymbols.Font);
+        Assert.True(constants.Length > 4000);
+        Assert.NotEqual(0, MaterialSymbols.Font.FindGlyphIndex(MaterialSymbols.Home[0]));
+        Assert.NotEqual(0, MaterialSymbols.Font.FindGlyphIndex(MaterialSymbols.Search[0]));
+        Assert.NotEqual(0, MaterialSymbols.Font.FindGlyphIndex(MaterialSymbols.Settings[0]));
+        Assert.NotEqual(0, MaterialSymbols.Font.FindGlyphIndex(MaterialSymbols.AvgTime[0]));
+    }
+
+    [Fact]
+    public void UiFont_Merge_Resolves_Fallback_Codepoint()
+    {
+        int home = MaterialSymbols.Home[0];
+        Assert.Equal(0, UiFonts.DefaultSans.FindGlyphIndex(home));
+
+        UiFont merged = UiFont.Merge(UiFonts.DefaultSans, UiFonts.MaterialSymbols);
+
+        Assert.NotEqual(0, merged.FindGlyphIndex(home));
+    }
+
+    [Fact]
     public void GetScaledGlyphMetrics_Scales_AdvanceWidth()
     {
         int glyphIndex = Font.FindGlyphIndex('A');

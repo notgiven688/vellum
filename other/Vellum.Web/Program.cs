@@ -68,6 +68,9 @@ public partial class Application
         s_checkerTexture = s_renderer.CreateTexture(CreateCheckerRgba(), 16, 16);
         s_ui = new Ui(s_renderer)
         {
+            FontStack = UiFont.Merge(
+                UiFont.Source(UiFonts.DefaultSans),
+                UiFont.Source(MaterialSymbols.Font, offsetY: 4f)),
             DefaultFontSize = 18f,
             Lcd = true,
             Platform = new RaylibUiPlatform()
@@ -375,7 +378,7 @@ static Response DrawHeaderPanel(Ui host, DemoState state, bool wideLayout)
     {
         DemoState state = context.State;
 
-        header.Heading("Vellum Web");
+        header.Heading($"{MaterialSymbols.Dashboard} Vellum Web");
         header.Label(
             "A compact immediate-mode dashboard with framed sections, popups, keyboard navigation, and custom painting.",
             color: header.Theme.TextSecondary,
@@ -457,25 +460,25 @@ static void DrawQuickActions(Ui panel, DemoState state)
     {
         using (panel.Row())
         {
-            if (panel.Button("Click me", width: rowWidth).Clicked) state.ClickCount++;
-            if (panel.Button("Reset", width: rowWidth).Clicked) state.ClickCount = 0;
+            if (panel.Button($"{MaterialSymbols.Bolt} Click me", width: rowWidth).Clicked) state.ClickCount++;
+            if (panel.Button($"{MaterialSymbols.Refresh} Reset", width: rowWidth).Clicked) state.ClickCount = 0;
         }
 
         using (panel.Row())
         {
-            if (panel.Button("Focus name", width: rowWidth).Clicked)
+            if (panel.Button($"{MaterialSymbols.Person} Focus name", width: rowWidth).Clicked)
                 panel.RequestFocus(UiWidgetKind.TextField, "name");
 
-            state.QuickMenuButton = panel.Button("Quick menu", width: rowWidth);
+            state.QuickMenuButton = panel.Button($"{MaterialSymbols.Menu} Quick menu", width: rowWidth);
         }
     }
     else
     {
-        if (panel.Button("Click me", width: panel.AvailableWidth).Clicked) state.ClickCount++;
-        if (panel.Button("Reset", width: panel.AvailableWidth).Clicked) state.ClickCount = 0;
-        if (panel.Button("Focus name", width: panel.AvailableWidth).Clicked)
+        if (panel.Button($"{MaterialSymbols.Bolt} Click me", width: panel.AvailableWidth).Clicked) state.ClickCount++;
+        if (panel.Button($"{MaterialSymbols.Refresh} Reset", width: panel.AvailableWidth).Clicked) state.ClickCount = 0;
+        if (panel.Button($"{MaterialSymbols.Person} Focus name", width: panel.AvailableWidth).Clicked)
             panel.RequestFocus(UiWidgetKind.TextField, "name");
-        state.QuickMenuButton = panel.Button("Quick menu", width: panel.AvailableWidth);
+        state.QuickMenuButton = panel.Button($"{MaterialSymbols.Menu} Quick menu", width: panel.AvailableWidth);
     }
 
     if (state.QuickMenuButton.Clicked)
@@ -495,6 +498,17 @@ static void DrawQuickActions(Ui panel, DemoState state)
     }
 }
 
+static void DrawIconFontPreview(Ui panel)
+{
+    panel.Label("Merged icon font", color: panel.Theme.TextSecondary);
+    panel.Label(
+        $"{MaterialSymbols.Home}  {MaterialSymbols.Search}  {MaterialSymbols.Settings}  {MaterialSymbols.Favorite}  {MaterialSymbols.Add}",
+        size: panel.DefaultFontSize * 1.35f,
+        color: panel.Theme.Accent,
+        maxWidth: panel.AvailableWidth,
+        wrap: TextWrapMode.NoWrap);
+}
+
 static void DrawSettingsPanel(Ui host, DemoState state, int checkerTexture)
 {
     host.Panel(host.AvailableWidth, (State: state, CheckerTexture: checkerTexture), static (panel, context) =>
@@ -502,6 +516,8 @@ static void DrawSettingsPanel(Ui host, DemoState state, int checkerTexture)
         DemoState state = context.State;
 
         PanelTitle(panel, "Controls", "Toggles, selection widgets, color editing, and a small texture preview.");
+        DrawIconFontPreview(panel);
+        panel.Separator();
         panel.Checkbox("Enable notifications", ref state.NotificationsEnabled, width: panel.AvailableWidth);
         panel.Checkbox("Enable analytics", ref state.AnalyticsEnabled, width: panel.AvailableWidth);
         panel.Separator();

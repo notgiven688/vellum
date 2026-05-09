@@ -4,13 +4,15 @@
     <InternalsVisibleTo Include="Vellum.Tests" />
     <EmbeddedResource Include="_package\JetBrainsMono-Regular.ttf"
                       LogicalName="Vellum.Assets.Fonts.JetBrainsMono-Regular.ttf" />
+    <EmbeddedResource Include="_package\MaterialSymbolsOutlined.ttf"
+                      LogicalName="Vellum.Assets.Fonts.MaterialSymbolsOutlined.ttf" />
     <None Include="_package\THIRD-PARTY-NOTICES.txt"
           Pack="true"
           PackagePath="" />
     <None Include="_package\README.md"
           Pack="true"
           PackagePath="" />
-    <None Include="_package\LICENSE"
+    <None Include="_package\LICENSE.txt"
           Pack="true"
           PackagePath="" />
   </ItemGroup>
@@ -27,7 +29,7 @@
     <RepositoryUrl>https://github.com/notgiven688/vellum.git</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageLicenseFile>LICENSE</PackageLicenseFile>
+    <PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
   </PropertyGroup>
 
 </Project>

@@ -10,6 +10,10 @@ Vellum currently supports:
 
 - loading TrueType fonts from bytes or files with `TrueTypeFont`;
 - an embedded default sans font via `UiFonts.DefaultSans`;
+- an embedded Google Material Symbols Outlined font via `UiFonts.MaterialSymbols` and `MaterialSymbols.Font`;
+- generated Material Symbols glyph string constants such as `MaterialSymbols.Home`;
+- merged font stacks via `Ui.FontStack`, `UiFont.Merge(...)`, and `UiFont.Source(...)`;
+- first-match codepoint fallback across merged font sources;
 - Unicode text enumeration by scalar value;
 - glyph lookup through TrueType `cmap` format 4 and 12 tables;
 - simple and composite glyph outlines;
@@ -32,7 +36,9 @@ Vellum does not currently implement:
 - OpenType shaping;
 - ligatures;
 - contextual substitutions;
-- glyph fallback across multiple fonts;
+- OpenType icon ligature name resolution;
+- automatic platform font fallback;
+- cross-font kerning in merged font stacks;
 - emoji color fonts;
 - vertical text;
 - platform IME composition;
@@ -43,13 +49,25 @@ For scripts that require shaping or bidi handling, text may display as individua
 
 ## Font API Boundary
 
-Most applications should only set a font on `Ui`:
+Most applications should set either a single font or a merged font stack on `Ui`:
 
 ```csharp
 ui.Font = TrueTypeFont.FromFile("Inter-Regular.ttf");
 ```
 
-`TrueTypeFont`, `GlyphMetrics`, `ScaledGlyphMetrics`, and `FontVMetrics` are public as advanced font API. They are useful when an application wants to inspect metrics, rasterize glyphs directly, or build custom diagnostics.
+```csharp
+ui.FontStack = UiFont.Merge(
+    UiFont.Source(UiFonts.DefaultSans),
+    UiFont.Source(MaterialSymbols.Font, offsetY: 4f));
+```
+
+`Ui.FontStack` takes precedence over `Ui.Font` when both are set. Use the generated Material Symbols constants when drawing icon glyphs:
+
+```csharp
+root.Button($"{MaterialSymbols.Home} Home");
+```
+
+`TrueTypeFont`, `UiFont`, `UiFontSource`, `UiFonts`, `MaterialSymbols`, `GlyphMetrics`, `ScaledGlyphMetrics`, and `FontVMetrics` are public as advanced font API. They are useful when an application wants to inspect metrics, rasterize glyphs directly, tune fallback font placement, or build custom diagnostics.
 
 Font table parsing, outline loading, rasterization internals, and glyph atlas construction are internal implementation details.
 

@@ -1,4 +1,21 @@
-Vellum MIT License
+Vellum License
+==============
+
+The Vellum library code is licensed under the MIT License below.
+
+This repository and the VellumUI package also include bundled third-party
+assets and attribution notices:
+
+- JetBrains Mono Regular: SIL Open Font License 1.1
+- Material Symbols Outlined font and generated icon constants: Apache License 2.0
+- stb_truetype.h implementation reference: public domain or MIT License
+
+Full package license text is available in src/Vellum/_package/LICENSE.txt.
+Third-party attribution is available in src/Vellum/_package/THIRD-PARTY-NOTICES.txt.
+
+
+MIT License
+-----------
 
 Copyright (c) Thorben Linneweber and contributors
 

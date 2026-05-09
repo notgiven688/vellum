@@ -76,6 +76,6 @@ ui.Frame(width, height, mouse, input, root =>
 });
 ```
 
-Vellum includes a lightweight TrueType loader, glyph rasterizer, atlas manager, and default embedded font. Custom fonts can be assigned with `TrueTypeFont.FromFile(...)`.
+Vellum includes a lightweight TrueType loader, glyph rasterizer, atlas manager, a default embedded text font, and a bundled Material Symbols Outlined font exposed as `UiFonts.MaterialSymbols` and `MaterialSymbols.Font`. Custom fonts can be assigned with `TrueTypeFont.FromFile(...)`; merged fallback stacks can be assigned with `UiFont.Merge(...)` and tuned with `UiFont.Source(...)`.
 
 Implement `IRenderer` to connect Vellum to your graphics backend.

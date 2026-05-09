@@ -47,12 +47,15 @@ This is public because `IRenderer.Render` receives a `RenderList`. Backend types
 The font API is public for applications that want to load a custom TrueType font or inspect/rasterize glyphs directly:
 
 - `TrueTypeFont`
+- `UiFont`
+- `UiFontSource`
 - `UiFonts`
+- `MaterialSymbols`
 - `GlyphMetrics`
 - `ScaledGlyphMetrics`
 - `FontVMetrics`
 
-Most applications only need `Ui.Font = TrueTypeFont.FromFile(...)` or `UiFonts.DefaultSans`. Direct glyph metrics and rasterization are advanced use cases.
+Most applications only need `Ui.Font = TrueTypeFont.FromFile(...)`, `UiFonts.DefaultSans`, or `Ui.FontStack = UiFont.Merge(...)` for fallback/icon fonts. Direct glyph metrics and rasterization are advanced use cases.
 
 ## Internal Implementation
 

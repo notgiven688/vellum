@@ -91,6 +91,9 @@ internal sealed class OpenTkDemoWindow : GameWindow
         _ui = new Ui(_renderer)
         {
             Platform = new OpenTkUiPlatform(this),
+            FontStack = UiFont.Merge(
+                UiFont.Source(UiFonts.DefaultSans),
+                UiFont.Source(MaterialSymbols.Font, offsetY: 4f)),
             DefaultFontSize = 18f,
             Lcd = true
         };
